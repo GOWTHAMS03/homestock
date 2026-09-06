@@ -12,6 +12,12 @@ class StoreModel {
       location: json['location'],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'location': location,
+  };
 }
 
 class PurchaseItemModel {
@@ -47,6 +53,17 @@ class PurchaseItemModel {
       totalPrice: (json['totalPrice'] as num?)?.toDouble() ?? 0.0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'inventoryItemId': inventoryItemId,
+    'itemName': itemName,
+    'categoryName': categoryName,
+    'quantity': quantity,
+    'unit': unit,
+    'unitPrice': unitPrice,
+    'totalPrice': totalPrice,
+  };
 }
 
 class PurchaseModel {
@@ -83,4 +100,15 @@ class PurchaseModel {
       items: rawItems.map((i) => PurchaseItemModel.fromJson(i)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'storeName': storeName,
+    'recordedByName': recordedByName,
+    'purchaseDate': purchaseDate,
+    'totalAmount': totalAmount,
+    'currency': currency,
+    'notes': notes,
+    'items': items.map((i) => i.toJson()).toList(),
+  };
 }

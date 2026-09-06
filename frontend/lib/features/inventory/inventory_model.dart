@@ -75,6 +75,30 @@ class InventoryItemModel {
   bool get isLowStock => stockStatus == 'LOW_STOCK';
   bool get isExpiringSoon => expiryStatus == 'EXPIRING_SOON';
   bool get isExpired => expiryStatus == 'EXPIRED';
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'homeId': homeId,
+    'categoryId': categoryId,
+    'categoryName': categoryName,
+    'categoryIcon': categoryIcon,
+    'categoryColor': categoryColor,
+    'name': name,
+    'brand': brand,
+    'quantity': quantity,
+    'unit': unit,
+    'minimumQuantity': minimumQuantity,
+    'maximumQuantity': maximumQuantity,
+    'storageLocation': storageLocation,
+    'purchasePrice': purchasePrice,
+    'purchaseDate': purchaseDate,
+    'expiryDate': expiryDate,
+    'imageUrl': imageUrl,
+    'notes': notes,
+    'stockStatus': stockStatus,
+    'expiryStatus': expiryStatus,
+    'daysUntilExpiry': daysUntilExpiry,
+  };
 }
 
 class StockTransactionModel {
@@ -119,4 +143,18 @@ class StockTransactionModel {
       createdAt: json['createdAt'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'itemId': itemId,
+    'itemName': itemName,
+    'userName': userName,
+    'transactionType': transactionType,
+    'quantityChange': quantityChange,
+    'previousQuantity': previousQuantity,
+    'newQuantity': newQuantity,
+    'unit': unit,
+    'reason': reason,
+    'createdAt': createdAt,
+  };
 }

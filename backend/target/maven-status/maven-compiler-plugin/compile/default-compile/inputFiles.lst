@@ -23,6 +23,7 @@ D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\analytics\dto
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\analytics\service\AnalyticsService.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\auth\controller\AuthController.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\auth\dto\AuthResponse.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\auth\dto\InviteLoginRequest.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\auth\dto\LoginRequest.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\auth\dto\RefreshTokenRequest.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\auth\dto\RegisterRequest.java

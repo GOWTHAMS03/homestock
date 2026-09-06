@@ -37,6 +37,13 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Login successful", response));
     }
 
+    @PostMapping("/invite-login")
+    @Operation(summary = "Join or log in to a household using an invite code and name")
+    public ResponseEntity<ApiResponse<AuthResponse>> loginWithInviteCode(@Valid @RequestBody com.homestock.modules.auth.dto.InviteLoginRequest request) {
+        AuthResponse response = authService.loginWithInviteCode(request);
+        return ResponseEntity.ok(ApiResponse.success("Joined household successfully", response));
+    }
+
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token using refresh token")
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {

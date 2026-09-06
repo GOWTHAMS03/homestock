@@ -28,6 +28,15 @@ class CategoryModel {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'homeId': homeId,
+    'name': name,
+    'icon': icon,
+    'colorHex': colorHex,
+    'displayOrder': displayOrder,
+  };
+
   Color get color {
     try {
       final hex = colorHex.replaceAll('#', '');

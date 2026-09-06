@@ -37,6 +37,19 @@ class NeedsAttentionModel {
       reasonMessage: json['reasonMessage'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'itemId': itemId,
+    'name': name,
+    'categoryName': categoryName,
+    'quantity': quantity,
+    'unit': unit,
+    'stockStatus': stockStatus,
+    'expiryStatus': expiryStatus,
+    'expiryDate': expiryDate,
+    'daysUntilExpiry': daysUntilExpiry,
+    'reasonMessage': reasonMessage,
+  };
 }
 
 class DashboardSummaryModel {
@@ -70,6 +83,16 @@ class DashboardSummaryModel {
       needsAttention: rawAttention.map((i) => NeedsAttentionModel.fromJson(i)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'homeName': homeName,
+    'totalInventoryItems': totalInventoryItems,
+    'lowStockCount': lowStockCount,
+    'outOfStockCount': outOfStockCount,
+    'pendingShoppingCount': pendingShoppingCount,
+    'expiringSoonCount': expiringSoonCount,
+    'needsAttention': needsAttention.map((i) => i.toJson()).toList(),
+  };
 }
 
 class RecommendationModel {
@@ -102,6 +125,16 @@ class RecommendationModel {
       rationale: json['rationale'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'itemId': itemId,
+    'name': name,
+    'categoryName': categoryName,
+    'currentQuantity': currentQuantity,
+    'recommendedQuantity': recommendedQuantity,
+    'unit': unit,
+    'rationale': rationale,
+  };
 }
 
 class WhatDoINeedModel {
@@ -126,4 +159,10 @@ class WhatDoINeedModel {
       optional: rawOptional.map((i) => RecommendationModel.fromJson(i)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'urgent': urgent.map((i) => i.toJson()).toList(),
+    'soon': soon.map((i) => i.toJson()).toList(),
+    'optional': optional.map((i) => i.toJson()).toList(),
+  };
 }
