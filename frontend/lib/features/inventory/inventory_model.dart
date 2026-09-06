@@ -1,0 +1,122 @@
+class InventoryItemModel {
+  final String id;
+  final String homeId;
+  final String? categoryId;
+  final String categoryName;
+  final String categoryIcon;
+  final String categoryColor;
+  final String name;
+  final String? brand;
+  final double quantity;
+  final String unit;
+  final double minimumQuantity;
+  final double? maximumQuantity;
+  final String? storageLocation;
+  final double? purchasePrice;
+  final String? purchaseDate;
+  final String? expiryDate;
+  final String? imageUrl;
+  final String? notes;
+  final String stockStatus; // IN_STOCK, LOW_STOCK, OUT_OF_STOCK
+  final String expiryStatus; // SAFE, EXPIRING_SOON, EXPIRED
+  final int? daysUntilExpiry;
+
+  InventoryItemModel({
+    required this.id,
+    required this.homeId,
+    this.categoryId,
+    required this.categoryName,
+    required this.categoryIcon,
+    required this.categoryColor,
+    required this.name,
+    this.brand,
+    required this.quantity,
+    required this.unit,
+    required this.minimumQuantity,
+    this.maximumQuantity,
+    this.storageLocation,
+    this.purchasePrice,
+    this.purchaseDate,
+    this.expiryDate,
+    this.imageUrl,
+    this.notes,
+    required this.stockStatus,
+    required this.expiryStatus,
+    this.daysUntilExpiry,
+  });
+
+  factory InventoryItemModel.fromJson(Map<String, dynamic> json) {
+    return InventoryItemModel(
+      id: json['id'] ?? '',
+      homeId: json['homeId'] ?? '',
+      categoryId: json['categoryId'],
+      categoryName: json['categoryName'] ?? 'General',
+      categoryIcon: json['categoryIcon'] ?? 'category',
+      categoryColor: json['categoryColor'] ?? '#6366F1',
+      name: json['name'] ?? '',
+      brand: json['brand'],
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
+      unit: json['unit'] ?? 'pcs',
+      minimumQuantity: (json['minimumQuantity'] as num?)?.toDouble() ?? 1.0,
+      maximumQuantity: (json['maximumQuantity'] as num?)?.toDouble(),
+      storageLocation: json['storageLocation'],
+      purchasePrice: (json['purchasePrice'] as num?)?.toDouble(),
+      purchaseDate: json['purchaseDate'],
+      expiryDate: json['expiryDate'],
+      imageUrl: json['imageUrl'],
+      notes: json['notes'],
+      stockStatus: json['stockStatus'] ?? 'IN_STOCK',
+      expiryStatus: json['expiryStatus'] ?? 'SAFE',
+      daysUntilExpiry: json['daysUntilExpiry'] as int?,
+    );
+  }
+
+  bool get isOutOfStock => stockStatus == 'OUT_OF_STOCK' || quantity == 0;
+  bool get isLowStock => stockStatus == 'LOW_STOCK';
+  bool get isExpiringSoon => expiryStatus == 'EXPIRING_SOON';
+  bool get isExpired => expiryStatus == 'EXPIRED';
+}
+
+class StockTransactionModel {
+  final String id;
+  final String itemId;
+  final String itemName;
+  final String userName;
+  final String transactionType;
+  final double quantityChange;
+  final double previousQuantity;
+  final double newQuantity;
+  final String unit;
+  final String? reason;
+  final String createdAt;
+
+  StockTransactionModel({
+    required this.id,
+    required this.itemId,
+    required this.itemName,
+    required this.userName,
+    required this.transactionType,
+    required this.quantityChange,
+    required this.previousQuantity,
+    required this.newQuantity,
+    required this.unit,
+    this.reason,
+    required this.createdAt,
+  });
+
+  factory StockTransactionModel.fromJson(Map<String, dynamic> json) {
+    return StockTransactionModel(
+      id: json['id'] ?? '',
+      itemId: json['itemId'] ?? '',
+      itemName: json['itemName'] ?? '',
+      userName: json['userName'] ?? '',
+      transactionType: json['transactionType'] ?? 'ADJUSTMENT',
+      quantityChange: (json['quantityChange'] as num?)?.toDouble() ?? 0.0,
+      previousQuantity: (json['previousQuantity'] as num?)?.toDouble() ?? 0.0,
+      newQuantity: (json['newQuantity'] as num?)?.toDouble() ?? 0.0,
+      unit: json['unit'] ?? 'pcs',
+      reason: json['reason'],
+      createdAt: json['createdAt'] ?? '',
+    );
+  }
+}

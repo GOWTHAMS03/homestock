@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: homestock-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: ${PORT:8080}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    access-token-expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 hours
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:7776000000} # 90 days (maintained until explicit logout)
+  storage:
+    provider: ${STORAGE_PROVIDER:local} # local or s3
+    local:
+      upload-dir: ${UPLOAD_DIR:./uploads}
+    s3:
+      bucket: ${AWS_S3_BUCKET:homestock-media}
+      region: ${AWS_REGION:us-east-1}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method

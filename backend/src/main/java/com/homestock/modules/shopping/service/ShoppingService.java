@@ -1,0 +1,259 @@
+package com.homestock.modules.shopping.service;
+
+import com.homestock.core.exception.ResourceNotFoundException;
+import com.homestock.core.util.SecurityUtils;
+import com.homestock.modules.category.entity.Category;
+import com.homestock.modules.category.repository.CategoryRepository;
+import com.homestock.modules.home.entity.Home;
+import com.homestock.modules.home.repository.HomeRepository;
+import com.homestock.modules.inventory.entity.InventoryItem;
+import com.homestock.modules.inventory.repository.InventoryItemRepository;
+import com.homestock.modules.notification.entity.NotificationType;
+import com.homestock.modules.notification.service.NotificationService;
+import com.homestock.modules.shopping.dto.CreateShoppingItemRequest;
+import com.homestock.modules.shopping.dto.ShoppingListDto;
+import com.homestock.modules.shopping.dto.ShoppingListItemDto;
+import com.homestock.modules.shopping.dto.UpdateShoppingItemRequest;
+import com.homestock.modules.shopping.entity.ShoppingList;
+import com.homestock.modules.shopping.entity.ShoppingListItem;
+import com.homestock.modules.shopping.repository.ShoppingListItemRepository;
+import com.homestock.modules.shopping.repository.ShoppingListRepository;
+import com.homestock.modules.user.entity.User;
+import com.homestock.modules.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ShoppingService {
+
+    private static final Logger log = LoggerFactory.getLogger(ShoppingService.class);
+
+    private final ShoppingListRepository shoppingListRepository;
+    private final ShoppingListItemRepository shoppingListItemRepository;
+    private final HomeRepository homeRepository;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
+    private final InventoryItemRepository inventoryItemRepository;
+    private final NotificationService notificationService;
+
+    @Transactional
+    public ShoppingList getOrCreateDefaultListEntity(Home home) {
+        return shoppingListRepository.findByHomeIdAndIsDefaultTrue(home.getId())
+                .orElseGet(() -> {
+                    ShoppingList newList = ShoppingList.builder()
+                            .home(home)
+                            .name("Main Shopping List")
+                            .isDefault(true)
+                            .build();
+                    return shoppingListRepository.save(newList);
+                });
+    }
+
+    @Transactional
+    public ShoppingListDto getDefaultShoppingList(UUID homeId) {
+        Home home = homeRepository.findById(homeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
+
+        ShoppingList list = getOrCreateDefaultListEntity(home);
+        List<ShoppingListItem> entities = shoppingListItemRepository
+                .findAllByShoppingListIdOrderByIsCompletedAscCreatedAtDesc(list.getId());
+
+        List<ShoppingListItemDto> dtos = entities.stream()
+                .map(ShoppingListItemDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return ShoppingListDto.fromEntity(list, dtos);
+    }
+
+    @Transactional
+    public ShoppingListItemDto addItem(UUID homeId, UUID listId, CreateShoppingItemRequest request) {
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
+
+        InventoryItem linkedItem = null;
+        if (request.getInventoryItemId() != null) {
+            linkedItem = inventoryItemRepository.findByIdAndHomeId(request.getInventoryItemId(), homeId)
+                    .orElse(null);
+        }
+
+        Category category = null;
+        if (request.getCategoryId() != null) {
+            category = categoryRepository.findById(request.getCategoryId()).orElse(null);
+        } else if (linkedItem != null && linkedItem.getCategory() != null) {
+            category = linkedItem.getCategory();
+        }
+
+        ShoppingListItem item = ShoppingListItem.builder()
+                .shoppingList(list)
+                .inventoryItem(linkedItem)
+                .itemName(request.getItemName().trim())
+                .category(category)
+                .quantity(request.getQuantity())
+                .unit(request.getUnit() != null ? request.getUnit().trim() : "pcs")
+                .isCompleted(false)
+                .isAutoGenerated(false)
+                .addedBy(currentUser)
+                .notes(request.getNotes())
+                .build();
+
+        ShoppingListItem saved = shoppingListItemRepository.save(item);
+
+        // Notify family members
+        notificationService.notifyHomeMembers(
+                list.getHome(),
+                currentUser,
+                NotificationType.SHOPPING_LIST_UPDATE,
+                "New item added to shopping list",
+                currentUser.getFullName() + " added " + item.getItemName() + " (" + item.getQuantity() + " " + item.getUnit() + ")",
+                "{\"shoppingItemId\":\"" + saved.getId() + "\"}"
+        );
+
+        return ShoppingListItemDto.fromEntity(saved);
+    }
+
+    @Transactional
+    public ShoppingListItemDto updateItem(UUID homeId, UUID listId, UUID itemId, UpdateShoppingItemRequest request) {
+        ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
+
+        ShoppingListItem item = shoppingListItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping item not found"));
+
+        if (!item.getShoppingList().getId().equals(list.getId())) {
+            throw new ResourceNotFoundException("Shopping item does not belong to this list");
+        }
+
+        item.setItemName(request.getItemName().trim());
+        item.setQuantity(request.getQuantity());
+        if (request.getUnit() != null) item.setUnit(request.getUnit().trim());
+        if (request.getNotes() != null) item.setNotes(request.getNotes());
+
+        if (request.getCategoryId() != null) {
+            categoryRepository.findById(request.getCategoryId()).ifPresent(item::setCategory);
+        }
+
+        return ShoppingListItemDto.fromEntity(shoppingListItemRepository.save(item));
+    }
+
+    @Transactional
+    public ShoppingListItemDto toggleItem(UUID homeId, UUID listId, UUID itemId) {
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
+
+        ShoppingListItem item = shoppingListItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping item not found"));
+
+        if (!item.getShoppingList().getId().equals(list.getId())) {
+            throw new ResourceNotFoundException("Shopping item does not belong to this list");
+        }
+
+        boolean willBeCompleted = !Boolean.TRUE.equals(item.getIsCompleted());
+        item.setIsCompleted(willBeCompleted);
+        if (willBeCompleted) {
+            item.setCompletedBy(currentUser);
+            item.setCompletedAt(Instant.now());
+        } else {
+            item.setCompletedBy(null);
+            item.setCompletedAt(null);
+        }
+
+        return ShoppingListItemDto.fromEntity(shoppingListItemRepository.save(item));
+    }
+
+    @Transactional
+    public void deleteItem(UUID homeId, UUID listId, UUID itemId) {
+        ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
+
+        ShoppingListItem item = shoppingListItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping item not found"));
+
+        if (!item.getShoppingList().getId().equals(list.getId())) {
+            throw new ResourceNotFoundException("Shopping item does not belong to this list");
+        }
+
+        shoppingListItemRepository.delete(item);
+    }
+
+    @Transactional
+    public void clearCompleted(UUID homeId, UUID listId) {
+        shoppingListRepository.findByIdAndHomeId(listId, homeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
+
+        shoppingListItemRepository.deleteAllCompletedByShoppingListId(listId);
+    }
+
+    /**
+     * Automatic Low Stock Hook:
+     * When inventory quantity <= minimum quantity, auto-add item to shopping list if not already present.
+     */
+    @Transactional
+    public void handleAutoLowStock(Home home, InventoryItem inventoryItem, User actor) {
+        ShoppingList defaultList = getOrCreateDefaultListEntity(home);
+
+        // Check if item is already in shopping list (uncompleted)
+        Optional<ShoppingListItem> existingActive = shoppingListItemRepository
+                .findActiveItemByInventoryItemId(defaultList.getId(), inventoryItem.getId());
+
+        if (existingActive.isPresent()) {
+            log.debug("Item {} already on shopping list, skipping duplicate auto-add.", inventoryItem.getName());
+            return;
+        }
+
+        BigDecimal neededQuantity;
+        if (inventoryItem.getMaximumQuantity() != null && inventoryItem.getMaximumQuantity().compareTo(inventoryItem.getQuantity()) > 0) {
+            neededQuantity = inventoryItem.getMaximumQuantity().subtract(inventoryItem.getQuantity());
+        } else {
+            neededQuantity = inventoryItem.getMinimumQuantity().multiply(BigDecimal.valueOf(2));
+            if (neededQuantity.compareTo(BigDecimal.ZERO) == 0) {
+                neededQuantity = BigDecimal.ONE;
+            }
+        }
+
+        ShoppingListItem autoItem = ShoppingListItem.builder()
+                .shoppingList(defaultList)
+                .inventoryItem(inventoryItem)
+                .itemName(inventoryItem.getName())
+                .category(inventoryItem.getCategory())
+                .quantity(neededQuantity)
+                .unit(inventoryItem.getUnit())
+                .isCompleted(false)
+                .isAutoGenerated(true)
+                .addedBy(actor != null ? actor : home.getCreatedBy())
+                .notes("Auto-added: Low stock threshold reached")
+                .build();
+
+        shoppingListItemRepository.save(autoItem);
+        log.info("Auto-added low stock item '{}' to shopping list for home '{}'", inventoryItem.getName(), home.getName());
+
+        // Send Low Stock Notification
+        String stockMsg = inventoryItem.getQuantity().compareTo(BigDecimal.ZERO) == 0 ? "is out of stock!" : "is running low (" + inventoryItem.getQuantity() + " " + inventoryItem.getUnit() + " remaining).";
+        notificationService.notifyHomeMembers(
+                home,
+                null,
+                inventoryItem.getQuantity().compareTo(BigDecimal.ZERO) == 0 ? NotificationType.OUT_OF_STOCK : NotificationType.LOW_STOCK,
+                inventoryItem.getName() + " " + (inventoryItem.getQuantity().compareTo(BigDecimal.ZERO) == 0 ? "Out of Stock" : "Low Stock"),
+                inventoryItem.getName() + " " + stockMsg + " Added to shopping list.",
+                "{\"itemId\":\"" + inventoryItem.getId() + "\"}"
+        );
+    }
+}

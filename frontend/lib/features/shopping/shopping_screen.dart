@@ -1,0 +1,271 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/empty_state_view.dart';
+import '../../core/widgets/section_header.dart';
+import '../../core/widgets/skeleton_loader.dart';
+import '../purchase/add_purchase_screen.dart';
+import 'add_shopping_item_dialog.dart';
+import 'shopping_controller.dart';
+import 'shopping_model.dart';
+
+class ShoppingScreen extends ConsumerWidget {
+  const ShoppingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final shoppingState = ref.watch(shoppingControllerProvider);
+    final list = shoppingState.list;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Shared Shopping List'),
+        actions: [
+          if (list != null && list.completedCount > 0)
+            TextButton(
+              onPressed: () => ref.read(shoppingControllerProvider.notifier).clearCompleted(),
+              child: const Text('Clear Checked', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+            ),
+        ],
+      ),
+      body: shoppingState.isLoading
+          ? ListView.separated(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              itemCount: 6,
+              separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
+              itemBuilder: (context, index) => const SkeletonItemCard(),
+            )
+          : (list == null || list.items.isEmpty)
+              ? EmptyStateView(
+                  icon: Icons.shopping_bag_outlined,
+                  title: 'Your shopping list is empty',
+                  message: "Looks like you're all set! Items running low in your inventory will also appear here automatically.",
+                  actionLabel: 'Add Item',
+                  onAction: () => AddShoppingItemDialog.show(context),
+                )
+              : RefreshIndicator(
+                  onRefresh: () => ref.read(shoppingControllerProvider.notifier).loadShoppingList(),
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    children: [
+                      // Quick CTA: Record Purchase Direct from Shopping List
+                      if (list.pendingCount > 0)
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.receipt_long_rounded, color: AppColors.primary),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${list.pendingCount} item(s) to buy',
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                    ),
+                                    const Text(
+                                      'Record receipt to automatically restock your inventory',
+                                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                height: 38,
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
+                                  ),
+                                  child: const Text('Record', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // Pending Items (Checkbox with strike-through)
+                      ...list.items.where((i) => !i.isCompleted).map((item) => _buildShoppingItemTile(context, ref, item)),
+
+                      // Completed Items section
+                      if (list.completedCount > 0) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        SectionHeader(
+                          title: 'Purchased Items (${list.completedCount})',
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        ...list.items.where((i) => i.isCompleted).map((item) => _buildShoppingItemTile(context, ref, item)),
+                      ],
+                    ],
+                  ),
+                ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => AddShoppingItemDialog.show(context),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700)),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildShoppingItemTile(BuildContext context, WidgetRef ref, ShoppingItemModel item) {
+    return Dismissible(
+      key: Key('shopping_item_${item.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: AppColors.outOfStockBg,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          border: Border.all(color: AppColors.outOfStockBorder),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text('Delete', style: TextStyle(color: AppColors.outOfStockText, fontWeight: FontWeight.w700, fontSize: 13)),
+            SizedBox(width: 8),
+            Icon(Icons.delete_outline_rounded, color: AppColors.outOfStockText, size: 20),
+          ],
+        ),
+      ),
+      onDismissed: (_) {
+        ref.read(shoppingControllerProvider.notifier).deleteItem(item.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${item.itemName} removed from list'),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Undo',
+              textColor: Colors.white,
+              onPressed: () {
+                ref.read(shoppingControllerProvider.notifier).addItem(
+                      inventoryItemId: item.inventoryItemId,
+                      itemName: item.itemName,
+                      categoryId: null,
+                      quantity: item.quantity,
+                      unit: item.unit,
+                    );
+              },
+            ),
+          ),
+        );
+      },
+      child: Card(
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          onTap: () => ref.read(shoppingControllerProvider.notifier).toggleItem(item.id),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                // 1-Tap Checkbox (48dp touch target)
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: Checkbox(
+                      value: item.isCompleted,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      activeColor: AppColors.primary,
+                      onChanged: (_) => ref.read(shoppingControllerProvider.notifier).toggleItem(item.id),
+                    ),
+                  ),
+                ),
+
+                // Item details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.itemName,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                                color: item.isCompleted ? AppColors.textMuted : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (item.isAutoGenerated) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.lowStockBg,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppColors.lowStockBorder, width: 0.6),
+                              ),
+                              child: const Text(
+                                'Auto Low-Stock',
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.lowStockText),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.isCompleted
+                            ? 'Bought by ${item.completedByName ?? 'Family'}'
+                            : 'Added by ${item.addedByName} • ${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: item.isCompleted ? AppColors.inStockText : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Right Quantity Tag
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
+                  child: Text(
+                    '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+
+                // Delete IconButton with min 48dp target
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                    onPressed: () => ref.read(shoppingControllerProvider.notifier).deleteItem(item.id),
+                    tooltip: 'Remove',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
