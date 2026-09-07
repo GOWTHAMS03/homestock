@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
-import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_text_field.dart';
+import '../../core/widgets/homestock/homestock_app_bar.dart';
+import '../../core/widgets/homestock/homestock_card.dart';
 import 'auth_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -38,7 +39,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
           fullName: _nameController.text.trim(),
-          phoneNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          phoneNumber: _phoneController.text.trim().isNotEmpty ? null : _phoneController.text.trim(),
         );
 
     if (success && mounted) {
@@ -51,122 +52,142 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final authState = ref.watch(authControllerProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Create Account'),
+      backgroundColor: const Color(0xFFF6F7F9),
+      appBar: const HomeStockAppBar(
+        title: 'Create Account',
+        subtitle: 'New household member profile',
       ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.lg),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Get started with HomeStock',
+                    '⚡ Get started with HomeStock',
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       color: AppColors.textPrimary,
+                      letterSpacing: -0.4,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: 4),
                   const Text(
                     'Manage your household inventory and shared shopping lists seamlessly.',
-                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.lg),
 
                   if (authState.errorMessage != null) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.outOfStockBg,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        border: Border.all(color: AppColors.outOfStockBorder),
+                        color: const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
                       ),
                       child: Text(
                         authState.errorMessage!,
                         style: const TextStyle(color: AppColors.outOfStockText, fontSize: 13),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.md),
                   ],
 
-                  AppTextField(
-                    controller: _nameController,
-                    label: 'Full Name',
-                    hint: 'e.g. Gowtham Sekar',
-                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) return 'Enter your name';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                  HomeStockCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AppTextField(
+                          controller: _nameController,
+                          label: 'Full Name',
+                          hint: 'e.g. Gowtham Sekar',
+                          prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Enter your name';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
 
-                  AppTextField(
-                    controller: _emailController,
-                    label: 'Email Address',
-                    hint: 'you@example.com',
-                    keyboardType: TextInputType.emailAddress,
-                    prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) return 'Enter your email';
-                      if (!val.contains('@')) return 'Enter a valid email';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                        AppTextField(
+                          controller: _emailController,
+                          label: 'Email Address',
+                          hint: 'you@example.com',
+                          keyboardType: TextInputType.emailAddress,
+                          prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Enter your email';
+                            if (!val.contains('@')) return 'Enter a valid email';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
 
-                  AppTextField(
-                    controller: _phoneController,
-                    label: 'Phone Number (Optional)',
-                    hint: '+91 98765 43210',
-                    keyboardType: TextInputType.phone,
-                    prefixIcon: const Icon(Icons.phone_outlined, size: 20),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                        AppTextField(
+                          controller: _phoneController,
+                          label: 'Phone Number (Optional)',
+                          hint: '+91 98765 43210',
+                          keyboardType: TextInputType.phone,
+                          prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
 
-                  AppTextField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    hint: 'At least 6 characters',
-                    obscureText: _obscurePassword,
-                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        size: 20,
-                        color: AppColors.textMuted,
-                      ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        AppTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          hint: 'At least 6 characters',
+                          obscureText: _obscurePassword,
+                          prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 20,
+                              color: AppColors.textMuted,
+                            ),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.length < 6) return 'Password must be at least 6 characters';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+
+                        SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: authState.isLoading ? null : _submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                              elevation: 2,
+                            ),
+                            child: authState.isLoading
+                                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : const Text('Create Account', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ],
                     ),
-                    validator: (val) {
-                      if (val == null || val.length < 6) return 'Password must be at least 6 characters';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-
-                  AppButton(
-                    label: 'Create Account',
-                    onPressed: _submit,
-                    isLoading: authState.isLoading,
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Already have an account? ', style: TextStyle(color: AppColors.textSecondary)),
+                      const Text('Already have an account? ', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                       GestureDetector(
                         onTap: () => context.pop(),
                         child: const Text(
                           'Sign In',
-                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 13),
                         ),
                       ),
                     ],

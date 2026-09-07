@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/empty_state_view.dart';
+import '../../core/widgets/homestock/homestock_app_bar.dart';
+import '../../core/widgets/homestock/homestock_card.dart';
+import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/sync_status_bar.dart';
 import 'add_purchase_screen.dart';
@@ -19,9 +22,10 @@ class PurchasesScreen extends ConsumerWidget {
     final purchases = purchaseState.purchases;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Household Purchases'),
+      backgroundColor: const Color(0xFFF6F7F9),
+      appBar: HomeStockAppBar(
+        title: 'Household Purchases',
+        subtitle: '${purchases.length} receipts recorded & restocked',
       ),
       body: Column(
         children: [
@@ -49,7 +53,7 @@ class PurchasesScreen extends ConsumerWidget {
                         child: ListView.separated(
                           padding: const EdgeInsets.all(AppSpacing.lg),
                           itemCount: purchases.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final p = purchases[index];
                             return _buildPurchaseCard(context, p);
@@ -63,80 +67,138 @@ class PurchasesScreen extends ConsumerWidget {
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
         ),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Record Purchase', style: TextStyle(fontWeight: FontWeight.w700)),
+        icon: const Icon(Icons.add_rounded, size: 20),
+        label: const Text('Record Purchase', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
       ),
     );
   }
 
   Widget _buildPurchaseCard(BuildContext context, PurchaseModel purchase) {
-    final dateStr = DateFormat('dd MMM yyyy').format(DateTime.tryParse(purchase.purchaseDate) ?? DateTime.now());
+    final dateStr = DateFormat('dd MMM yyyy, hh:mm a')
+        .format(DateTime.tryParse(purchase.purchaseDate) ?? DateTime.now());
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+    return HomeStockCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Store Icon, Store Name, Date, Status Badge
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.outline.withValues(alpha: 0.7)),
+                ),
+                child: const Icon(Icons.storefront_rounded, size: 22, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      ),
-                      child: const Icon(Icons.storefront_rounded, size: 20, color: AppColors.primary),
+                    Text(
+                      purchase.storeName ?? 'Grocery Store',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          purchase.storeName ?? 'General Store',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                        ),
-                        Text(
-                          '$dateStr • by ${purchase.recordedByName}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                        ),
-                      ],
+                    const SizedBox(height: 2),
+                    Text(
+                      '$dateStr • ${purchase.recordedByName}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
-                Text(
-                  '₹${purchase.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.primary),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
+              ),
+              const HomeStockPillBadge(
+                label: '✓ Restocked',
+                variant: HomeStockPillVariant.green,
+                fontSize: 10,
+                padding: EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              ),
+            ],
+          ),
 
-            // Item summary pills
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: purchase.items.map((item) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  ),
-                  child: Text(
-                    '${item.itemName} (${item.quantity} ${item.unit})',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
-                  ),
-                );
-              }).toList(),
+          const SizedBox(height: 12),
+          const HomeStockDottedDivider(height: 14),
+          const SizedBox(height: 8),
+
+          // Items summary list
+          Column(
+            children: purchase.items.take(4).map((item) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: AppColors.textMuted,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item.itemName,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    if (item.totalPrice > 0) ...[
+                      const SizedBox(width: 12),
+                      Text(
+                        '₹${item.totalPrice.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+
+          if (purchase.items.length > 4)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '+ ${purchase.items.length - 4} more items',
+                style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
+              ),
             ),
-          ],
-        ),
+
+          const SizedBox(height: 8),
+          const HomeStockDottedDivider(height: 14),
+          const SizedBox(height: 8),
+
+          // Total Price & Actions
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total Amount Paid',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+              ),
+              Text(
+                '₹${purchase.totalAmount.toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.primary),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

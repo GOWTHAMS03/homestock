@@ -65,4 +65,16 @@ class AppColors {
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color cardBorderHover = Color(0xFFCBD5E1);
   static const Color chipBackground = Color(0xFFF1F5F9);
+
+  // Modern HomeStock header & vibrant accent tokens
+  static const Color headerGradientStart = Color(0xFFF3E8FF); // Soft pastel lavender
+  static const Color headerGradientEnd = Color(0xFFF8FAFC);
+  static const Color hsPurple = Color(0xFF8B5CF6);
+  static const Color hsPurpleBg = Color(0xFFF5F3FF);
+  static const Color hsPink = Color(0xFFEC4899);
+  static const Color hsGreen = Color(0xFF10B981);
+  static const Color hsGreenBg = Color(0xFFECFDF5);
+  static const Color hsYellow = Color(0xFFF59E0B);
+  static const Color hsYellowBg = Color(0xFFFEF3C7);
+  static const Color darkFloatingPill = Color(0xFF1E293B);
 }

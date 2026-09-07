@@ -203,6 +203,30 @@ class InventoryController extends StateNotifier<InventoryState> {
     }
   }
 
+  /// Create item: local-first with sync queue.
+  Future<bool> createItem(Map<String, dynamic> data) async {
+    if (_homeId == null) return false;
+    try {
+      await _repo.createItem(_homeId, data);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  /// Update item: local-first with sync queue.
+  Future<bool> updateItem(String itemId, Map<String, dynamic> data) async {
+    if (_homeId == null) return false;
+    try {
+      await _repo.updateItem(_homeId, itemId, data);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _itemsSub?.cancel();

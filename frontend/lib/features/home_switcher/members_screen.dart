@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/homestock/homestock_app_bar.dart';
+import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/sync_status_bar.dart';
 import '../auth/auth_controller.dart';
 import 'home_controller.dart';
@@ -498,15 +500,17 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
     final isAdmin = activeHome?.isAdmin ?? false;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Family Members'),
+      backgroundColor: const Color(0xFFF6F7F9),
+      appBar: HomeStockAppBar(
+        title: 'Family Members',
+        subtitle: '${activeHome?.name ?? "Household"} • ${membersState.members.length} members',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, size: 20, color: AppColors.textPrimary),
             tooltip: 'Refresh',
             onPressed: () => ref.read(membersControllerProvider.notifier).loadMembers(),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -633,24 +637,21 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
   }
 
   Widget _buildHouseholdHeader(HomeModel home, bool canEdit) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.outline),
-      ),
+    return HomeStockCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: AppColors.primaryContainer,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.outline.withValues(alpha: 0.7)),
             ),
-            child: const Icon(Icons.roofing_rounded, color: AppColors.primary, size: 24),
+            child: const Icon(Icons.roofing_rounded, color: AppColors.primary, size: 22),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -658,15 +659,16 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                 Text(
                   home.name,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  'Role: ${home.currentUserRole}',
+                  'Your Role: ${home.currentUserRole}',
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
@@ -684,50 +686,38 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
   }
 
   Widget _buildInviteCard(HomeModel home) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primaryContainer,
-            AppColors.primaryContainer.withValues(alpha: 0.5),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.3)),
-      ),
+    return HomeStockCard(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
               Icon(Icons.group_add_rounded, color: AppColors.primary, size: 20),
-              SizedBox(width: AppSpacing.sm),
+              SizedBox(width: 8),
               Text(
                 'Invite Family Members',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryDark,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: 6),
           const Text(
             'Share this code so family members can join your household inventory and shopping list.',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 12),
 
           // Code display box
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
             ),
             child: Row(
@@ -737,7 +727,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                     home.inviteCode,
                     style: const TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       letterSpacing: 3,
                       color: AppColors.primary,
                     ),
@@ -751,9 +741,9 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 12),
 
-          // Action buttons: Copy, Share, QR
+          // Action buttons: Share & QR
           Row(
             children: [
               Expanded(
@@ -764,29 +754,19 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    ),
+                    minimumSize: const Size(0, 42),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showQrCodeDialog(context, home),
-                  icon: const Icon(Icons.qr_code_rounded, size: 18),
-                  label: const Text('QR Code'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primaryDark,
-                    side: BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.5)),
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    ),
-                  ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _showQrCodeDialog(context, home),
+                icon: const Icon(Icons.qr_code_rounded, size: 16),
+                label: const Text('QR Code'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                 ),
               ),
             ],
@@ -837,22 +817,11 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
       roleIcon = Icons.person_rounded;
     }
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        side: BorderSide(
-          color: isCurrentUser
-              ? AppColors.primaryLight.withValues(alpha: 0.5)
-              : AppColors.outline,
-        ),
-      ),
-      color: isCurrentUser ? AppColors.primaryContainer.withValues(alpha: 0.3) : AppColors.surface,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
-        child: Row(
-          children: [
+    return HomeStockCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
             // Avatar
             Stack(
               clipBehavior: Clip.none,
@@ -1032,8 +1001,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
               ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 

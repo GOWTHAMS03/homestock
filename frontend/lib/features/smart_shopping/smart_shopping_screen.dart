@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/empty_state_view.dart';
+import '../../core/widgets/homestock/homestock_app_bar.dart';
+import '../../core/widgets/homestock/homestock_card.dart';
+import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../home_switcher/home_controller.dart';
 import 'local_purchase_dialog.dart';
@@ -54,10 +57,10 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
     final homeId = ref.watch(homeControllerProvider).activeHome?.id ?? '';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Compare Prices'),
-        elevation: 0,
+      backgroundColor: const Color(0xFFF6F7F9),
+      appBar: HomeStockAppBar(
+        title: 'Compare Prices',
+        subtitle: '${widget.itemName} • ${widget.quantity == widget.quantity.roundToDouble() ? widget.quantity.toInt() : widget.quantity} ${widget.unit}',
       ),
       body: state.isLoading
           ? _buildLoadingState()
@@ -77,7 +80,6 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
       children: [
         _buildItemHeader(),
         const SizedBox(height: AppSpacing.lg),
-        // Skeleton cards mimicking offer layout
         ...List.generate(3, (i) => const Padding(
           padding: EdgeInsets.only(bottom: AppSpacing.sm),
           child: SkeletonItemCard(),
@@ -117,6 +119,7 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(140, 44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                 ),
               ),
           ],
@@ -148,7 +151,7 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
         children: [
           // Item header
           _buildItemHeader(),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
 
           // Provider status warnings
           if (result.failedProviderCount > 0)
@@ -157,88 +160,82 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
           // Best Deal
           if (result.bestOffer != null) ...[
             _buildBestDealCard(result.bestOffer!, homeId, result.shoppingItem.id),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
           ],
 
           // Other offers
           if (otherOffers.isNotEmpty) ...[
-            _buildSectionLabel('Other options'),
+            _buildSectionLabel('Other store options'),
             const SizedBox(height: AppSpacing.sm),
             ...otherOffers.map((offer) =>
                 _buildOfferCard(offer, homeId, result.shoppingItem.id)),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
           ],
 
-          // Savings label
+          // Savings label banner
           if (result.savingsLabel != null) ...[
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.inStockBg,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                border: Border.all(color: AppColors.inStockBorder),
-              ),
+            HomeStockCard(
+              backgroundColor: AppColors.hsGreenBg,
+              borderColor: AppColors.hsGreen.withValues(alpha: 0.4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
-                  const Icon(Icons.savings_outlined, size: 18, color: AppColors.inStockText),
-                  const SizedBox(width: AppSpacing.sm),
+                  const Icon(Icons.savings_outlined, color: AppColors.hsGreen, size: 22),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       result.savingsLabel!,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.inStockText),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.hsGreen),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
           ],
 
           // Local purchase option
           _buildLocalPurchaseCard(),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.lg),
 
           // Affiliate disclosure
           _buildAffiliateDisclosure(),
-          const SizedBox(height: AppSpacing.xxxl),
+          const SizedBox(height: AppSpacing.xl),
         ],
       ),
     );
   }
 
-  // ──── Sub-components ────
+  // ──── Components ────
 
   Widget _buildItemHeader() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.primaryContainer,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.3)),
-      ),
+    return HomeStockCard(
+      padding: const EdgeInsets.all(14),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.outline.withValues(alpha: 0.6)),
             ),
             child: const Icon(Icons.shopping_bag_outlined, color: AppColors.primary, size: 22),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   widget.itemName,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${widget.quantity == widget.quantity.roundToDouble() ? widget.quantity.toInt() : widget.quantity} ${widget.unit}',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  'Quantity Needed: ${widget.quantity == widget.quantity.roundToDouble() ? widget.quantity.toInt() : widget.quantity} ${widget.unit}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -257,18 +254,18 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.lowStockBg,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          border: Border.all(color: AppColors.lowStockBorder),
+          color: AppColors.hsYellowBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.hsYellow.withValues(alpha: 0.4)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.lowStockText),
+            const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.hsYellow),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 '${failed.map((f) => f.provider).join(', ')} temporarily unavailable',
-                style: const TextStyle(fontSize: 12, color: AppColors.lowStockText, fontWeight: FontWeight.w500),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -278,152 +275,119 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
   }
 
   Widget _buildBestDealCard(ProductOfferModel offer, String homeId, String itemId) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return HomeStockCard(
+      borderColor: AppColors.hsGreen.withValues(alpha: 0.5),
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Best deal badge
+          // Best deal header strip
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.06),
+              color: AppColors.hsGreenBg,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(AppSpacing.radiusMd),
-                topRight: Radius.circular(AppSpacing.radiusMd),
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+              border: Border(
+                bottom: BorderSide(color: AppColors.hsGreen.withValues(alpha: 0.2)),
               ),
             ),
             child: const Row(
               children: [
-                Text('🏆', style: TextStyle(fontSize: 16)),
-                SizedBox(width: AppSpacing.sm),
+                Text('🏆', style: TextStyle(fontSize: 15)),
+                SizedBox(width: 8),
                 Text(
-                  'Best Online Price',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
+                  'Best Online Deal',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.hsGreen),
+                ),
+                Spacer(),
+                HomeStockPillBadge(
+                  label: 'Lowest Price',
+                  variant: HomeStockPillVariant.green,
+                  fontSize: 10,
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 ),
               ],
             ),
           ),
 
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Product name + provider
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      offer.provider,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
+                    ),
+                    if (offer.isFreeDelivery)
+                      const HomeStockPillBadge(
+                        label: 'Free Delivery',
+                        variant: HomeStockPillVariant.purple,
+                        fontSize: 10,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 Text(
                   offer.productName,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  offer.provider,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: 12),
 
-                // Price + delivery
+                // Price and delivery
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       '₹${offer.effectivePrice.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
+                    const SizedBox(width: 8),
                     if (offer.pricePerUnitLabel != null)
-                      Text(
-                        offer.pricePerUnitLabel!,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          offer.pricePerUnitLabel!,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        ),
                       ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: 8),
 
-                // Delivery + arrival
                 Row(
                   children: [
-                    Icon(
-                      offer.isFreeDelivery ? Icons.local_shipping_outlined : Icons.local_shipping_outlined,
-                      size: 15,
-                      color: offer.isFreeDelivery ? AppColors.inStockText : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
+                    const Icon(Icons.bolt_rounded, size: 16, color: AppColors.hsYellow),
+                    const SizedBox(width: 4),
                     Text(
                       offer.deliveryText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: offer.isFreeDelivery ? AppColors.inStockText : AppColors.textSecondary,
-                      ),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     ),
-                    if (offer.estimatedDelivery != null) ...[
-                      const SizedBox(width: AppSpacing.md),
-                      const Icon(Icons.schedule_rounded, size: 14, color: AppColors.textMuted),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Arrives: ${offer.estimatedDelivery}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                    ],
                   ],
                 ),
+                const SizedBox(height: 14),
 
-                // Match type + freshness
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    if (offer.matchType == 'SIMILAR')
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.lowStockBg,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.lowStockBorder, width: 0.6),
-                        ),
-                        child: const Text(
-                          'Similar product',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.lowStockText),
-                        ),
-                      ),
-                    const Spacer(),
-                    if (offer.freshnessLabel.isNotEmpty)
-                      Text(
-                        'Price checked: ${offer.freshnessLabel}',
-                        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: AppSpacing.md),
-
-                // Buy Online button
                 SizedBox(
                   width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton.icon(
+                  height: 46,
+                  child: ElevatedButton(
                     onPressed: () => _onBuyOnline(offer, homeId, itemId),
-                    icon: const Icon(Icons.shopping_cart_outlined, size: 18),
-                    label: const Text('Buy Online', style: TextStyle(fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                      elevation: 1,
                     ),
+                    child: const Text('Buy Online Now', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                   ),
                 ),
               ],
@@ -435,128 +399,107 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
   }
 
   Widget _buildOfferCard(ProductOfferModel offer, String homeId, String itemId) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          children: [
-            // Provider + product
-            Expanded(
-              child: Column(
+    return HomeStockCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                offer.provider,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+              ),
+              if (offer.isFreeDelivery)
+                const HomeStockPillBadge(
+                  label: 'Free Delivery',
+                  variant: HomeStockPillVariant.neutral,
+                  fontSize: 10,
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            offer.productName,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 10),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    offer.productName,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    '₹${offer.effectivePrice.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                   ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        offer.provider,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text(
-                        offer.deliveryText,
-                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                      ),
-                    ],
-                  ),
-                  if (offer.matchType == 'SIMILAR')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Similar product',
-                        style: TextStyle(fontSize: 10, color: AppColors.lowStockText, fontWeight: FontWeight.w500),
-                      ),
+                  if (offer.pricePerUnitLabel != null)
+                    Text(
+                      offer.pricePerUnitLabel!,
+                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                     ),
                 ],
               ),
-            ),
-
-            // Price + buy
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '₹${offer.effectivePrice.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ElevatedButton(
+                onPressed: () => _onBuyOnline(offer, homeId, itemId),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryContainer,
+                  foregroundColor: AppColors.primary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                 ),
-                if (offer.pricePerUnitLabel != null)
-                  Text(
-                    offer.pricePerUnitLabel!,
-                    style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-                  ),
-                const SizedBox(height: AppSpacing.xs),
-                SizedBox(
-                  height: 32,
-                  child: OutlinedButton(
-                    onPressed: () => _onBuyOnline(offer, homeId, itemId),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary, width: 1),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
-                    ),
-                    child: const Text('Buy Online', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+                child: const Text('Select', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildLocalPurchaseCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.store_rounded, size: 20, color: AppColors.textSecondary),
-                SizedBox(width: AppSpacing.sm),
-                Text(
-                  'Nearby / Local',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            const Text(
-              'Prefer buying from a nearby store? Record your purchase to update inventory.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: OutlinedButton.icon(
-                onPressed: _onBuyLocally,
-                icon: const Icon(Icons.storefront_rounded, size: 18),
-                label: const Text('I\'ll Buy Locally', style: TextStyle(fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.outline),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
-                ),
+    return HomeStockCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.storefront_rounded, size: 20, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text(
+                'Nearby Grocery Store',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Prefer buying from a local shop? Record your purchase to restock inventory.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: _onBuyLocally,
+              icon: const Icon(Icons.receipt_long_rounded, size: 18),
+              label: const Text('Record Local Store Purchase', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -575,7 +518,7 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
   Widget _buildSectionLabel(String label) {
     return Text(
       label,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
     );
   }
 
@@ -590,7 +533,6 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
       fallbackUrl: offer.affiliateUrl ?? offer.productUrl,
     );
 
-    // Show purchase confirmation after a short delay
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         _showPurchaseConfirmation(offer);
@@ -609,7 +551,7 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
     );
 
     if (recorded == true && mounted) {
-      Navigator.of(context).pop(); // Back to shopping list
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Local purchase recorded! Inventory restocked 🎉'),
@@ -631,7 +573,7 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
     );
 
     if (recorded == true && mounted) {
-      Navigator.of(context).pop(); // Back to shopping list
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Purchase recorded! Inventory restocked 🎉'),
