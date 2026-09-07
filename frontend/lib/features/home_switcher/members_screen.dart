@@ -165,6 +165,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: const BorderSide(color: AppColors.primary),
+                          minimumSize: const Size(0, 40),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                           ),
@@ -183,6 +184,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 40),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                           ),
@@ -285,6 +287,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 36),
                   ),
                   child: isSubmitting
                       ? const SizedBox(
@@ -356,6 +359,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: newRole == 'OWNER' ? const Color(0xFFD97706) : AppColors.primary,
               foregroundColor: Colors.white,
+              minimumSize: const Size(0, 36),
             ),
             child: const Text('Confirm'),
           ),
@@ -413,6 +417,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.outOfStockText,
               foregroundColor: Colors.white,
+              minimumSize: const Size(0, 36),
             ),
             child: const Text('Remove'),
           ),
@@ -474,6 +479,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.outOfStockText,
               foregroundColor: Colors.white,
+              minimumSize: const Size(0, 36),
             ),
             child: const Text('Leave'),
           ),
@@ -592,6 +598,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                               ),
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: AppColors.outOfStockBorder),
+                                minimumSize: const Size(0, 44),
                                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -757,6 +764,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 40),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -765,16 +773,19 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              OutlinedButton.icon(
-                onPressed: () => _showQrCodeDialog(context, home),
-                icon: const Icon(Icons.qr_code_rounded, size: 18),
-                label: const Text('QR Code'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primaryDark,
-                  side: BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.5)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showQrCodeDialog(context, home),
+                  icon: const Icon(Icons.qr_code_rounded, size: 18),
+                  label: const Text('QR Code'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryDark,
+                    side: BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.5)),
+                    minimumSize: const Size(0, 40),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    ),
                   ),
                 ),
               ),
