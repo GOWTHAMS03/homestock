@@ -68,5 +68,11 @@ class ApiEndpoints {
   static String affiliateClick(String homeId) =>
       '/homes/$homeId/affiliate/click';
   static const String shoppingCompare = '/shopping/compare';
+
+  // Voice & STT
+  static const String voiceTranscribe = '/voice/transcribe';
+  static const String voiceCommand = '/voice/command';
+  static const String voiceProcessAudio = '/voice/process-audio';
+  static const String voiceExecute = '/voice/execute';
 }
 

@@ -63,6 +63,9 @@ dependencies:
   connectivity_plus: ^6.1.2
   uuid: ^4.5.1
 
+  # Audio Recording for Voice Commands
+  record: ^5.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

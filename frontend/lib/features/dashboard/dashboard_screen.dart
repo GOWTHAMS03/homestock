@@ -16,6 +16,7 @@ import '../inventory/category_model.dart';
 import '../inventory/inventory_controller.dart';
 import '../notifications/notification_controller.dart';
 import '../shopping/shopping_controller.dart';
+import '../voice/widgets/voice_input_button.dart';
 import 'dashboard_controller.dart';
 import 'dashboard_model.dart';
 import 'what_do_i_need_sheet.dart';
@@ -111,6 +112,9 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
         actions: [
+          const VoiceInputButton(
+            tooltip: 'Voice command',
+          ),
           Stack(
             children: [
               IconButton(

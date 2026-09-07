@@ -7,6 +7,7 @@ import '../../core/widgets/quantity_stepper.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/stock_status_badge.dart';
 import '../../core/widgets/sync_status_bar.dart';
+import '../voice/widgets/voice_input_button.dart';
 import 'add_edit_item_screen.dart';
 import 'category_model.dart';
 import 'inventory_controller.dart';
@@ -94,11 +95,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Household Inventory', style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: const [
+          VoiceInputButton(
+            tooltip: 'Inventory voice command',
+          ),
+        ],
       ),
       body: Column(
         children: [
           const SyncStatusBar(),
-          // Search Box with Clean Clear Action
+          // Search Box with Clean Clear Action and Voice Input
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
             child: TextField(
@@ -107,15 +113,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               decoration: InputDecoration(
                 hintText: 'Search items, brands, storage location...',
                 prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
                         icon: const Icon(Icons.clear_rounded, size: 18),
                         onPressed: () {
                           _searchController.clear();
                           ref.read(inventoryControllerProvider.notifier).setSearchQuery('');
                         },
-                      )
-                    : null,
+                      ),
+                    const VoiceInputButton(size: 20),
+                  ],
+                ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
@@ -254,14 +265,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AddEditItemScreen()),
-        ),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700)),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const VoiceInputButton.floating(
+            tooltip: 'Voice inventory command',
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton.extended(
+            heroTag: 'inventory_add_btn',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AddEditItemScreen()),
+            ),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700)),
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
+        ],
       ),
     );
   }

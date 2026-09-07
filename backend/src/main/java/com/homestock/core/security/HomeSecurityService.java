@@ -40,6 +40,10 @@ public class HomeSecurityService {
         return hasPermission(homeId, HomeRole.MEMBER);
     }
 
+    public boolean canEditShoppingList(UUID homeId) {
+        return hasPermission(homeId, HomeRole.MEMBER);
+    }
+
     public boolean canManageMembers(UUID homeId) {
         return hasPermission(homeId, HomeRole.ADMIN);
     }

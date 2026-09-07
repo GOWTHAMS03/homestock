@@ -9,6 +9,7 @@ import '../../core/widgets/sync_status_bar.dart';
 import '../purchase/add_purchase_screen.dart';
 import 'add_shopping_item_dialog.dart';
 import '../smart_shopping/smart_shopping_screen.dart';
+import '../voice/widgets/voice_input_button.dart';
 import 'shopping_controller.dart';
 import 'shopping_model.dart';
 
@@ -25,6 +26,9 @@ class ShoppingScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Shared Shopping List'),
         actions: [
+          const VoiceInputButton(
+            tooltip: 'Voice shopping command',
+          ),
           if (list != null && list.completedCount > 0)
             TextButton(
               onPressed: () => ref.read(shoppingControllerProvider.notifier).clearCompleted(),
@@ -122,12 +126,22 @@ class ShoppingScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => AddShoppingItemDialog.show(context),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700)),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const VoiceInputButton.floating(
+            tooltip: 'Voice shopping command',
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton.extended(
+            heroTag: 'shopping_add_btn',
+            onPressed: () => AddShoppingItemDialog.show(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700)),
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
+        ],
       ),
     );
   }

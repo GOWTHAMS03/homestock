@@ -42,6 +42,18 @@ app:
         enabled: ${FLIPKART_PROVIDER_ENABLED:false}
         affiliate-id: ${FLIPKART_AFFILIATE_ID:}
         token: ${FLIPKART_AFFILIATE_TOKEN:}
+  voice:
+    provider: ${VOICE_PROVIDER:whisper} # whisper, mock, local
+    whisper:
+      api-url: ${WHISPER_API_URL:https://api.openai.com/v1/audio/transcriptions}
+      api-key: ${OPENAI_API_KEY:}
+      model: ${WHISPER_MODEL:whisper-1}
+      temperature: ${WHISPER_TEMPERATURE:0.0}
+    limits:
+      max-audio-size-mb: ${VOICE_MAX_AUDIO_SIZE_MB:15}
+      max-audio-duration-seconds: ${VOICE_MAX_AUDIO_DURATION_SECONDS:60}
+    matching:
+      confidence-threshold: ${VOICE_CONFIDENCE_THRESHOLD:0.80}
 
 springdoc:
   api-docs:
