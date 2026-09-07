@@ -8,6 +8,7 @@ import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/sync_status_bar.dart';
 import '../purchase/add_purchase_screen.dart';
 import 'add_shopping_item_dialog.dart';
+import '../smart_shopping/smart_shopping_screen.dart';
 import 'shopping_controller.dart';
 import 'shopping_model.dart';
 
@@ -246,17 +247,55 @@ class ShoppingScreen extends ConsumerWidget {
                   ),
                 ),
 
-                // Right Quantity Tag
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  ),
-                  child: Text(
-                    '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-                  ),
+                // Right side: Quantity tag + Compare button
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      ),
+                      child: Text(
+                        '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                      ),
+                    ),
+                    if (!item.isCompleted)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SmartShoppingScreen(
+                                itemId: item.id,
+                                inventoryItemId: item.inventoryItemId,
+                                itemName: item.itemName,
+                                quantity: item.quantity,
+                                unit: item.unit,
+                              ),
+                            ),
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.compare_arrows_rounded, size: 13, color: AppColors.primary),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Compare',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
 
                 // Delete IconButton with min 48dp target

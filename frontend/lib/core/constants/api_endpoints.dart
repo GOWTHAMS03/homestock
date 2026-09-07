@@ -61,4 +61,12 @@ class ApiEndpoints {
   static const String notifications = '/notifications';
   static String readNotification(String id) => '/notifications/$id/read';
   static const String readAllNotifications = '/notifications/read-all';
+
+  // Smart Shopping — Price Comparison
+  static String itemOffers(String homeId, String itemId) =>
+      '/homes/$homeId/shopping-list/items/$itemId/offers';
+  static String affiliateClick(String homeId) =>
+      '/homes/$homeId/affiliate/click';
+  static const String shoppingCompare = '/shopping/compare';
 }
+

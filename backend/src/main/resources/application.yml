@@ -23,6 +23,25 @@ app:
     s3:
       bucket: ${AWS_S3_BUCKET:homestock-media}
       region: ${AWS_REGION:us-east-1}
+  smart-shopping:
+    enabled: ${SMART_SHOPPING_ENABLED:true}
+    cache:
+      ttl-minutes: ${PRICE_CACHE_TTL_MINUTES:15}
+    matching:
+      confidence-threshold: ${MATCH_CONFIDENCE_THRESHOLD:0.75}
+    provider-timeout-seconds: ${PROVIDER_TIMEOUT_SECONDS:5}
+    providers:
+      mock:
+        enabled: ${MOCK_PROVIDER_ENABLED:true}
+      amazon:
+        enabled: ${AMAZON_PROVIDER_ENABLED:false}
+        partner-tag: ${AMAZON_PARTNER_TAG:}
+        access-key: ${AMAZON_ACCESS_KEY:}
+        secret-key: ${AMAZON_SECRET_KEY:}
+      flipkart:
+        enabled: ${FLIPKART_PROVIDER_ENABLED:false}
+        affiliate-id: ${FLIPKART_AFFILIATE_ID:}
+        token: ${FLIPKART_AFFILIATE_TOKEN:}
 
 springdoc:
   api-docs:
@@ -30,3 +49,4 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operationsSorter: method
+

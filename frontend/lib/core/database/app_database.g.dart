@@ -8570,6 +8570,1071 @@ class SyncMetadataEntriesCompanion extends UpdateCompanion<SyncMetadataEntry> {
   }
 }
 
+class $LocalProductOffersTable extends LocalProductOffers
+    with TableInfo<$LocalProductOffersTable, LocalProductOffer> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalProductOffersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _shoppingItemIdMeta = const VerificationMeta(
+    'shoppingItemId',
+  );
+  @override
+  late final GeneratedColumn<String> shoppingItemId = GeneratedColumn<String>(
+    'shopping_item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerMeta = const VerificationMeta(
+    'provider',
+  );
+  @override
+  late final GeneratedColumn<String> provider = GeneratedColumn<String>(
+    'provider',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productNameMeta = const VerificationMeta(
+    'productName',
+  );
+  @override
+  late final GeneratedColumn<String> productName = GeneratedColumn<String>(
+    'product_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _brandMeta = const VerificationMeta('brand');
+  @override
+  late final GeneratedColumn<String> brand = GeneratedColumn<String>(
+    'brand',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _priceMeta = const VerificationMeta('price');
+  @override
+  late final GeneratedColumn<double> price = GeneratedColumn<double>(
+    'price',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deliveryChargeMeta = const VerificationMeta(
+    'deliveryCharge',
+  );
+  @override
+  late final GeneratedColumn<double> deliveryCharge = GeneratedColumn<double>(
+    'delivery_charge',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _effectivePriceMeta = const VerificationMeta(
+    'effectivePrice',
+  );
+  @override
+  late final GeneratedColumn<double> effectivePrice = GeneratedColumn<double>(
+    'effective_price',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _currencyMeta = const VerificationMeta(
+    'currency',
+  );
+  @override
+  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
+    'currency',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('INR'),
+  );
+  static const VerificationMeta _availabilityMeta = const VerificationMeta(
+    'availability',
+  );
+  @override
+  late final GeneratedColumn<String> availability = GeneratedColumn<String>(
+    'availability',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _estimatedDeliveryMeta = const VerificationMeta(
+    'estimatedDelivery',
+  );
+  @override
+  late final GeneratedColumn<String> estimatedDelivery =
+      GeneratedColumn<String>(
+        'estimated_delivery',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _affiliateUrlMeta = const VerificationMeta(
+    'affiliateUrl',
+  );
+  @override
+  late final GeneratedColumn<String> affiliateUrl = GeneratedColumn<String>(
+    'affiliate_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _imageUrlMeta = const VerificationMeta(
+    'imageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
+    'image_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _matchConfidenceMeta = const VerificationMeta(
+    'matchConfidence',
+  );
+  @override
+  late final GeneratedColumn<double> matchConfidence = GeneratedColumn<double>(
+    'match_confidence',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _matchTypeMeta = const VerificationMeta(
+    'matchType',
+  );
+  @override
+  late final GeneratedColumn<String> matchType = GeneratedColumn<String>(
+    'match_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pricePerUnitLabelMeta = const VerificationMeta(
+    'pricePerUnitLabel',
+  );
+  @override
+  late final GeneratedColumn<String> pricePerUnitLabel =
+      GeneratedColumn<String>(
+        'price_per_unit_label',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastCheckedAtMeta = const VerificationMeta(
+    'lastCheckedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastCheckedAt =
+      GeneratedColumn<DateTime>(
+        'last_checked_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    shoppingItemId,
+    provider,
+    productName,
+    brand,
+    price,
+    deliveryCharge,
+    effectivePrice,
+    currency,
+    availability,
+    estimatedDelivery,
+    affiliateUrl,
+    imageUrl,
+    matchConfidence,
+    matchType,
+    pricePerUnitLabel,
+    lastCheckedAt,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_product_offers';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalProductOffer> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('shopping_item_id')) {
+      context.handle(
+        _shoppingItemIdMeta,
+        shoppingItemId.isAcceptableOrUnknown(
+          data['shopping_item_id']!,
+          _shoppingItemIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_shoppingItemIdMeta);
+    }
+    if (data.containsKey('provider')) {
+      context.handle(
+        _providerMeta,
+        provider.isAcceptableOrUnknown(data['provider']!, _providerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerMeta);
+    }
+    if (data.containsKey('product_name')) {
+      context.handle(
+        _productNameMeta,
+        productName.isAcceptableOrUnknown(
+          data['product_name']!,
+          _productNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_productNameMeta);
+    }
+    if (data.containsKey('brand')) {
+      context.handle(
+        _brandMeta,
+        brand.isAcceptableOrUnknown(data['brand']!, _brandMeta),
+      );
+    }
+    if (data.containsKey('price')) {
+      context.handle(
+        _priceMeta,
+        price.isAcceptableOrUnknown(data['price']!, _priceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_priceMeta);
+    }
+    if (data.containsKey('delivery_charge')) {
+      context.handle(
+        _deliveryChargeMeta,
+        deliveryCharge.isAcceptableOrUnknown(
+          data['delivery_charge']!,
+          _deliveryChargeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('effective_price')) {
+      context.handle(
+        _effectivePriceMeta,
+        effectivePrice.isAcceptableOrUnknown(
+          data['effective_price']!,
+          _effectivePriceMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_effectivePriceMeta);
+    }
+    if (data.containsKey('currency')) {
+      context.handle(
+        _currencyMeta,
+        currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta),
+      );
+    }
+    if (data.containsKey('availability')) {
+      context.handle(
+        _availabilityMeta,
+        availability.isAcceptableOrUnknown(
+          data['availability']!,
+          _availabilityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('estimated_delivery')) {
+      context.handle(
+        _estimatedDeliveryMeta,
+        estimatedDelivery.isAcceptableOrUnknown(
+          data['estimated_delivery']!,
+          _estimatedDeliveryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('affiliate_url')) {
+      context.handle(
+        _affiliateUrlMeta,
+        affiliateUrl.isAcceptableOrUnknown(
+          data['affiliate_url']!,
+          _affiliateUrlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('image_url')) {
+      context.handle(
+        _imageUrlMeta,
+        imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
+      );
+    }
+    if (data.containsKey('match_confidence')) {
+      context.handle(
+        _matchConfidenceMeta,
+        matchConfidence.isAcceptableOrUnknown(
+          data['match_confidence']!,
+          _matchConfidenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('match_type')) {
+      context.handle(
+        _matchTypeMeta,
+        matchType.isAcceptableOrUnknown(data['match_type']!, _matchTypeMeta),
+      );
+    }
+    if (data.containsKey('price_per_unit_label')) {
+      context.handle(
+        _pricePerUnitLabelMeta,
+        pricePerUnitLabel.isAcceptableOrUnknown(
+          data['price_per_unit_label']!,
+          _pricePerUnitLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_checked_at')) {
+      context.handle(
+        _lastCheckedAtMeta,
+        lastCheckedAt.isAcceptableOrUnknown(
+          data['last_checked_at']!,
+          _lastCheckedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalProductOffer map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalProductOffer(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      shoppingItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shopping_item_id'],
+      )!,
+      provider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider'],
+      )!,
+      productName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_name'],
+      )!,
+      brand: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brand'],
+      ),
+      price: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}price'],
+      )!,
+      deliveryCharge: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}delivery_charge'],
+      ),
+      effectivePrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}effective_price'],
+      )!,
+      currency: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}currency'],
+      )!,
+      availability: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}availability'],
+      ),
+      estimatedDelivery: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}estimated_delivery'],
+      ),
+      affiliateUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}affiliate_url'],
+      ),
+      imageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_url'],
+      ),
+      matchConfidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}match_confidence'],
+      ),
+      matchType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}match_type'],
+      ),
+      pricePerUnitLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}price_per_unit_label'],
+      ),
+      lastCheckedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_checked_at'],
+      ),
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      ),
+    );
+  }
+
+  @override
+  $LocalProductOffersTable createAlias(String alias) {
+    return $LocalProductOffersTable(attachedDatabase, alias);
+  }
+}
+
+class LocalProductOffer extends DataClass
+    implements Insertable<LocalProductOffer> {
+  final String id;
+  final String shoppingItemId;
+  final String provider;
+  final String productName;
+  final String? brand;
+  final double price;
+  final double? deliveryCharge;
+  final double effectivePrice;
+  final String currency;
+  final String? availability;
+  final String? estimatedDelivery;
+  final String? affiliateUrl;
+  final String? imageUrl;
+  final double? matchConfidence;
+  final String? matchType;
+  final String? pricePerUnitLabel;
+  final DateTime? lastCheckedAt;
+  final DateTime? cachedAt;
+  const LocalProductOffer({
+    required this.id,
+    required this.shoppingItemId,
+    required this.provider,
+    required this.productName,
+    this.brand,
+    required this.price,
+    this.deliveryCharge,
+    required this.effectivePrice,
+    required this.currency,
+    this.availability,
+    this.estimatedDelivery,
+    this.affiliateUrl,
+    this.imageUrl,
+    this.matchConfidence,
+    this.matchType,
+    this.pricePerUnitLabel,
+    this.lastCheckedAt,
+    this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['shopping_item_id'] = Variable<String>(shoppingItemId);
+    map['provider'] = Variable<String>(provider);
+    map['product_name'] = Variable<String>(productName);
+    if (!nullToAbsent || brand != null) {
+      map['brand'] = Variable<String>(brand);
+    }
+    map['price'] = Variable<double>(price);
+    if (!nullToAbsent || deliveryCharge != null) {
+      map['delivery_charge'] = Variable<double>(deliveryCharge);
+    }
+    map['effective_price'] = Variable<double>(effectivePrice);
+    map['currency'] = Variable<String>(currency);
+    if (!nullToAbsent || availability != null) {
+      map['availability'] = Variable<String>(availability);
+    }
+    if (!nullToAbsent || estimatedDelivery != null) {
+      map['estimated_delivery'] = Variable<String>(estimatedDelivery);
+    }
+    if (!nullToAbsent || affiliateUrl != null) {
+      map['affiliate_url'] = Variable<String>(affiliateUrl);
+    }
+    if (!nullToAbsent || imageUrl != null) {
+      map['image_url'] = Variable<String>(imageUrl);
+    }
+    if (!nullToAbsent || matchConfidence != null) {
+      map['match_confidence'] = Variable<double>(matchConfidence);
+    }
+    if (!nullToAbsent || matchType != null) {
+      map['match_type'] = Variable<String>(matchType);
+    }
+    if (!nullToAbsent || pricePerUnitLabel != null) {
+      map['price_per_unit_label'] = Variable<String>(pricePerUnitLabel);
+    }
+    if (!nullToAbsent || lastCheckedAt != null) {
+      map['last_checked_at'] = Variable<DateTime>(lastCheckedAt);
+    }
+    if (!nullToAbsent || cachedAt != null) {
+      map['cached_at'] = Variable<DateTime>(cachedAt);
+    }
+    return map;
+  }
+
+  LocalProductOffersCompanion toCompanion(bool nullToAbsent) {
+    return LocalProductOffersCompanion(
+      id: Value(id),
+      shoppingItemId: Value(shoppingItemId),
+      provider: Value(provider),
+      productName: Value(productName),
+      brand: brand == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brand),
+      price: Value(price),
+      deliveryCharge: deliveryCharge == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deliveryCharge),
+      effectivePrice: Value(effectivePrice),
+      currency: Value(currency),
+      availability: availability == null && nullToAbsent
+          ? const Value.absent()
+          : Value(availability),
+      estimatedDelivery: estimatedDelivery == null && nullToAbsent
+          ? const Value.absent()
+          : Value(estimatedDelivery),
+      affiliateUrl: affiliateUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(affiliateUrl),
+      imageUrl: imageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imageUrl),
+      matchConfidence: matchConfidence == null && nullToAbsent
+          ? const Value.absent()
+          : Value(matchConfidence),
+      matchType: matchType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(matchType),
+      pricePerUnitLabel: pricePerUnitLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pricePerUnitLabel),
+      lastCheckedAt: lastCheckedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastCheckedAt),
+      cachedAt: cachedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cachedAt),
+    );
+  }
+
+  factory LocalProductOffer.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalProductOffer(
+      id: serializer.fromJson<String>(json['id']),
+      shoppingItemId: serializer.fromJson<String>(json['shoppingItemId']),
+      provider: serializer.fromJson<String>(json['provider']),
+      productName: serializer.fromJson<String>(json['productName']),
+      brand: serializer.fromJson<String?>(json['brand']),
+      price: serializer.fromJson<double>(json['price']),
+      deliveryCharge: serializer.fromJson<double?>(json['deliveryCharge']),
+      effectivePrice: serializer.fromJson<double>(json['effectivePrice']),
+      currency: serializer.fromJson<String>(json['currency']),
+      availability: serializer.fromJson<String?>(json['availability']),
+      estimatedDelivery: serializer.fromJson<String?>(
+        json['estimatedDelivery'],
+      ),
+      affiliateUrl: serializer.fromJson<String?>(json['affiliateUrl']),
+      imageUrl: serializer.fromJson<String?>(json['imageUrl']),
+      matchConfidence: serializer.fromJson<double?>(json['matchConfidence']),
+      matchType: serializer.fromJson<String?>(json['matchType']),
+      pricePerUnitLabel: serializer.fromJson<String?>(
+        json['pricePerUnitLabel'],
+      ),
+      lastCheckedAt: serializer.fromJson<DateTime?>(json['lastCheckedAt']),
+      cachedAt: serializer.fromJson<DateTime?>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'shoppingItemId': serializer.toJson<String>(shoppingItemId),
+      'provider': serializer.toJson<String>(provider),
+      'productName': serializer.toJson<String>(productName),
+      'brand': serializer.toJson<String?>(brand),
+      'price': serializer.toJson<double>(price),
+      'deliveryCharge': serializer.toJson<double?>(deliveryCharge),
+      'effectivePrice': serializer.toJson<double>(effectivePrice),
+      'currency': serializer.toJson<String>(currency),
+      'availability': serializer.toJson<String?>(availability),
+      'estimatedDelivery': serializer.toJson<String?>(estimatedDelivery),
+      'affiliateUrl': serializer.toJson<String?>(affiliateUrl),
+      'imageUrl': serializer.toJson<String?>(imageUrl),
+      'matchConfidence': serializer.toJson<double?>(matchConfidence),
+      'matchType': serializer.toJson<String?>(matchType),
+      'pricePerUnitLabel': serializer.toJson<String?>(pricePerUnitLabel),
+      'lastCheckedAt': serializer.toJson<DateTime?>(lastCheckedAt),
+      'cachedAt': serializer.toJson<DateTime?>(cachedAt),
+    };
+  }
+
+  LocalProductOffer copyWith({
+    String? id,
+    String? shoppingItemId,
+    String? provider,
+    String? productName,
+    Value<String?> brand = const Value.absent(),
+    double? price,
+    Value<double?> deliveryCharge = const Value.absent(),
+    double? effectivePrice,
+    String? currency,
+    Value<String?> availability = const Value.absent(),
+    Value<String?> estimatedDelivery = const Value.absent(),
+    Value<String?> affiliateUrl = const Value.absent(),
+    Value<String?> imageUrl = const Value.absent(),
+    Value<double?> matchConfidence = const Value.absent(),
+    Value<String?> matchType = const Value.absent(),
+    Value<String?> pricePerUnitLabel = const Value.absent(),
+    Value<DateTime?> lastCheckedAt = const Value.absent(),
+    Value<DateTime?> cachedAt = const Value.absent(),
+  }) => LocalProductOffer(
+    id: id ?? this.id,
+    shoppingItemId: shoppingItemId ?? this.shoppingItemId,
+    provider: provider ?? this.provider,
+    productName: productName ?? this.productName,
+    brand: brand.present ? brand.value : this.brand,
+    price: price ?? this.price,
+    deliveryCharge: deliveryCharge.present
+        ? deliveryCharge.value
+        : this.deliveryCharge,
+    effectivePrice: effectivePrice ?? this.effectivePrice,
+    currency: currency ?? this.currency,
+    availability: availability.present ? availability.value : this.availability,
+    estimatedDelivery: estimatedDelivery.present
+        ? estimatedDelivery.value
+        : this.estimatedDelivery,
+    affiliateUrl: affiliateUrl.present ? affiliateUrl.value : this.affiliateUrl,
+    imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
+    matchConfidence: matchConfidence.present
+        ? matchConfidence.value
+        : this.matchConfidence,
+    matchType: matchType.present ? matchType.value : this.matchType,
+    pricePerUnitLabel: pricePerUnitLabel.present
+        ? pricePerUnitLabel.value
+        : this.pricePerUnitLabel,
+    lastCheckedAt: lastCheckedAt.present
+        ? lastCheckedAt.value
+        : this.lastCheckedAt,
+    cachedAt: cachedAt.present ? cachedAt.value : this.cachedAt,
+  );
+  LocalProductOffer copyWithCompanion(LocalProductOffersCompanion data) {
+    return LocalProductOffer(
+      id: data.id.present ? data.id.value : this.id,
+      shoppingItemId: data.shoppingItemId.present
+          ? data.shoppingItemId.value
+          : this.shoppingItemId,
+      provider: data.provider.present ? data.provider.value : this.provider,
+      productName: data.productName.present
+          ? data.productName.value
+          : this.productName,
+      brand: data.brand.present ? data.brand.value : this.brand,
+      price: data.price.present ? data.price.value : this.price,
+      deliveryCharge: data.deliveryCharge.present
+          ? data.deliveryCharge.value
+          : this.deliveryCharge,
+      effectivePrice: data.effectivePrice.present
+          ? data.effectivePrice.value
+          : this.effectivePrice,
+      currency: data.currency.present ? data.currency.value : this.currency,
+      availability: data.availability.present
+          ? data.availability.value
+          : this.availability,
+      estimatedDelivery: data.estimatedDelivery.present
+          ? data.estimatedDelivery.value
+          : this.estimatedDelivery,
+      affiliateUrl: data.affiliateUrl.present
+          ? data.affiliateUrl.value
+          : this.affiliateUrl,
+      imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
+      matchConfidence: data.matchConfidence.present
+          ? data.matchConfidence.value
+          : this.matchConfidence,
+      matchType: data.matchType.present ? data.matchType.value : this.matchType,
+      pricePerUnitLabel: data.pricePerUnitLabel.present
+          ? data.pricePerUnitLabel.value
+          : this.pricePerUnitLabel,
+      lastCheckedAt: data.lastCheckedAt.present
+          ? data.lastCheckedAt.value
+          : this.lastCheckedAt,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalProductOffer(')
+          ..write('id: $id, ')
+          ..write('shoppingItemId: $shoppingItemId, ')
+          ..write('provider: $provider, ')
+          ..write('productName: $productName, ')
+          ..write('brand: $brand, ')
+          ..write('price: $price, ')
+          ..write('deliveryCharge: $deliveryCharge, ')
+          ..write('effectivePrice: $effectivePrice, ')
+          ..write('currency: $currency, ')
+          ..write('availability: $availability, ')
+          ..write('estimatedDelivery: $estimatedDelivery, ')
+          ..write('affiliateUrl: $affiliateUrl, ')
+          ..write('imageUrl: $imageUrl, ')
+          ..write('matchConfidence: $matchConfidence, ')
+          ..write('matchType: $matchType, ')
+          ..write('pricePerUnitLabel: $pricePerUnitLabel, ')
+          ..write('lastCheckedAt: $lastCheckedAt, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    shoppingItemId,
+    provider,
+    productName,
+    brand,
+    price,
+    deliveryCharge,
+    effectivePrice,
+    currency,
+    availability,
+    estimatedDelivery,
+    affiliateUrl,
+    imageUrl,
+    matchConfidence,
+    matchType,
+    pricePerUnitLabel,
+    lastCheckedAt,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalProductOffer &&
+          other.id == this.id &&
+          other.shoppingItemId == this.shoppingItemId &&
+          other.provider == this.provider &&
+          other.productName == this.productName &&
+          other.brand == this.brand &&
+          other.price == this.price &&
+          other.deliveryCharge == this.deliveryCharge &&
+          other.effectivePrice == this.effectivePrice &&
+          other.currency == this.currency &&
+          other.availability == this.availability &&
+          other.estimatedDelivery == this.estimatedDelivery &&
+          other.affiliateUrl == this.affiliateUrl &&
+          other.imageUrl == this.imageUrl &&
+          other.matchConfidence == this.matchConfidence &&
+          other.matchType == this.matchType &&
+          other.pricePerUnitLabel == this.pricePerUnitLabel &&
+          other.lastCheckedAt == this.lastCheckedAt &&
+          other.cachedAt == this.cachedAt);
+}
+
+class LocalProductOffersCompanion extends UpdateCompanion<LocalProductOffer> {
+  final Value<String> id;
+  final Value<String> shoppingItemId;
+  final Value<String> provider;
+  final Value<String> productName;
+  final Value<String?> brand;
+  final Value<double> price;
+  final Value<double?> deliveryCharge;
+  final Value<double> effectivePrice;
+  final Value<String> currency;
+  final Value<String?> availability;
+  final Value<String?> estimatedDelivery;
+  final Value<String?> affiliateUrl;
+  final Value<String?> imageUrl;
+  final Value<double?> matchConfidence;
+  final Value<String?> matchType;
+  final Value<String?> pricePerUnitLabel;
+  final Value<DateTime?> lastCheckedAt;
+  final Value<DateTime?> cachedAt;
+  final Value<int> rowid;
+  const LocalProductOffersCompanion({
+    this.id = const Value.absent(),
+    this.shoppingItemId = const Value.absent(),
+    this.provider = const Value.absent(),
+    this.productName = const Value.absent(),
+    this.brand = const Value.absent(),
+    this.price = const Value.absent(),
+    this.deliveryCharge = const Value.absent(),
+    this.effectivePrice = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.availability = const Value.absent(),
+    this.estimatedDelivery = const Value.absent(),
+    this.affiliateUrl = const Value.absent(),
+    this.imageUrl = const Value.absent(),
+    this.matchConfidence = const Value.absent(),
+    this.matchType = const Value.absent(),
+    this.pricePerUnitLabel = const Value.absent(),
+    this.lastCheckedAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalProductOffersCompanion.insert({
+    required String id,
+    required String shoppingItemId,
+    required String provider,
+    required String productName,
+    this.brand = const Value.absent(),
+    required double price,
+    this.deliveryCharge = const Value.absent(),
+    required double effectivePrice,
+    this.currency = const Value.absent(),
+    this.availability = const Value.absent(),
+    this.estimatedDelivery = const Value.absent(),
+    this.affiliateUrl = const Value.absent(),
+    this.imageUrl = const Value.absent(),
+    this.matchConfidence = const Value.absent(),
+    this.matchType = const Value.absent(),
+    this.pricePerUnitLabel = const Value.absent(),
+    this.lastCheckedAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       shoppingItemId = Value(shoppingItemId),
+       provider = Value(provider),
+       productName = Value(productName),
+       price = Value(price),
+       effectivePrice = Value(effectivePrice);
+  static Insertable<LocalProductOffer> custom({
+    Expression<String>? id,
+    Expression<String>? shoppingItemId,
+    Expression<String>? provider,
+    Expression<String>? productName,
+    Expression<String>? brand,
+    Expression<double>? price,
+    Expression<double>? deliveryCharge,
+    Expression<double>? effectivePrice,
+    Expression<String>? currency,
+    Expression<String>? availability,
+    Expression<String>? estimatedDelivery,
+    Expression<String>? affiliateUrl,
+    Expression<String>? imageUrl,
+    Expression<double>? matchConfidence,
+    Expression<String>? matchType,
+    Expression<String>? pricePerUnitLabel,
+    Expression<DateTime>? lastCheckedAt,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (shoppingItemId != null) 'shopping_item_id': shoppingItemId,
+      if (provider != null) 'provider': provider,
+      if (productName != null) 'product_name': productName,
+      if (brand != null) 'brand': brand,
+      if (price != null) 'price': price,
+      if (deliveryCharge != null) 'delivery_charge': deliveryCharge,
+      if (effectivePrice != null) 'effective_price': effectivePrice,
+      if (currency != null) 'currency': currency,
+      if (availability != null) 'availability': availability,
+      if (estimatedDelivery != null) 'estimated_delivery': estimatedDelivery,
+      if (affiliateUrl != null) 'affiliate_url': affiliateUrl,
+      if (imageUrl != null) 'image_url': imageUrl,
+      if (matchConfidence != null) 'match_confidence': matchConfidence,
+      if (matchType != null) 'match_type': matchType,
+      if (pricePerUnitLabel != null) 'price_per_unit_label': pricePerUnitLabel,
+      if (lastCheckedAt != null) 'last_checked_at': lastCheckedAt,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalProductOffersCompanion copyWith({
+    Value<String>? id,
+    Value<String>? shoppingItemId,
+    Value<String>? provider,
+    Value<String>? productName,
+    Value<String?>? brand,
+    Value<double>? price,
+    Value<double?>? deliveryCharge,
+    Value<double>? effectivePrice,
+    Value<String>? currency,
+    Value<String?>? availability,
+    Value<String?>? estimatedDelivery,
+    Value<String?>? affiliateUrl,
+    Value<String?>? imageUrl,
+    Value<double?>? matchConfidence,
+    Value<String?>? matchType,
+    Value<String?>? pricePerUnitLabel,
+    Value<DateTime?>? lastCheckedAt,
+    Value<DateTime?>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalProductOffersCompanion(
+      id: id ?? this.id,
+      shoppingItemId: shoppingItemId ?? this.shoppingItemId,
+      provider: provider ?? this.provider,
+      productName: productName ?? this.productName,
+      brand: brand ?? this.brand,
+      price: price ?? this.price,
+      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
+      effectivePrice: effectivePrice ?? this.effectivePrice,
+      currency: currency ?? this.currency,
+      availability: availability ?? this.availability,
+      estimatedDelivery: estimatedDelivery ?? this.estimatedDelivery,
+      affiliateUrl: affiliateUrl ?? this.affiliateUrl,
+      imageUrl: imageUrl ?? this.imageUrl,
+      matchConfidence: matchConfidence ?? this.matchConfidence,
+      matchType: matchType ?? this.matchType,
+      pricePerUnitLabel: pricePerUnitLabel ?? this.pricePerUnitLabel,
+      lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (shoppingItemId.present) {
+      map['shopping_item_id'] = Variable<String>(shoppingItemId.value);
+    }
+    if (provider.present) {
+      map['provider'] = Variable<String>(provider.value);
+    }
+    if (productName.present) {
+      map['product_name'] = Variable<String>(productName.value);
+    }
+    if (brand.present) {
+      map['brand'] = Variable<String>(brand.value);
+    }
+    if (price.present) {
+      map['price'] = Variable<double>(price.value);
+    }
+    if (deliveryCharge.present) {
+      map['delivery_charge'] = Variable<double>(deliveryCharge.value);
+    }
+    if (effectivePrice.present) {
+      map['effective_price'] = Variable<double>(effectivePrice.value);
+    }
+    if (currency.present) {
+      map['currency'] = Variable<String>(currency.value);
+    }
+    if (availability.present) {
+      map['availability'] = Variable<String>(availability.value);
+    }
+    if (estimatedDelivery.present) {
+      map['estimated_delivery'] = Variable<String>(estimatedDelivery.value);
+    }
+    if (affiliateUrl.present) {
+      map['affiliate_url'] = Variable<String>(affiliateUrl.value);
+    }
+    if (imageUrl.present) {
+      map['image_url'] = Variable<String>(imageUrl.value);
+    }
+    if (matchConfidence.present) {
+      map['match_confidence'] = Variable<double>(matchConfidence.value);
+    }
+    if (matchType.present) {
+      map['match_type'] = Variable<String>(matchType.value);
+    }
+    if (pricePerUnitLabel.present) {
+      map['price_per_unit_label'] = Variable<String>(pricePerUnitLabel.value);
+    }
+    if (lastCheckedAt.present) {
+      map['last_checked_at'] = Variable<DateTime>(lastCheckedAt.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalProductOffersCompanion(')
+          ..write('id: $id, ')
+          ..write('shoppingItemId: $shoppingItemId, ')
+          ..write('provider: $provider, ')
+          ..write('productName: $productName, ')
+          ..write('brand: $brand, ')
+          ..write('price: $price, ')
+          ..write('deliveryCharge: $deliveryCharge, ')
+          ..write('effectivePrice: $effectivePrice, ')
+          ..write('currency: $currency, ')
+          ..write('availability: $availability, ')
+          ..write('estimatedDelivery: $estimatedDelivery, ')
+          ..write('affiliateUrl: $affiliateUrl, ')
+          ..write('imageUrl: $imageUrl, ')
+          ..write('matchConfidence: $matchConfidence, ')
+          ..write('matchType: $matchType, ')
+          ..write('pricePerUnitLabel: $pricePerUnitLabel, ')
+          ..write('lastCheckedAt: $lastCheckedAt, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -8600,6 +9665,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $SyncMetadataEntriesTable syncMetadataEntries =
       $SyncMetadataEntriesTable(this);
+  late final $LocalProductOffersTable localProductOffers =
+      $LocalProductOffersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8619,6 +9686,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     localNotifications,
     syncQueueEntries,
     syncMetadataEntries,
+    localProductOffers,
   ];
 }
 
@@ -12927,6 +13995,486 @@ typedef $$SyncMetadataEntriesTableProcessedTableManager =
       SyncMetadataEntry,
       PrefetchHooks Function()
     >;
+typedef $$LocalProductOffersTableCreateCompanionBuilder =
+    LocalProductOffersCompanion Function({
+      required String id,
+      required String shoppingItemId,
+      required String provider,
+      required String productName,
+      Value<String?> brand,
+      required double price,
+      Value<double?> deliveryCharge,
+      required double effectivePrice,
+      Value<String> currency,
+      Value<String?> availability,
+      Value<String?> estimatedDelivery,
+      Value<String?> affiliateUrl,
+      Value<String?> imageUrl,
+      Value<double?> matchConfidence,
+      Value<String?> matchType,
+      Value<String?> pricePerUnitLabel,
+      Value<DateTime?> lastCheckedAt,
+      Value<DateTime?> cachedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalProductOffersTableUpdateCompanionBuilder =
+    LocalProductOffersCompanion Function({
+      Value<String> id,
+      Value<String> shoppingItemId,
+      Value<String> provider,
+      Value<String> productName,
+      Value<String?> brand,
+      Value<double> price,
+      Value<double?> deliveryCharge,
+      Value<double> effectivePrice,
+      Value<String> currency,
+      Value<String?> availability,
+      Value<String?> estimatedDelivery,
+      Value<String?> affiliateUrl,
+      Value<String?> imageUrl,
+      Value<double?> matchConfidence,
+      Value<String?> matchType,
+      Value<String?> pricePerUnitLabel,
+      Value<DateTime?> lastCheckedAt,
+      Value<DateTime?> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalProductOffersTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalProductOffersTable> {
+  $$LocalProductOffersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shoppingItemId => $composableBuilder(
+    column: $table.shoppingItemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get price => $composableBuilder(
+    column: $table.price,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get deliveryCharge => $composableBuilder(
+    column: $table.deliveryCharge,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get effectivePrice => $composableBuilder(
+    column: $table.effectivePrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get availability => $composableBuilder(
+    column: $table.availability,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get estimatedDelivery => $composableBuilder(
+    column: $table.estimatedDelivery,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get affiliateUrl => $composableBuilder(
+    column: $table.affiliateUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get matchConfidence => $composableBuilder(
+    column: $table.matchConfidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get matchType => $composableBuilder(
+    column: $table.matchType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pricePerUnitLabel => $composableBuilder(
+    column: $table.pricePerUnitLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastCheckedAt => $composableBuilder(
+    column: $table.lastCheckedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalProductOffersTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalProductOffersTable> {
+  $$LocalProductOffersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shoppingItemId => $composableBuilder(
+    column: $table.shoppingItemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get price => $composableBuilder(
+    column: $table.price,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get deliveryCharge => $composableBuilder(
+    column: $table.deliveryCharge,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get effectivePrice => $composableBuilder(
+    column: $table.effectivePrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get availability => $composableBuilder(
+    column: $table.availability,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get estimatedDelivery => $composableBuilder(
+    column: $table.estimatedDelivery,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get affiliateUrl => $composableBuilder(
+    column: $table.affiliateUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get matchConfidence => $composableBuilder(
+    column: $table.matchConfidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get matchType => $composableBuilder(
+    column: $table.matchType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pricePerUnitLabel => $composableBuilder(
+    column: $table.pricePerUnitLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastCheckedAt => $composableBuilder(
+    column: $table.lastCheckedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalProductOffersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalProductOffersTable> {
+  $$LocalProductOffersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get shoppingItemId => $composableBuilder(
+    column: $table.shoppingItemId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get provider =>
+      $composableBuilder(column: $table.provider, builder: (column) => column);
+
+  GeneratedColumn<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get brand =>
+      $composableBuilder(column: $table.brand, builder: (column) => column);
+
+  GeneratedColumn<double> get price =>
+      $composableBuilder(column: $table.price, builder: (column) => column);
+
+  GeneratedColumn<double> get deliveryCharge => $composableBuilder(
+    column: $table.deliveryCharge,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get effectivePrice => $composableBuilder(
+    column: $table.effectivePrice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get currency =>
+      $composableBuilder(column: $table.currency, builder: (column) => column);
+
+  GeneratedColumn<String> get availability => $composableBuilder(
+    column: $table.availability,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get estimatedDelivery => $composableBuilder(
+    column: $table.estimatedDelivery,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get affiliateUrl => $composableBuilder(
+    column: $table.affiliateUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get imageUrl =>
+      $composableBuilder(column: $table.imageUrl, builder: (column) => column);
+
+  GeneratedColumn<double> get matchConfidence => $composableBuilder(
+    column: $table.matchConfidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get matchType =>
+      $composableBuilder(column: $table.matchType, builder: (column) => column);
+
+  GeneratedColumn<String> get pricePerUnitLabel => $composableBuilder(
+    column: $table.pricePerUnitLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastCheckedAt => $composableBuilder(
+    column: $table.lastCheckedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$LocalProductOffersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalProductOffersTable,
+          LocalProductOffer,
+          $$LocalProductOffersTableFilterComposer,
+          $$LocalProductOffersTableOrderingComposer,
+          $$LocalProductOffersTableAnnotationComposer,
+          $$LocalProductOffersTableCreateCompanionBuilder,
+          $$LocalProductOffersTableUpdateCompanionBuilder,
+          (
+            LocalProductOffer,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalProductOffersTable,
+              LocalProductOffer
+            >,
+          ),
+          LocalProductOffer,
+          PrefetchHooks Function()
+        > {
+  $$LocalProductOffersTableTableManager(
+    _$AppDatabase db,
+    $LocalProductOffersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalProductOffersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalProductOffersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalProductOffersTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> shoppingItemId = const Value.absent(),
+                Value<String> provider = const Value.absent(),
+                Value<String> productName = const Value.absent(),
+                Value<String?> brand = const Value.absent(),
+                Value<double> price = const Value.absent(),
+                Value<double?> deliveryCharge = const Value.absent(),
+                Value<double> effectivePrice = const Value.absent(),
+                Value<String> currency = const Value.absent(),
+                Value<String?> availability = const Value.absent(),
+                Value<String?> estimatedDelivery = const Value.absent(),
+                Value<String?> affiliateUrl = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
+                Value<double?> matchConfidence = const Value.absent(),
+                Value<String?> matchType = const Value.absent(),
+                Value<String?> pricePerUnitLabel = const Value.absent(),
+                Value<DateTime?> lastCheckedAt = const Value.absent(),
+                Value<DateTime?> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalProductOffersCompanion(
+                id: id,
+                shoppingItemId: shoppingItemId,
+                provider: provider,
+                productName: productName,
+                brand: brand,
+                price: price,
+                deliveryCharge: deliveryCharge,
+                effectivePrice: effectivePrice,
+                currency: currency,
+                availability: availability,
+                estimatedDelivery: estimatedDelivery,
+                affiliateUrl: affiliateUrl,
+                imageUrl: imageUrl,
+                matchConfidence: matchConfidence,
+                matchType: matchType,
+                pricePerUnitLabel: pricePerUnitLabel,
+                lastCheckedAt: lastCheckedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String shoppingItemId,
+                required String provider,
+                required String productName,
+                Value<String?> brand = const Value.absent(),
+                required double price,
+                Value<double?> deliveryCharge = const Value.absent(),
+                required double effectivePrice,
+                Value<String> currency = const Value.absent(),
+                Value<String?> availability = const Value.absent(),
+                Value<String?> estimatedDelivery = const Value.absent(),
+                Value<String?> affiliateUrl = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
+                Value<double?> matchConfidence = const Value.absent(),
+                Value<String?> matchType = const Value.absent(),
+                Value<String?> pricePerUnitLabel = const Value.absent(),
+                Value<DateTime?> lastCheckedAt = const Value.absent(),
+                Value<DateTime?> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalProductOffersCompanion.insert(
+                id: id,
+                shoppingItemId: shoppingItemId,
+                provider: provider,
+                productName: productName,
+                brand: brand,
+                price: price,
+                deliveryCharge: deliveryCharge,
+                effectivePrice: effectivePrice,
+                currency: currency,
+                availability: availability,
+                estimatedDelivery: estimatedDelivery,
+                affiliateUrl: affiliateUrl,
+                imageUrl: imageUrl,
+                matchConfidence: matchConfidence,
+                matchType: matchType,
+                pricePerUnitLabel: pricePerUnitLabel,
+                lastCheckedAt: lastCheckedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalProductOffersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalProductOffersTable,
+      LocalProductOffer,
+      $$LocalProductOffersTableFilterComposer,
+      $$LocalProductOffersTableOrderingComposer,
+      $$LocalProductOffersTableAnnotationComposer,
+      $$LocalProductOffersTableCreateCompanionBuilder,
+      $$LocalProductOffersTableUpdateCompanionBuilder,
+      (
+        LocalProductOffer,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalProductOffersTable,
+          LocalProductOffer
+        >,
+      ),
+      LocalProductOffer,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -12965,4 +14513,6 @@ class $AppDatabaseManager {
       $$SyncQueueEntriesTableTableManager(_db, _db.syncQueueEntries);
   $$SyncMetadataEntriesTableTableManager get syncMetadataEntries =>
       $$SyncMetadataEntriesTableTableManager(_db, _db.syncMetadataEntries);
+  $$LocalProductOffersTableTableManager get localProductOffers =>
+      $$LocalProductOffersTableTableManager(_db, _db.localProductOffers);
 }

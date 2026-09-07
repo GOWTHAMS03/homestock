@@ -246,6 +246,31 @@ class SyncMetadataEntries extends Table {
   Set<Column> get primaryKey => {homeId};
 }
 
+/// Cached product offers for smart shopping price comparison
+class LocalProductOffers extends Table {
+  TextColumn get id => text()();
+  TextColumn get shoppingItemId => text()();
+  TextColumn get provider => text()();
+  TextColumn get productName => text()();
+  TextColumn get brand => text().nullable()();
+  RealColumn get price => real()();
+  RealColumn get deliveryCharge => real().nullable()();
+  RealColumn get effectivePrice => real()();
+  TextColumn get currency => text().withDefault(const Constant('INR'))();
+  TextColumn get availability => text().nullable()();
+  TextColumn get estimatedDelivery => text().nullable()();
+  TextColumn get affiliateUrl => text().nullable()();
+  TextColumn get imageUrl => text().nullable()();
+  RealColumn get matchConfidence => real().nullable()();
+  TextColumn get matchType => text().nullable()();
+  TextColumn get pricePerUnitLabel => text().nullable()();
+  DateTimeColumn get lastCheckedAt => dateTime().nullable()();
+  DateTimeColumn get cachedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // ──────────────────────────────────────────────────
 //  DATABASE CLASS
 // ──────────────────────────────────────────────────
@@ -265,6 +290,7 @@ class SyncMetadataEntries extends Table {
   LocalNotifications,
   SyncQueueEntries,
   SyncMetadataEntries,
+  LocalProductOffers,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -273,7 +299,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -282,7 +308,9 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // Future schema migrations go here
+        if (from < 2) {
+          await m.createTable(localProductOffers);
+        }
       },
     );
   }
