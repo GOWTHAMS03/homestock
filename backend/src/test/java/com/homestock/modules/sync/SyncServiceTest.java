@@ -153,4 +153,68 @@ class SyncServiceTest {
         verify(stockTransactionRepository).save(any());
         verify(processedOperationRepository).save(any(ProcessedOperation.class));
     }
+
+    @Test
+    void pushOperations_createStore_savesStoreSuccessfully() {
+        UUID storeId = UUID.randomUUID();
+        when(homeRepository.findById(homeId)).thenReturn(Optional.of(home));
+        when(processedOperationRepository.existsByOperationId("op-store-1")).thenReturn(false);
+        when(storeRepository.existsById(storeId)).thenReturn(false);
+
+        SyncOperationDto op = SyncOperationDto.builder()
+                .operationId("op-store-1")
+                .operationType("CREATE_STORE")
+                .entityType("STORE")
+                .entityId(storeId.toString())
+                .payload(Map.of("name", "Local Organic Market", "location", "Downtown"))
+                .build();
+
+        SyncRequest request = SyncRequest.builder()
+                .homeId(homeId)
+                .operations(List.of(op))
+                .build();
+
+        SyncPushResponse response = syncService.pushOperations(request);
+
+        assertNotNull(response);
+        assertEquals(1, response.getResults().size());
+        assertEquals("SYNCED", response.getResults().get(0).getStatus());
+        verify(storeRepository).save(argThat(s ->
+                s.getId().equals(storeId) &&
+                "Local Organic Market".equals(s.getName()) &&
+                "Downtown".equals(s.getLocation())
+        ));
+    }
+
+    @Test
+    void pushOperations_clearCompletedShopping_callsRepository() {
+        when(homeRepository.findById(homeId)).thenReturn(Optional.of(home));
+        when(processedOperationRepository.existsByOperationId("op-clear-1")).thenReturn(false);
+        com.homestock.modules.shopping.entity.ShoppingList mockList = com.homestock.modules.shopping.entity.ShoppingList.builder()
+                .name("Default List")
+                .build();
+        UUID listId = UUID.randomUUID();
+        mockList.setId(listId);
+        when(shoppingService.getOrCreateDefaultListEntity(home)).thenReturn(mockList);
+
+        SyncOperationDto op = SyncOperationDto.builder()
+                .operationId("op-clear-1")
+                .operationType("CLEAR_COMPLETED_SHOPPING")
+                .entityType("SHOPPING_LIST")
+                .entityId(listId.toString())
+                .payload(Map.of())
+                .build();
+
+        SyncRequest request = SyncRequest.builder()
+                .homeId(homeId)
+                .operations(List.of(op))
+                .build();
+
+        SyncPushResponse response = syncService.pushOperations(request);
+
+        assertNotNull(response);
+        assertEquals(1, response.getResults().size());
+        assertEquals("SYNCED", response.getResults().get(0).getStatus());
+        verify(shoppingListItemRepository).deleteAllCompletedByShoppingListId(listId);
+    }
 }

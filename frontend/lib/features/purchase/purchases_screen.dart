@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/sync_status_bar.dart';
 import 'add_purchase_screen.dart';
 import 'purchase_controller.dart';
 import 'purchase_model.dart';
@@ -22,35 +23,42 @@ class PurchasesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Household Purchases'),
       ),
-      body: purchaseState.isLoading
-          ? ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: 4,
-              separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) => const SkeletonItemCard(),
-            )
-          : purchases.isEmpty
-              ? EmptyStateView(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'No purchases recorded yet',
-                  message: 'Record grocery receipts to track your household spending and automatically restock items.',
-                  actionLabel: 'Record Purchase',
-                  onAction: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () => ref.read(purchaseControllerProvider.notifier).loadPurchases(),
-                  child: ListView.separated(
+      body: Column(
+        children: [
+          const SyncStatusBar(),
+          Expanded(
+            child: purchaseState.isLoading
+                ? ListView.separated(
                     padding: const EdgeInsets.all(AppSpacing.lg),
-                    itemCount: purchases.length,
+                    itemCount: 4,
                     separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final p = purchases[index];
-                      return _buildPurchaseCard(context, p);
-                    },
-                  ),
-                ),
+                    itemBuilder: (context, index) => const SkeletonItemCard(),
+                  )
+                : purchases.isEmpty
+                    ? EmptyStateView(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'No purchases recorded yet',
+                        message: 'Record grocery receipts to track your household spending and automatically restock items.',
+                        actionLabel: 'Record Purchase',
+                        onAction: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => ref.read(purchaseControllerProvider.notifier).loadPurchases(),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          itemCount: purchases.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
+                          itemBuilder: (context, index) {
+                            final p = purchases[index];
+                            return _buildPurchaseCard(context, p);
+                          },
+                        ),
+                      ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),

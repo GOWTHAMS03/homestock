@@ -64,6 +64,9 @@ class SyncOperationType {
 
   // Stores
   static const String createStore = 'CREATE_STORE';
+
+  // Categories
+  static const String createCategory = 'CREATE_CATEGORY';
 }
 
 /// Entity types for sync queue

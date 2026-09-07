@@ -13,4 +13,7 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     List<Store> findAllByHomeIdOrderByNameAsc(UUID homeId);
     Optional<Store> findByIdAndHomeId(UUID id, UUID homeId);
     boolean existsByHomeIdAndNameIgnoreCase(UUID homeId, String name);
+
+    @org.springframework.data.jpa.repository.Query("SELECT s FROM Store s WHERE s.home.id = :homeId AND s.updatedAt > :since ORDER BY s.name ASC")
+    List<Store> findByHomeIdAndUpdatedAtAfter(@org.springframework.data.repository.query.Param("homeId") UUID homeId, @org.springframework.data.repository.query.Param("since") java.time.Instant since);
 }

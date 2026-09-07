@@ -42,8 +42,8 @@ class ShoppingRepository {
   Stream<ShoppingListModel?> watchDefaultList(String homeId) {
     final listStream = _shoppingDao.watchShoppingItemsForHome(homeId);
     return listStream.asyncMap((items) async {
-      final list = await _shoppingDao.getDefaultList(homeId);
-      if (list == null) return null;
+      var list = await _shoppingDao.getDefaultList(homeId);
+      list ??= await _shoppingDao.ensureDefaultList(homeId);
 
       final modelItems = items
           .map((item) => ShoppingItemModel(
@@ -79,8 +79,8 @@ class ShoppingRepository {
 
   /// Get the default list (non-reactive).
   Future<ShoppingListModel?> getDefaultList(String homeId) async {
-    final list = await _shoppingDao.getDefaultList(homeId);
-    if (list == null) return null;
+    var list = await _shoppingDao.getDefaultList(homeId);
+    list ??= await _shoppingDao.ensureDefaultList(homeId);
 
     final items = await _shoppingDao.getShoppingItems(list.id);
     final modelItems = items
@@ -114,12 +114,17 @@ class ShoppingRepository {
     );
   }
 
+  /// Ensure a default shopping list exists locally in SQLite.
+  Future<LocalShoppingList> ensureDefaultList(String homeId) {
+    return _shoppingDao.ensureDefaultList(homeId);
+  }
+
   // ──── WRITE (local-first) ────
 
   /// Add an item to the shopping list locally and queue for sync.
   Future<ShoppingItemModel> addItem(
     String homeId,
-    String listId, {
+    String? listId, {
     String? inventoryItemId,
     required String itemName,
     String? categoryId,
@@ -130,6 +135,9 @@ class ShoppingRepository {
     String unit = 'pcs',
     String? notes,
   }) async {
+    final effectiveListId = (listId != null && listId.isNotEmpty)
+        ? listId
+        : (await _shoppingDao.ensureDefaultList(homeId)).id;
     final itemId = _uuid.v4();
     final operationId = _uuid.v4();
     final now = DateTime.now();
@@ -137,7 +145,7 @@ class ShoppingRepository {
     // 1. Insert locally
     await _shoppingDao.upsertShoppingItem(LocalShoppingListItemsCompanion(
       id: Value(itemId),
-      shoppingListId: Value(listId),
+      shoppingListId: Value(effectiveListId),
       inventoryItemId: Value(inventoryItemId),
       itemName: Value(itemName),
       categoryName: Value(categoryName),
@@ -178,7 +186,7 @@ class ShoppingRepository {
 
     return ShoppingItemModel(
       id: itemId,
-      shoppingListId: listId,
+      shoppingListId: effectiveListId,
       inventoryItemId: inventoryItemId,
       itemName: itemName,
       categoryName: categoryName,

@@ -4,6 +4,7 @@ class HomeModel {
   final String inviteCode;
   final String currentUserRole;
   final int memberCount;
+  final String? createdAt;
 
   HomeModel({
     required this.id,
@@ -11,6 +12,7 @@ class HomeModel {
     required this.inviteCode,
     required this.currentUserRole,
     required this.memberCount,
+    this.createdAt,
   });
 
   factory HomeModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class HomeModel {
       inviteCode: json['inviteCode'] ?? '',
       currentUserRole: json['currentUserRole'] ?? 'MEMBER',
       memberCount: json['memberCount'] ?? 1,
+      createdAt: json['createdAt']?.toString(),
     );
   }
 
@@ -32,6 +35,7 @@ class HomeModel {
     'inviteCode': inviteCode,
     'currentUserRole': currentUserRole,
     'memberCount': memberCount,
+    if (createdAt != null) 'createdAt': createdAt,
   };
 }
 
@@ -53,6 +57,10 @@ class HomeMemberModel {
     required this.role,
     required this.joinedAt,
   });
+
+  bool get isOwner => role == 'OWNER';
+  bool get isAdmin => role == 'ADMIN';
+  bool get isMember => role == 'MEMBER';
 
   factory HomeMemberModel.fromJson(Map<String, dynamic> json) {
     return HomeMemberModel(

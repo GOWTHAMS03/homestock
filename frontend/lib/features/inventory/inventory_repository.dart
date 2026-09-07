@@ -140,6 +140,57 @@ class InventoryRepository {
 
   // ──── WRITE (local-first) ────
 
+  /// Create a new category locally and queue for sync.
+  Future<CategoryModel> createCategory(
+    String homeId, {
+    required String name,
+    String icon = 'category',
+    String colorHex = '#6366F1',
+    int displayOrder = 0,
+  }) async {
+    final catId = _uuid.v4();
+    final operationId = _uuid.v4();
+    final now = DateTime.now();
+
+    final companion = LocalCategoriesCompanion(
+      id: Value(catId),
+      homeId: Value(homeId),
+      name: Value(name.trim()),
+      iconName: Value(icon),
+      colorHex: Value(colorHex),
+      sortOrder: Value(displayOrder),
+      updatedAt: Value(now),
+    );
+
+    await _inventoryDao.upsertCategories([companion]);
+
+    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+      operationId: Value(operationId),
+      operationType: const Value(SyncOperationType.createCategory),
+      entityType: const Value(SyncEntityType.category),
+      entityId: Value(catId),
+      payload: Value(jsonEncode({
+        'name': name.trim(),
+        'icon': icon,
+        'colorHex': colorHex,
+        'displayOrder': displayOrder,
+      })),
+      createdAt: Value(now),
+      homeId: Value(homeId),
+    ));
+
+    _syncEngine.trySyncImmediate();
+
+    return CategoryModel(
+      id: catId,
+      homeId: homeId,
+      name: name.trim(),
+      icon: icon,
+      colorHex: colorHex,
+      displayOrder: displayOrder,
+    );
+  }
+
   /// Create a new inventory item locally and queue for sync.
   Future<InventoryItemModel> createItem(
       String homeId, Map<String, dynamic> data) async {

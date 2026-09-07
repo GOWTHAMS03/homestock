@@ -17,6 +17,32 @@ class ShoppingDao {
         .getSingleOrNull();
   }
 
+  /// Ensure a default shopping list exists locally for the home.
+  /// If none exists, creates one and returns it.
+  Future<LocalShoppingList> ensureDefaultList(String homeId,
+      [String name = 'Home Shopping List']) async {
+    final existing = await getDefaultList(homeId);
+    if (existing != null) return existing;
+
+    final companion = LocalShoppingListsCompanion(
+      id: Value(homeId),
+      homeId: Value(homeId),
+      name: Value(name),
+      isDefault: const Value(true),
+      updatedAt: Value(DateTime.now()),
+    );
+    await upsertShoppingList(companion);
+    final created = await getDefaultList(homeId);
+    return created ??
+        LocalShoppingList(
+          id: homeId,
+          homeId: homeId,
+          name: name,
+          isDefault: true,
+          updatedAt: DateTime.now(),
+        );
+  }
+
   /// Upsert a shopping list.
   Future<void> upsertShoppingList(LocalShoppingListsCompanion list) {
     return _db

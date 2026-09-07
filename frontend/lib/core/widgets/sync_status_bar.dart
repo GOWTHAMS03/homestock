@@ -102,47 +102,64 @@ class SyncStatusBar extends ConsumerWidget {
       );
     }
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: bgColor,
-      child: SafeArea(
-        top: false,
-        bottom: false,
-        child: Row(
-          children: [
-            isSpinning
-                ? SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(textColor),
-                    ),
-                  )
-                : Icon(icon, size: 16, color: textColor),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
+    return InkWell(
+      onTap: syncState.isSyncing
+          ? null
+          : () {
+              ref.read(syncEngineProvider).syncAll();
+            },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        color: bgColor,
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: Row(
+            children: [
+              isSpinning
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(textColor),
+                      ),
+                    )
+                  : Icon(icon, size: 16, color: textColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
                 ),
               ),
-            ),
-            if (syncState.isOffline && syncState.lastSyncedAt != null)
-              Text(
-                syncState.lastSyncedAgo,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: textColor.withValues(alpha: 0.8),
+              if (syncState.isOffline && syncState.lastSyncedAt != null)
+                Text(
+                  syncState.lastSyncedAgo,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textColor.withValues(alpha: 0.8),
+                  ),
+                )
+              else if (!syncState.isSyncing && syncState.pendingOperationsCount > 0)
+                Text(
+                  'Tap to sync',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                    decoration: TextDecoration.underline,
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

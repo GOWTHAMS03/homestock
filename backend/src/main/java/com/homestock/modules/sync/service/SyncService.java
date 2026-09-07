@@ -110,6 +110,9 @@ public class SyncService {
                 case "TOGGLE_SHOPPING_ITEM" -> handleToggleShoppingItem(op, currentUser, payload);
                 case "DELETE_SHOPPING_ITEM" -> handleDeleteShoppingItem(op);
                 case "RECORD_PURCHASE" -> handleRecordPurchase(op, home, currentUser, payload);
+                case "CREATE_STORE" -> handleCreateStore(op, home, payload);
+                case "CLEAR_COMPLETED_SHOPPING" -> handleClearCompletedShopping(home);
+                case "CREATE_CATEGORY" -> handleCreateCategory(op, home, payload);
                 default -> log.warn("Unknown sync operation type: {}", opType);
             }
 
@@ -488,6 +491,71 @@ public class SyncService {
         }
     }
 
+    private void handleCreateStore(SyncOperationDto op, Home home, Map<String, Object> payload) {
+        UUID storeId = null;
+        if (op.getEntityId() != null) {
+            try {
+                storeId = UUID.fromString(op.getEntityId());
+            } catch (Exception ignored) {}
+        }
+
+        if (storeId != null && storeRepository.existsById(storeId)) {
+            return;
+        }
+
+        String name = payload.getOrDefault("name", "Store").toString().trim();
+        String location = payload.get("location") != null ? payload.get("location").toString().trim() : null;
+
+        Store store = Store.builder()
+                .home(home)
+                .name(name)
+                .location(location)
+                .build();
+
+        if (storeId != null) {
+            store.setId(storeId);
+        }
+
+        storeRepository.save(store);
+    }
+
+    private void handleClearCompletedShopping(Home home) {
+        ShoppingList list = shoppingService.getOrCreateDefaultListEntity(home);
+        shoppingListItemRepository.deleteAllCompletedByShoppingListId(list.getId());
+    }
+
+    private void handleCreateCategory(SyncOperationDto op, Home home, Map<String, Object> payload) {
+        UUID categoryId = null;
+        if (op.getEntityId() != null) {
+            try {
+                categoryId = UUID.fromString(op.getEntityId());
+            } catch (Exception ignored) {}
+        }
+
+        if (categoryId != null && categoryRepository.existsById(categoryId)) {
+            return;
+        }
+
+        String name = payload.getOrDefault("name", "Category").toString().trim();
+        String icon = payload.getOrDefault("icon", "category").toString();
+        String colorHex = payload.getOrDefault("colorHex", "#6366F1").toString();
+        int displayOrder = payload.get("displayOrder") != null ? Integer.parseInt(payload.get("displayOrder").toString()) : 0;
+
+        Category category = Category.builder()
+                .home(home)
+                .name(name)
+                .icon(icon)
+                .colorHex(colorHex)
+                .displayOrder(displayOrder)
+                .build();
+
+        if (categoryId != null) {
+            category.setId(categoryId);
+        }
+
+        categoryRepository.save(category);
+    }
+
     /**
      * Pull incremental server changes since the given timestamp.
      */
@@ -600,6 +668,16 @@ public class SyncService {
             return map;
         }).toList();
 
+        // 7. Stores
+        List<Store> stores = storeRepository.findByHomeIdAndUpdatedAtAfter(homeId, since);
+        List<Map<String, Object>> storeMaps = stores.stream().map(s -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", s.getId().toString());
+            map.put("name", s.getName());
+            map.put("location", s.getLocation());
+            return map;
+        }).toList();
+
         return SyncPullResponse.builder()
                 .inventoryItems(itemMaps)
                 .stockTransactions(txMaps)
@@ -607,7 +685,7 @@ public class SyncService {
                 .shoppingListItems(shoppingItemMaps)
                 .purchases(purchaseMaps)
                 .categories(catMaps)
-                .stores(Collections.emptyList())
+                .stores(storeMaps)
                 .serverTimestamp(serverTimestamp.toString())
                 .build();
     }

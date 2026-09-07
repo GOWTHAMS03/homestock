@@ -63,6 +63,7 @@ class SyncEngine {
   /// Start automatic synchronization.
   /// Listens for connectivity changes and triggers sync on restoration.
   void startAutoSync() {
+    _connectivity.start();
     _connectivity.onConnectivityRestored = () {
       if (kDebugMode) print('[SyncEngine] Connectivity restored — starting sync');
       syncAll();
@@ -97,10 +98,22 @@ class SyncEngine {
       // Push all pending operations
       await _pushPendingOperations();
 
-      // Pull changes for each home that has sync metadata
+      // Pull changes for each home: localHomes, pending operations, and sync metadata
       final homes = await (_db.select(_db.localHomes)).get();
-      for (final home in homes) {
-        await _pullServerChanges(home.id);
+      final homeIds = homes.map((h) => h.id).toSet();
+
+      final pendingOps = await _syncDao.getPendingOperations();
+      for (final p in pendingOps) {
+        if (p.homeId.isNotEmpty) homeIds.add(p.homeId);
+      }
+
+      final metadata = await (_db.select(_db.syncMetadataEntries)).get();
+      for (final m in metadata) {
+        if (m.homeId.isNotEmpty) homeIds.add(m.homeId);
+      }
+
+      for (final homeId in homeIds) {
+        await _pullServerChanges(homeId);
       }
 
       _updateState(_currentState.copyWith(

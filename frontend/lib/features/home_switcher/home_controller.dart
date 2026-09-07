@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/sync/sync_providers.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../auth/auth_controller.dart';
 import 'home_model.dart';
@@ -7,7 +8,8 @@ import 'home_repository.dart';
 final homeRepositoryProvider = Provider<HomeRepository>((ref) {
   final client = ref.watch(apiClientProvider);
   final storage = ref.watch(secureStorageProvider);
-  return HomeRepository(apiClient: client, storage: storage);
+  final db = ref.watch(databaseProvider);
+  return HomeRepository(apiClient: client, storage: storage, database: db);
 });
 
 class HomeState {
@@ -130,4 +132,113 @@ class HomeController extends StateNotifier<HomeState> {
       return false;
     }
   }
+
+  Future<bool> updateHomeName(String homeId, String newName) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final updated = await _repo.updateHome(homeId, newName);
+      final updatedHomes = state.homes.map((h) => h.id == homeId ? updated : h).toList();
+      state = state.copyWith(
+        isLoading: false,
+        homes: updatedHomes,
+        activeHome: state.activeHome?.id == homeId ? updated : state.activeHome,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
 }
+
+class MembersState {
+  final bool isLoading;
+  final List<HomeMemberModel> members;
+  final String? errorMessage;
+
+  const MembersState({
+    this.isLoading = false,
+    this.members = const [],
+    this.errorMessage,
+  });
+
+  MembersState copyWith({
+    bool? isLoading,
+    List<HomeMemberModel>? members,
+    String? errorMessage,
+  }) {
+    return MembersState(
+      isLoading: isLoading ?? this.isLoading,
+      members: members ?? this.members,
+      errorMessage: errorMessage,
+    );
+  }
+}
+
+final membersControllerProvider = StateNotifierProvider<MembersController, MembersState>((ref) {
+  final repo = ref.watch(homeRepositoryProvider);
+  final activeHome = ref.watch(homeControllerProvider).activeHome;
+  return MembersController(repo, activeHome?.id);
+});
+
+class MembersController extends StateNotifier<MembersState> {
+  final HomeRepository _repo;
+  final String? _homeId;
+
+  MembersController(this._repo, this._homeId) : super(const MembersState()) {
+    if (_homeId != null) {
+      loadMembers();
+    }
+  }
+
+  Future<void> loadMembers() async {
+    if (_homeId == null) return;
+    state = state.copyWith(isLoading: state.members.isEmpty, errorMessage: null);
+    try {
+      final members = await _repo.getMembers(_homeId);
+      state = state.copyWith(isLoading: false, members: members);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: state.members.isEmpty ? e.toString() : null);
+    }
+  }
+
+  Future<bool> changeRole(String userId, String newRole) async {
+    if (_homeId == null) return false;
+    try {
+      await _repo.updateMemberRole(_homeId, userId, newRole);
+      final updated = state.members.map((m) {
+        if (m.userId == userId) {
+          return HomeMemberModel(
+            id: m.id,
+            userId: m.userId,
+            fullName: m.fullName,
+            email: m.email,
+            avatarUrl: m.avatarUrl,
+            role: newRole,
+            joinedAt: m.joinedAt,
+          );
+        }
+        return m;
+      }).toList();
+      state = state.copyWith(members: updated);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> removeMember(String userId) async {
+    if (_homeId == null) return false;
+    try {
+      await _repo.removeMember(_homeId, userId);
+      final updated = state.members.where((m) => m.userId != userId).toList();
+      state = state.copyWith(members: updated);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+}
+

@@ -99,12 +99,13 @@ class ShoppingController extends StateNotifier<ShoppingState> {
     String unit = 'pcs',
     String? notes,
   }) async {
-    if (_homeId == null || state.list == null) return false;
+    if (_homeId == null) return false;
 
     try {
+      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
       await _repo.addItem(
         _homeId,
-        state.list!.id,
+        listId,
         inventoryItemId: inventoryItemId,
         itemName: itemName,
         categoryId: categoryId,
@@ -125,10 +126,11 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   /// Toggle item: local-first, no rollback needed.
   Future<void> toggleItem(String itemId) async {
-    if (_homeId == null || state.list == null) return;
+    if (_homeId == null) return;
 
     try {
-      await _repo.toggleItem(_homeId, state.list!.id, itemId);
+      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
+      await _repo.toggleItem(_homeId, listId, itemId);
       // UI updates automatically via Drift stream
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
@@ -137,9 +139,10 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   /// Delete item: local-first.
   Future<void> deleteItem(String itemId) async {
-    if (_homeId == null || state.list == null) return;
+    if (_homeId == null) return;
     try {
-      await _repo.deleteItem(_homeId, state.list!.id, itemId);
+      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
+      await _repo.deleteItem(_homeId, listId, itemId);
       // UI updates automatically via Drift stream
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
@@ -148,9 +151,10 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   /// Clear completed: local-first.
   Future<void> clearCompleted() async {
-    if (_homeId == null || state.list == null) return;
+    if (_homeId == null) return;
     try {
-      await _repo.clearCompleted(_homeId, state.list!.id);
+      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
+      await _repo.clearCompleted(_homeId, listId);
       // UI updates automatically via Drift stream
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());

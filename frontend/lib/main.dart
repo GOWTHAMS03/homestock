@@ -38,6 +38,7 @@ void main() async {
 
   // 5. Initialize ConnectivityMonitor
   final connectivityMonitor = ConnectivityMonitor();
+  await connectivityMonitor.start();
 
   // 6. Initialize SyncEngine
   final syncEngine = SyncEngine(
