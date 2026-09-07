@@ -69,6 +69,26 @@ class InventoryDao {
         .getSingleOrNull();
   }
 
+  /// Get item by barcode for a home.
+  Future<LocalInventoryItem?> getItemByBarcode(String homeId, String barcode) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.homeId.equals(homeId) &
+              t.barcode.equals(barcode) &
+              t.isDeleted.equals(false)))
+        .getSingleOrNull();
+  }
+
+  /// Get item by product ID for a home.
+  Future<LocalInventoryItem?> getItemByProductId(String homeId, String productId) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.homeId.equals(homeId) &
+              t.productId.equals(productId) &
+              t.isDeleted.equals(false)))
+        .getSingleOrNull();
+  }
+
   /// Get all items for a home (non-reactive, for sync use).
   Future<List<LocalInventoryItem>> getAllItems(String homeId) {
     return (_db.select(_db.localInventoryItems)

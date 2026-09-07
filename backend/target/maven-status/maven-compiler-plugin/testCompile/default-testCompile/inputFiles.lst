@@ -1,5 +1,7 @@
 D:\New folder (3)\home\backend\src\test\java\com\homestock\HomeStockApplicationTests.java
 D:\New folder (3)\home\backend\src\test\java\com\homestock\InventoryAndShoppingIntegrationTest.java
+D:\New folder (3)\home\backend\src\test\java\com\homestock\modules\product\service\BarcodeValidationServiceTest.java
+D:\New folder (3)\home\backend\src\test\java\com\homestock\modules\product\service\ProductLookupServiceTest.java
 D:\New folder (3)\home\backend\src\test\java\com\homestock\modules\smartshopping\MockProviderTest.java
 D:\New folder (3)\home\backend\src\test\java\com\homestock\modules\smartshopping\ProductMatchingServiceTest.java
 D:\New folder (3)\home\backend\src\test\java\com\homestock\modules\smartshopping\UnitNormalizationServiceTest.java

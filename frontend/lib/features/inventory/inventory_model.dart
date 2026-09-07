@@ -19,6 +19,8 @@ class InventoryItemModel {
   final String? expiryDate;
   final String? imageUrl;
   final String? notes;
+  final String? barcode;
+  final String? productId;
   final String stockStatus; // IN_STOCK, LOW_STOCK, OUT_OF_STOCK
   final String expiryStatus; // SAFE, EXPIRING_SOON, EXPIRED
   final int? daysUntilExpiry;
@@ -42,6 +44,8 @@ class InventoryItemModel {
     this.expiryDate,
     this.imageUrl,
     this.notes,
+    this.barcode,
+    this.productId,
     required this.stockStatus,
     required this.expiryStatus,
     this.daysUntilExpiry,
@@ -67,6 +71,8 @@ class InventoryItemModel {
       expiryDate: json['expiryDate'],
       imageUrl: json['imageUrl'],
       notes: json['notes'],
+      barcode: json['barcode'] as String?,
+      productId: json['productId'] as String?,
       stockStatus: json['stockStatus'] ?? 'IN_STOCK',
       expiryStatus: json['expiryStatus'] ?? 'SAFE',
       daysUntilExpiry: json['daysUntilExpiry'] as int?,
@@ -123,6 +129,8 @@ class InventoryItemModel {
     'expiryDate': expiryDate,
     'imageUrl': imageUrl,
     'notes': notes,
+    'barcode': barcode,
+    'productId': productId,
     'stockStatus': stockStatus,
     'expiryStatus': expiryStatus,
     'daysUntilExpiry': daysUntilExpiry,

@@ -8,6 +8,8 @@ import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/stock_status_badge.dart';
 import '../../core/widgets/sync_status_bar.dart';
 import '../voice/widgets/voice_input_button.dart';
+import '../voice/widgets/voice_bottom_sheet.dart';
+import '../barcode/widgets/barcode_scanner_widget.dart';
 import 'add_edit_item_screen.dart';
 import 'category_model.dart';
 import 'inventory_controller.dart';
@@ -124,6 +126,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           ref.read(inventoryControllerProvider.notifier).setSearchQuery('');
                         },
                       ),
+                    IconButton(
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 20, color: AppColors.primary),
+                      tooltip: 'Scan Barcode',
+                      onPressed: () => BarcodeScannerWidget.open(context),
+                    ),
                     const VoiceInputButton(size: 20),
                   ],
                 ),
@@ -274,15 +281,101 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           const SizedBox(width: 12),
           FloatingActionButton.extended(
             heroTag: 'inventory_add_btn',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddEditItemScreen()),
-            ),
+            onPressed: () => _showAddItemMenu(context),
             icon: const Icon(Icons.add_rounded),
             label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700)),
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAddItemMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusXl)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Text(
+                'Add to Inventory',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.edit_note_rounded, color: AppColors.primary),
+                ),
+                title: const Text('Add Manually', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Enter name, quantity, category and details manually', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AddEditItemScreen()),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.secondary),
+                ),
+                title: const Text('Scan Barcode', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Fast camera scan with automatic product recognition', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  BarcodeScannerWidget.open(context);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E8FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.mic_rounded, color: Color(0xFF9333EA)),
+                ),
+                title: const Text('Voice Input', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Say e.g. "Add 2 packets of milk to inventory"', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  VoiceBottomSheet.show(context);
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

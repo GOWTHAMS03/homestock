@@ -50,6 +50,26 @@ public class ProductMatchingService {
             String itemCategory,
             ProductOfferDto offer
     ) {
+        return calculateMatch(itemName, itemBrand, itemQuantity, itemUnit, itemCategory, null, offer);
+    }
+
+    public MatchResult calculateMatch(
+            String itemName,
+            String itemBrand,
+            BigDecimal itemQuantity,
+            String itemUnit,
+            String itemCategory,
+            String barcode,
+            ProductOfferDto offer
+    ) {
+        // Barcode / GTIN is the strongest product identifier — 100% confidence on match
+        if (barcode != null && !barcode.isBlank() && offer.getBarcode() != null && !offer.getBarcode().isBlank()) {
+            if (barcode.trim().equalsIgnoreCase(offer.getBarcode().trim())) {
+                log.info("[ProductMatching] Exact barcode match for barcode {}: '{}'", barcode, offer.getProductName());
+                return new MatchResult(1.0, "EXACT", true);
+            }
+        }
+
         double brandScore = scoreBrand(itemBrand, offer.getBrand());
         double nameScore = scoreName(itemName, offer.getProductName());
         double sizeScore = scoreSize(itemQuantity, itemUnit, offer.getPackageSize(), offer.getUnit());

@@ -28,6 +28,12 @@ public class ProductSearchRequest {
     /** Product category hint (e.g. "Kitchen", "Cleaning") */
     private String category;
 
+    /** Barcode / GTIN for exact product identity match */
+    private String barcode;
+
+    /** Barcode type (e.g. EAN_13, UPC_A) */
+    private String barcodeType;
+
     /** Maximum number of results per provider */
     @Builder.Default
     private int maxResults = 5;

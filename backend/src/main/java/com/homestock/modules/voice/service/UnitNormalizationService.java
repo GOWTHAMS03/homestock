@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 
-@Service
+@Service("voiceUnitNormalizationService")
 public class UnitNormalizationService {
 
     private static final Map<String, String> UNIT_MAP = new HashMap<>();

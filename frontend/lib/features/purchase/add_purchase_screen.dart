@@ -9,7 +9,8 @@ import '../shopping/shopping_controller.dart';
 import 'purchase_controller.dart';
 
 class AddPurchaseScreen extends ConsumerStatefulWidget {
-  const AddPurchaseScreen({super.key});
+  final List<Map<String, dynamic>>? initialScannedItems;
+  const AddPurchaseScreen({super.key, this.initialScannedItems});
 
   @override
   ConsumerState<AddPurchaseScreen> createState() => _AddPurchaseScreenState();
@@ -37,19 +38,34 @@ class _AddPurchaseScreenState extends ConsumerState<AddPurchaseScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-populate with pending shopping items if available
-    final shoppingList = ref.read(shoppingControllerProvider).list;
-    if (shoppingList != null && shoppingList.items.isNotEmpty) {
-      final pending = shoppingList.items.where((i) => !i.isCompleted).toList();
-      for (final s in pending) {
+    // Pre-populate with quick scan items if provided
+    if (widget.initialScannedItems != null && widget.initialScannedItems!.isNotEmpty) {
+      for (final raw in widget.initialScannedItems!) {
         final entry = _AddPurchaseItemEntry()
-          ..inventoryItemId = s.inventoryItemId
-          ..itemName = s.itemName
-          ..quantity = s.quantity
-          ..unit = s.unit
-          ..unitPrice = 0.0
-          ..totalPrice = 0.0;
+          ..inventoryItemId = raw['inventoryItemId'] as String?
+          ..itemName = raw['name'] as String? ?? ''
+          ..quantity = (raw['quantity'] as num?)?.toDouble() ?? 1.0
+          ..unit = raw['unit'] as String? ?? 'pcs'
+          ..unitPrice = (raw['unitPrice'] as num?)?.toDouble() ?? 0.0
+          ..totalPrice = ((raw['quantity'] as num?)?.toDouble() ?? 1.0) *
+              ((raw['unitPrice'] as num?)?.toDouble() ?? 0.0);
         _items.add(entry);
+      }
+    } else {
+      // Pre-populate with pending shopping items if available
+      final shoppingList = ref.read(shoppingControllerProvider).list;
+      if (shoppingList != null && shoppingList.items.isNotEmpty) {
+        final pending = shoppingList.items.where((i) => !i.isCompleted).toList();
+        for (final s in pending) {
+          final entry = _AddPurchaseItemEntry()
+            ..inventoryItemId = s.inventoryItemId
+            ..itemName = s.itemName
+            ..quantity = s.quantity
+            ..unit = s.unit
+            ..unitPrice = 0.0
+            ..totalPrice = 0.0;
+          _items.add(entry);
+        }
       }
     }
 

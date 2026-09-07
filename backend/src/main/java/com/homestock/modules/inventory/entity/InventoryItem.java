@@ -27,6 +27,13 @@ public class InventoryItem extends BaseEntity {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private com.homestock.modules.product.entity.Product product;
+
+    @Column(name = "barcode", length = 50)
+    private String barcode;
+
     @Column(name = "name", nullable = false, length = 150)
     private String name;
 

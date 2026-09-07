@@ -22,6 +22,7 @@ public class ProductOfferDto {
 
     private String provider;
     private String providerProductId;
+    private String barcode;
     private String productName;
     private String brand;
     private String description;

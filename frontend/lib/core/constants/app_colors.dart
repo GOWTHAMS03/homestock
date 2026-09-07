@@ -9,6 +9,12 @@ class AppColors {
   static const Color primaryDark = Color(0xFF3730A3);
   static const Color primaryContainer = Color(0xFFEEF2FF);
 
+  // Secondary brand colors (Teal / Sky Blue)
+  static const Color secondary = Color(0xFF0284C7);
+  static const Color secondaryLight = Color(0xFF38BDF8);
+  static const Color secondaryDark = Color(0xFF0369A1);
+  static const Color secondaryContainer = Color(0xFFE0F2FE);
+
   // Background & Surfaces
   static const Color background = Color(0xFFF8FAFC);
   static const Color surface = Color(0xFFFFFFFF);

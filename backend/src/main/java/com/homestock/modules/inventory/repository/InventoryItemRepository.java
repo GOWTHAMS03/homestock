@@ -47,4 +47,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     long countOutOfStock(@Param("homeId") UUID homeId);
 
     List<InventoryItem> findByHomeIdAndUpdatedAtAfter(UUID homeId, Instant since);
+
+    Optional<InventoryItem> findByHomeIdAndBarcodeAndIsArchivedFalse(UUID homeId, String barcode);
+
+    Optional<InventoryItem> findByHomeIdAndProductIdAndIsArchivedFalse(UUID homeId, UUID productId);
 }

@@ -2280,6 +2280,28 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _barcodeMeta = const VerificationMeta(
+    'barcode',
+  );
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+    'barcode',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isDeletedMeta = const VerificationMeta(
     'isDeleted',
   );
@@ -2344,6 +2366,8 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
     stockStatus,
     expiryStatus,
     daysUntilExpiry,
+    barcode,
+    productId,
     isDeleted,
     isLocalOnly,
     updatedAt,
@@ -2522,6 +2546,18 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
         ),
       );
     }
+    if (data.containsKey('barcode')) {
+      context.handle(
+        _barcodeMeta,
+        barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
+      );
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    }
     if (data.containsKey('is_deleted')) {
       context.handle(
         _isDeletedMeta,
@@ -2636,6 +2672,14 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
         DriftSqlType.int,
         data['${effectivePrefix}days_until_expiry'],
       ),
+      barcode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode'],
+      ),
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      ),
       isDeleted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_deleted'],
@@ -2680,6 +2724,8 @@ class LocalInventoryItem extends DataClass
   final String stockStatus;
   final String expiryStatus;
   final int? daysUntilExpiry;
+  final String? barcode;
+  final String? productId;
   final bool isDeleted;
 
   /// True if this item was created locally and hasn't been synced yet
@@ -2707,6 +2753,8 @@ class LocalInventoryItem extends DataClass
     required this.stockStatus,
     required this.expiryStatus,
     this.daysUntilExpiry,
+    this.barcode,
+    this.productId,
     required this.isDeleted,
     required this.isLocalOnly,
     this.updatedAt,
@@ -2754,6 +2802,12 @@ class LocalInventoryItem extends DataClass
     map['expiry_status'] = Variable<String>(expiryStatus);
     if (!nullToAbsent || daysUntilExpiry != null) {
       map['days_until_expiry'] = Variable<int>(daysUntilExpiry);
+    }
+    if (!nullToAbsent || barcode != null) {
+      map['barcode'] = Variable<String>(barcode);
+    }
+    if (!nullToAbsent || productId != null) {
+      map['product_id'] = Variable<String>(productId);
     }
     map['is_deleted'] = Variable<bool>(isDeleted);
     map['is_local_only'] = Variable<bool>(isLocalOnly);
@@ -2806,6 +2860,12 @@ class LocalInventoryItem extends DataClass
       daysUntilExpiry: daysUntilExpiry == null && nullToAbsent
           ? const Value.absent()
           : Value(daysUntilExpiry),
+      barcode: barcode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barcode),
+      productId: productId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(productId),
       isDeleted: Value(isDeleted),
       isLocalOnly: Value(isLocalOnly),
       updatedAt: updatedAt == null && nullToAbsent
@@ -2841,6 +2901,8 @@ class LocalInventoryItem extends DataClass
       stockStatus: serializer.fromJson<String>(json['stockStatus']),
       expiryStatus: serializer.fromJson<String>(json['expiryStatus']),
       daysUntilExpiry: serializer.fromJson<int?>(json['daysUntilExpiry']),
+      barcode: serializer.fromJson<String?>(json['barcode']),
+      productId: serializer.fromJson<String?>(json['productId']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       isLocalOnly: serializer.fromJson<bool>(json['isLocalOnly']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
@@ -2871,6 +2933,8 @@ class LocalInventoryItem extends DataClass
       'stockStatus': serializer.toJson<String>(stockStatus),
       'expiryStatus': serializer.toJson<String>(expiryStatus),
       'daysUntilExpiry': serializer.toJson<int?>(daysUntilExpiry),
+      'barcode': serializer.toJson<String?>(barcode),
+      'productId': serializer.toJson<String?>(productId),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'isLocalOnly': serializer.toJson<bool>(isLocalOnly),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
@@ -2899,6 +2963,8 @@ class LocalInventoryItem extends DataClass
     String? stockStatus,
     String? expiryStatus,
     Value<int?> daysUntilExpiry = const Value.absent(),
+    Value<String?> barcode = const Value.absent(),
+    Value<String?> productId = const Value.absent(),
     bool? isDeleted,
     bool? isLocalOnly,
     Value<DateTime?> updatedAt = const Value.absent(),
@@ -2932,6 +2998,8 @@ class LocalInventoryItem extends DataClass
     daysUntilExpiry: daysUntilExpiry.present
         ? daysUntilExpiry.value
         : this.daysUntilExpiry,
+    barcode: barcode.present ? barcode.value : this.barcode,
+    productId: productId.present ? productId.value : this.productId,
     isDeleted: isDeleted ?? this.isDeleted,
     isLocalOnly: isLocalOnly ?? this.isLocalOnly,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
@@ -2985,6 +3053,8 @@ class LocalInventoryItem extends DataClass
       daysUntilExpiry: data.daysUntilExpiry.present
           ? data.daysUntilExpiry.value
           : this.daysUntilExpiry,
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
+      productId: data.productId.present ? data.productId.value : this.productId,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
       isLocalOnly: data.isLocalOnly.present
           ? data.isLocalOnly.value
@@ -3017,6 +3087,8 @@ class LocalInventoryItem extends DataClass
           ..write('stockStatus: $stockStatus, ')
           ..write('expiryStatus: $expiryStatus, ')
           ..write('daysUntilExpiry: $daysUntilExpiry, ')
+          ..write('barcode: $barcode, ')
+          ..write('productId: $productId, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('isLocalOnly: $isLocalOnly, ')
           ..write('updatedAt: $updatedAt')
@@ -3047,6 +3119,8 @@ class LocalInventoryItem extends DataClass
     stockStatus,
     expiryStatus,
     daysUntilExpiry,
+    barcode,
+    productId,
     isDeleted,
     isLocalOnly,
     updatedAt,
@@ -3076,6 +3150,8 @@ class LocalInventoryItem extends DataClass
           other.stockStatus == this.stockStatus &&
           other.expiryStatus == this.expiryStatus &&
           other.daysUntilExpiry == this.daysUntilExpiry &&
+          other.barcode == this.barcode &&
+          other.productId == this.productId &&
           other.isDeleted == this.isDeleted &&
           other.isLocalOnly == this.isLocalOnly &&
           other.updatedAt == this.updatedAt);
@@ -3103,6 +3179,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
   final Value<String> stockStatus;
   final Value<String> expiryStatus;
   final Value<int?> daysUntilExpiry;
+  final Value<String?> barcode;
+  final Value<String?> productId;
   final Value<bool> isDeleted;
   final Value<bool> isLocalOnly;
   final Value<DateTime?> updatedAt;
@@ -3129,6 +3207,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     this.stockStatus = const Value.absent(),
     this.expiryStatus = const Value.absent(),
     this.daysUntilExpiry = const Value.absent(),
+    this.barcode = const Value.absent(),
+    this.productId = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.isLocalOnly = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3156,6 +3236,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     this.stockStatus = const Value.absent(),
     this.expiryStatus = const Value.absent(),
     this.daysUntilExpiry = const Value.absent(),
+    this.barcode = const Value.absent(),
+    this.productId = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.isLocalOnly = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3185,6 +3267,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     Expression<String>? stockStatus,
     Expression<String>? expiryStatus,
     Expression<int>? daysUntilExpiry,
+    Expression<String>? barcode,
+    Expression<String>? productId,
     Expression<bool>? isDeleted,
     Expression<bool>? isLocalOnly,
     Expression<DateTime>? updatedAt,
@@ -3212,6 +3296,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
       if (stockStatus != null) 'stock_status': stockStatus,
       if (expiryStatus != null) 'expiry_status': expiryStatus,
       if (daysUntilExpiry != null) 'days_until_expiry': daysUntilExpiry,
+      if (barcode != null) 'barcode': barcode,
+      if (productId != null) 'product_id': productId,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (isLocalOnly != null) 'is_local_only': isLocalOnly,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -3241,6 +3327,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     Value<String>? stockStatus,
     Value<String>? expiryStatus,
     Value<int?>? daysUntilExpiry,
+    Value<String?>? barcode,
+    Value<String?>? productId,
     Value<bool>? isDeleted,
     Value<bool>? isLocalOnly,
     Value<DateTime?>? updatedAt,
@@ -3268,6 +3356,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
       stockStatus: stockStatus ?? this.stockStatus,
       expiryStatus: expiryStatus ?? this.expiryStatus,
       daysUntilExpiry: daysUntilExpiry ?? this.daysUntilExpiry,
+      barcode: barcode ?? this.barcode,
+      productId: productId ?? this.productId,
       isDeleted: isDeleted ?? this.isDeleted,
       isLocalOnly: isLocalOnly ?? this.isLocalOnly,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -3341,6 +3431,12 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     if (daysUntilExpiry.present) {
       map['days_until_expiry'] = Variable<int>(daysUntilExpiry.value);
     }
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
@@ -3380,6 +3476,8 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
           ..write('stockStatus: $stockStatus, ')
           ..write('expiryStatus: $expiryStatus, ')
           ..write('daysUntilExpiry: $daysUntilExpiry, ')
+          ..write('barcode: $barcode, ')
+          ..write('productId: $productId, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('isLocalOnly: $isLocalOnly, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4656,6 +4754,28 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _barcodeMeta = const VerificationMeta(
+    'barcode',
+  );
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+    'barcode',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isLocalOnlyMeta = const VerificationMeta(
     'isLocalOnly',
   );
@@ -4714,6 +4834,8 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
     completedByName,
     completedAt,
     notes,
+    barcode,
+    productId,
     isLocalOnly,
     isDeleted,
     updatedAt,
@@ -4853,6 +4975,18 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('barcode')) {
+      context.handle(
+        _barcodeMeta,
+        barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
+      );
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    }
     if (data.containsKey('is_local_only')) {
       context.handle(
         _isLocalOnlyMeta,
@@ -4943,6 +5077,14 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      barcode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode'],
+      ),
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      ),
       isLocalOnly: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_local_only'],
@@ -4981,6 +5123,8 @@ class LocalShoppingListItem extends DataClass
   final String? completedByName;
   final String? completedAt;
   final String? notes;
+  final String? barcode;
+  final String? productId;
   final bool isLocalOnly;
   final bool isDeleted;
   final DateTime? updatedAt;
@@ -5000,6 +5144,8 @@ class LocalShoppingListItem extends DataClass
     this.completedByName,
     this.completedAt,
     this.notes,
+    this.barcode,
+    this.productId,
     required this.isLocalOnly,
     required this.isDeleted,
     this.updatedAt,
@@ -5031,6 +5177,12 @@ class LocalShoppingListItem extends DataClass
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || barcode != null) {
+      map['barcode'] = Variable<String>(barcode);
+    }
+    if (!nullToAbsent || productId != null) {
+      map['product_id'] = Variable<String>(productId);
     }
     map['is_local_only'] = Variable<bool>(isLocalOnly);
     map['is_deleted'] = Variable<bool>(isDeleted);
@@ -5067,6 +5219,12 @@ class LocalShoppingListItem extends DataClass
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      barcode: barcode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barcode),
+      productId: productId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(productId),
       isLocalOnly: Value(isLocalOnly),
       isDeleted: Value(isDeleted),
       updatedAt: updatedAt == null && nullToAbsent
@@ -5096,6 +5254,8 @@ class LocalShoppingListItem extends DataClass
       completedByName: serializer.fromJson<String?>(json['completedByName']),
       completedAt: serializer.fromJson<String?>(json['completedAt']),
       notes: serializer.fromJson<String?>(json['notes']),
+      barcode: serializer.fromJson<String?>(json['barcode']),
+      productId: serializer.fromJson<String?>(json['productId']),
       isLocalOnly: serializer.fromJson<bool>(json['isLocalOnly']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
@@ -5120,6 +5280,8 @@ class LocalShoppingListItem extends DataClass
       'completedByName': serializer.toJson<String?>(completedByName),
       'completedAt': serializer.toJson<String?>(completedAt),
       'notes': serializer.toJson<String?>(notes),
+      'barcode': serializer.toJson<String?>(barcode),
+      'productId': serializer.toJson<String?>(productId),
       'isLocalOnly': serializer.toJson<bool>(isLocalOnly),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
@@ -5142,6 +5304,8 @@ class LocalShoppingListItem extends DataClass
     Value<String?> completedByName = const Value.absent(),
     Value<String?> completedAt = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    Value<String?> barcode = const Value.absent(),
+    Value<String?> productId = const Value.absent(),
     bool? isLocalOnly,
     bool? isDeleted,
     Value<DateTime?> updatedAt = const Value.absent(),
@@ -5165,6 +5329,8 @@ class LocalShoppingListItem extends DataClass
         : this.completedByName,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
     notes: notes.present ? notes.value : this.notes,
+    barcode: barcode.present ? barcode.value : this.barcode,
+    productId: productId.present ? productId.value : this.productId,
     isLocalOnly: isLocalOnly ?? this.isLocalOnly,
     isDeleted: isDeleted ?? this.isDeleted,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
@@ -5208,6 +5374,8 @@ class LocalShoppingListItem extends DataClass
           ? data.completedAt.value
           : this.completedAt,
       notes: data.notes.present ? data.notes.value : this.notes,
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
+      productId: data.productId.present ? data.productId.value : this.productId,
       isLocalOnly: data.isLocalOnly.present
           ? data.isLocalOnly.value
           : this.isLocalOnly,
@@ -5234,6 +5402,8 @@ class LocalShoppingListItem extends DataClass
           ..write('completedByName: $completedByName, ')
           ..write('completedAt: $completedAt, ')
           ..write('notes: $notes, ')
+          ..write('barcode: $barcode, ')
+          ..write('productId: $productId, ')
           ..write('isLocalOnly: $isLocalOnly, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('updatedAt: $updatedAt')
@@ -5258,6 +5428,8 @@ class LocalShoppingListItem extends DataClass
     completedByName,
     completedAt,
     notes,
+    barcode,
+    productId,
     isLocalOnly,
     isDeleted,
     updatedAt,
@@ -5281,6 +5453,8 @@ class LocalShoppingListItem extends DataClass
           other.completedByName == this.completedByName &&
           other.completedAt == this.completedAt &&
           other.notes == this.notes &&
+          other.barcode == this.barcode &&
+          other.productId == this.productId &&
           other.isLocalOnly == this.isLocalOnly &&
           other.isDeleted == this.isDeleted &&
           other.updatedAt == this.updatedAt);
@@ -5303,6 +5477,8 @@ class LocalShoppingListItemsCompanion
   final Value<String?> completedByName;
   final Value<String?> completedAt;
   final Value<String?> notes;
+  final Value<String?> barcode;
+  final Value<String?> productId;
   final Value<bool> isLocalOnly;
   final Value<bool> isDeleted;
   final Value<DateTime?> updatedAt;
@@ -5323,6 +5499,8 @@ class LocalShoppingListItemsCompanion
     this.completedByName = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.notes = const Value.absent(),
+    this.barcode = const Value.absent(),
+    this.productId = const Value.absent(),
     this.isLocalOnly = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -5344,6 +5522,8 @@ class LocalShoppingListItemsCompanion
     this.completedByName = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.notes = const Value.absent(),
+    this.barcode = const Value.absent(),
+    this.productId = const Value.absent(),
     this.isLocalOnly = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -5367,6 +5547,8 @@ class LocalShoppingListItemsCompanion
     Expression<String>? completedByName,
     Expression<String>? completedAt,
     Expression<String>? notes,
+    Expression<String>? barcode,
+    Expression<String>? productId,
     Expression<bool>? isLocalOnly,
     Expression<bool>? isDeleted,
     Expression<DateTime>? updatedAt,
@@ -5388,6 +5570,8 @@ class LocalShoppingListItemsCompanion
       if (completedByName != null) 'completed_by_name': completedByName,
       if (completedAt != null) 'completed_at': completedAt,
       if (notes != null) 'notes': notes,
+      if (barcode != null) 'barcode': barcode,
+      if (productId != null) 'product_id': productId,
       if (isLocalOnly != null) 'is_local_only': isLocalOnly,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -5411,6 +5595,8 @@ class LocalShoppingListItemsCompanion
     Value<String?>? completedByName,
     Value<String?>? completedAt,
     Value<String?>? notes,
+    Value<String?>? barcode,
+    Value<String?>? productId,
     Value<bool>? isLocalOnly,
     Value<bool>? isDeleted,
     Value<DateTime?>? updatedAt,
@@ -5432,6 +5618,8 @@ class LocalShoppingListItemsCompanion
       completedByName: completedByName ?? this.completedByName,
       completedAt: completedAt ?? this.completedAt,
       notes: notes ?? this.notes,
+      barcode: barcode ?? this.barcode,
+      productId: productId ?? this.productId,
       isLocalOnly: isLocalOnly ?? this.isLocalOnly,
       isDeleted: isDeleted ?? this.isDeleted,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -5487,6 +5675,12 @@ class LocalShoppingListItemsCompanion
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
     if (isLocalOnly.present) {
       map['is_local_only'] = Variable<bool>(isLocalOnly.value);
     }
@@ -5520,6 +5714,8 @@ class LocalShoppingListItemsCompanion
           ..write('completedByName: $completedByName, ')
           ..write('completedAt: $completedAt, ')
           ..write('notes: $notes, ')
+          ..write('barcode: $barcode, ')
+          ..write('productId: $productId, ')
           ..write('isLocalOnly: $isLocalOnly, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('updatedAt: $updatedAt, ')
@@ -9635,6 +9831,819 @@ class LocalProductOffersCompanion extends UpdateCompanion<LocalProductOffer> {
   }
 }
 
+class $LocalProductsTable extends LocalProducts
+    with TableInfo<$LocalProductsTable, LocalProduct> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalProductsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _barcodeMeta = const VerificationMeta(
+    'barcode',
+  );
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+    'barcode',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _barcodeTypeMeta = const VerificationMeta(
+    'barcodeType',
+  );
+  @override
+  late final GeneratedColumn<String> barcodeType = GeneratedColumn<String>(
+    'barcode_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('EAN_13'),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _normalizedNameMeta = const VerificationMeta(
+    'normalizedName',
+  );
+  @override
+  late final GeneratedColumn<String> normalizedName = GeneratedColumn<String>(
+    'normalized_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _brandMeta = const VerificationMeta('brand');
+  @override
+  late final GeneratedColumn<String> brand = GeneratedColumn<String>(
+    'brand',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  @override
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+    'category_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryNameMeta = const VerificationMeta(
+    'categoryName',
+  );
+  @override
+  late final GeneratedColumn<String> categoryName = GeneratedColumn<String>(
+    'category_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('General'),
+  );
+  static const VerificationMeta _packageSizeMeta = const VerificationMeta(
+    'packageSize',
+  );
+  @override
+  late final GeneratedColumn<double> packageSize = GeneratedColumn<double>(
+    'package_size',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pcs'),
+  );
+  static const VerificationMeta _imageUrlMeta = const VerificationMeta(
+    'imageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
+    'image_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('LOCAL'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    barcode,
+    barcodeType,
+    name,
+    normalizedName,
+    brand,
+    categoryId,
+    categoryName,
+    packageSize,
+    unit,
+    imageUrl,
+    source,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_products';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalProduct> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('barcode')) {
+      context.handle(
+        _barcodeMeta,
+        barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
+      );
+    }
+    if (data.containsKey('barcode_type')) {
+      context.handle(
+        _barcodeTypeMeta,
+        barcodeType.isAcceptableOrUnknown(
+          data['barcode_type']!,
+          _barcodeTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('normalized_name')) {
+      context.handle(
+        _normalizedNameMeta,
+        normalizedName.isAcceptableOrUnknown(
+          data['normalized_name']!,
+          _normalizedNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_normalizedNameMeta);
+    }
+    if (data.containsKey('brand')) {
+      context.handle(
+        _brandMeta,
+        brand.isAcceptableOrUnknown(data['brand']!, _brandMeta),
+      );
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['category_id']!, _categoryIdMeta),
+      );
+    }
+    if (data.containsKey('category_name')) {
+      context.handle(
+        _categoryNameMeta,
+        categoryName.isAcceptableOrUnknown(
+          data['category_name']!,
+          _categoryNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('package_size')) {
+      context.handle(
+        _packageSizeMeta,
+        packageSize.isAcceptableOrUnknown(
+          data['package_size']!,
+          _packageSizeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('image_url')) {
+      context.handle(
+        _imageUrlMeta,
+        imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
+      );
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalProduct map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalProduct(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      barcode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode'],
+      ),
+      barcodeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode_type'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      normalizedName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}normalized_name'],
+      )!,
+      brand: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brand'],
+      ),
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category_id'],
+      ),
+      categoryName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category_name'],
+      )!,
+      packageSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}package_size'],
+      ),
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      )!,
+      imageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_url'],
+      ),
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $LocalProductsTable createAlias(String alias) {
+    return $LocalProductsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalProduct extends DataClass implements Insertable<LocalProduct> {
+  final String id;
+  final String? barcode;
+  final String barcodeType;
+  final String name;
+  final String normalizedName;
+  final String? brand;
+  final String? categoryId;
+  final String categoryName;
+  final double? packageSize;
+  final String unit;
+  final String? imageUrl;
+  final String source;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  const LocalProduct({
+    required this.id,
+    this.barcode,
+    required this.barcodeType,
+    required this.name,
+    required this.normalizedName,
+    this.brand,
+    this.categoryId,
+    required this.categoryName,
+    this.packageSize,
+    required this.unit,
+    this.imageUrl,
+    required this.source,
+    this.createdAt,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || barcode != null) {
+      map['barcode'] = Variable<String>(barcode);
+    }
+    map['barcode_type'] = Variable<String>(barcodeType);
+    map['name'] = Variable<String>(name);
+    map['normalized_name'] = Variable<String>(normalizedName);
+    if (!nullToAbsent || brand != null) {
+      map['brand'] = Variable<String>(brand);
+    }
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<String>(categoryId);
+    }
+    map['category_name'] = Variable<String>(categoryName);
+    if (!nullToAbsent || packageSize != null) {
+      map['package_size'] = Variable<double>(packageSize);
+    }
+    map['unit'] = Variable<String>(unit);
+    if (!nullToAbsent || imageUrl != null) {
+      map['image_url'] = Variable<String>(imageUrl);
+    }
+    map['source'] = Variable<String>(source);
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  LocalProductsCompanion toCompanion(bool nullToAbsent) {
+    return LocalProductsCompanion(
+      id: Value(id),
+      barcode: barcode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barcode),
+      barcodeType: Value(barcodeType),
+      name: Value(name),
+      normalizedName: Value(normalizedName),
+      brand: brand == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brand),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
+      categoryName: Value(categoryName),
+      packageSize: packageSize == null && nullToAbsent
+          ? const Value.absent()
+          : Value(packageSize),
+      unit: Value(unit),
+      imageUrl: imageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imageUrl),
+      source: Value(source),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory LocalProduct.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalProduct(
+      id: serializer.fromJson<String>(json['id']),
+      barcode: serializer.fromJson<String?>(json['barcode']),
+      barcodeType: serializer.fromJson<String>(json['barcodeType']),
+      name: serializer.fromJson<String>(json['name']),
+      normalizedName: serializer.fromJson<String>(json['normalizedName']),
+      brand: serializer.fromJson<String?>(json['brand']),
+      categoryId: serializer.fromJson<String?>(json['categoryId']),
+      categoryName: serializer.fromJson<String>(json['categoryName']),
+      packageSize: serializer.fromJson<double?>(json['packageSize']),
+      unit: serializer.fromJson<String>(json['unit']),
+      imageUrl: serializer.fromJson<String?>(json['imageUrl']),
+      source: serializer.fromJson<String>(json['source']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'barcode': serializer.toJson<String?>(barcode),
+      'barcodeType': serializer.toJson<String>(barcodeType),
+      'name': serializer.toJson<String>(name),
+      'normalizedName': serializer.toJson<String>(normalizedName),
+      'brand': serializer.toJson<String?>(brand),
+      'categoryId': serializer.toJson<String?>(categoryId),
+      'categoryName': serializer.toJson<String>(categoryName),
+      'packageSize': serializer.toJson<double?>(packageSize),
+      'unit': serializer.toJson<String>(unit),
+      'imageUrl': serializer.toJson<String?>(imageUrl),
+      'source': serializer.toJson<String>(source),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  LocalProduct copyWith({
+    String? id,
+    Value<String?> barcode = const Value.absent(),
+    String? barcodeType,
+    String? name,
+    String? normalizedName,
+    Value<String?> brand = const Value.absent(),
+    Value<String?> categoryId = const Value.absent(),
+    String? categoryName,
+    Value<double?> packageSize = const Value.absent(),
+    String? unit,
+    Value<String?> imageUrl = const Value.absent(),
+    String? source,
+    Value<DateTime?> createdAt = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => LocalProduct(
+    id: id ?? this.id,
+    barcode: barcode.present ? barcode.value : this.barcode,
+    barcodeType: barcodeType ?? this.barcodeType,
+    name: name ?? this.name,
+    normalizedName: normalizedName ?? this.normalizedName,
+    brand: brand.present ? brand.value : this.brand,
+    categoryId: categoryId.present ? categoryId.value : this.categoryId,
+    categoryName: categoryName ?? this.categoryName,
+    packageSize: packageSize.present ? packageSize.value : this.packageSize,
+    unit: unit ?? this.unit,
+    imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
+    source: source ?? this.source,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  LocalProduct copyWithCompanion(LocalProductsCompanion data) {
+    return LocalProduct(
+      id: data.id.present ? data.id.value : this.id,
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
+      barcodeType: data.barcodeType.present
+          ? data.barcodeType.value
+          : this.barcodeType,
+      name: data.name.present ? data.name.value : this.name,
+      normalizedName: data.normalizedName.present
+          ? data.normalizedName.value
+          : this.normalizedName,
+      brand: data.brand.present ? data.brand.value : this.brand,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      categoryName: data.categoryName.present
+          ? data.categoryName.value
+          : this.categoryName,
+      packageSize: data.packageSize.present
+          ? data.packageSize.value
+          : this.packageSize,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
+      source: data.source.present ? data.source.value : this.source,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalProduct(')
+          ..write('id: $id, ')
+          ..write('barcode: $barcode, ')
+          ..write('barcodeType: $barcodeType, ')
+          ..write('name: $name, ')
+          ..write('normalizedName: $normalizedName, ')
+          ..write('brand: $brand, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('categoryName: $categoryName, ')
+          ..write('packageSize: $packageSize, ')
+          ..write('unit: $unit, ')
+          ..write('imageUrl: $imageUrl, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    barcode,
+    barcodeType,
+    name,
+    normalizedName,
+    brand,
+    categoryId,
+    categoryName,
+    packageSize,
+    unit,
+    imageUrl,
+    source,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalProduct &&
+          other.id == this.id &&
+          other.barcode == this.barcode &&
+          other.barcodeType == this.barcodeType &&
+          other.name == this.name &&
+          other.normalizedName == this.normalizedName &&
+          other.brand == this.brand &&
+          other.categoryId == this.categoryId &&
+          other.categoryName == this.categoryName &&
+          other.packageSize == this.packageSize &&
+          other.unit == this.unit &&
+          other.imageUrl == this.imageUrl &&
+          other.source == this.source &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalProductsCompanion extends UpdateCompanion<LocalProduct> {
+  final Value<String> id;
+  final Value<String?> barcode;
+  final Value<String> barcodeType;
+  final Value<String> name;
+  final Value<String> normalizedName;
+  final Value<String?> brand;
+  final Value<String?> categoryId;
+  final Value<String> categoryName;
+  final Value<double?> packageSize;
+  final Value<String> unit;
+  final Value<String?> imageUrl;
+  final Value<String> source;
+  final Value<DateTime?> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const LocalProductsCompanion({
+    this.id = const Value.absent(),
+    this.barcode = const Value.absent(),
+    this.barcodeType = const Value.absent(),
+    this.name = const Value.absent(),
+    this.normalizedName = const Value.absent(),
+    this.brand = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.categoryName = const Value.absent(),
+    this.packageSize = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.imageUrl = const Value.absent(),
+    this.source = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalProductsCompanion.insert({
+    required String id,
+    this.barcode = const Value.absent(),
+    this.barcodeType = const Value.absent(),
+    required String name,
+    required String normalizedName,
+    this.brand = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.categoryName = const Value.absent(),
+    this.packageSize = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.imageUrl = const Value.absent(),
+    this.source = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       normalizedName = Value(normalizedName);
+  static Insertable<LocalProduct> custom({
+    Expression<String>? id,
+    Expression<String>? barcode,
+    Expression<String>? barcodeType,
+    Expression<String>? name,
+    Expression<String>? normalizedName,
+    Expression<String>? brand,
+    Expression<String>? categoryId,
+    Expression<String>? categoryName,
+    Expression<double>? packageSize,
+    Expression<String>? unit,
+    Expression<String>? imageUrl,
+    Expression<String>? source,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (barcode != null) 'barcode': barcode,
+      if (barcodeType != null) 'barcode_type': barcodeType,
+      if (name != null) 'name': name,
+      if (normalizedName != null) 'normalized_name': normalizedName,
+      if (brand != null) 'brand': brand,
+      if (categoryId != null) 'category_id': categoryId,
+      if (categoryName != null) 'category_name': categoryName,
+      if (packageSize != null) 'package_size': packageSize,
+      if (unit != null) 'unit': unit,
+      if (imageUrl != null) 'image_url': imageUrl,
+      if (source != null) 'source': source,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalProductsCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? barcode,
+    Value<String>? barcodeType,
+    Value<String>? name,
+    Value<String>? normalizedName,
+    Value<String?>? brand,
+    Value<String?>? categoryId,
+    Value<String>? categoryName,
+    Value<double?>? packageSize,
+    Value<String>? unit,
+    Value<String?>? imageUrl,
+    Value<String>? source,
+    Value<DateTime?>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalProductsCompanion(
+      id: id ?? this.id,
+      barcode: barcode ?? this.barcode,
+      barcodeType: barcodeType ?? this.barcodeType,
+      name: name ?? this.name,
+      normalizedName: normalizedName ?? this.normalizedName,
+      brand: brand ?? this.brand,
+      categoryId: categoryId ?? this.categoryId,
+      categoryName: categoryName ?? this.categoryName,
+      packageSize: packageSize ?? this.packageSize,
+      unit: unit ?? this.unit,
+      imageUrl: imageUrl ?? this.imageUrl,
+      source: source ?? this.source,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
+    if (barcodeType.present) {
+      map['barcode_type'] = Variable<String>(barcodeType.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (normalizedName.present) {
+      map['normalized_name'] = Variable<String>(normalizedName.value);
+    }
+    if (brand.present) {
+      map['brand'] = Variable<String>(brand.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<String>(categoryId.value);
+    }
+    if (categoryName.present) {
+      map['category_name'] = Variable<String>(categoryName.value);
+    }
+    if (packageSize.present) {
+      map['package_size'] = Variable<double>(packageSize.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (imageUrl.present) {
+      map['image_url'] = Variable<String>(imageUrl.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalProductsCompanion(')
+          ..write('id: $id, ')
+          ..write('barcode: $barcode, ')
+          ..write('barcodeType: $barcodeType, ')
+          ..write('name: $name, ')
+          ..write('normalizedName: $normalizedName, ')
+          ..write('brand: $brand, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('categoryName: $categoryName, ')
+          ..write('packageSize: $packageSize, ')
+          ..write('unit: $unit, ')
+          ..write('imageUrl: $imageUrl, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -9667,6 +10676,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $SyncMetadataEntriesTable(this);
   late final $LocalProductOffersTable localProductOffers =
       $LocalProductOffersTable(this);
+  late final $LocalProductsTable localProducts = $LocalProductsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -9687,6 +10697,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncQueueEntries,
     syncMetadataEntries,
     localProductOffers,
+    localProducts,
   ];
 }
 
@@ -10751,6 +11762,8 @@ typedef $$LocalInventoryItemsTableCreateCompanionBuilder =
       Value<String> stockStatus,
       Value<String> expiryStatus,
       Value<int?> daysUntilExpiry,
+      Value<String?> barcode,
+      Value<String?> productId,
       Value<bool> isDeleted,
       Value<bool> isLocalOnly,
       Value<DateTime?> updatedAt,
@@ -10779,6 +11792,8 @@ typedef $$LocalInventoryItemsTableUpdateCompanionBuilder =
       Value<String> stockStatus,
       Value<String> expiryStatus,
       Value<int?> daysUntilExpiry,
+      Value<String?> barcode,
+      Value<String?> productId,
       Value<bool> isDeleted,
       Value<bool> isLocalOnly,
       Value<DateTime?> updatedAt,
@@ -10896,6 +11911,16 @@ class $$LocalInventoryItemsTableFilterComposer
 
   ColumnFilters<int> get daysUntilExpiry => $composableBuilder(
     column: $table.daysUntilExpiry,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11029,6 +12054,16 @@ class $$LocalInventoryItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
     column: $table.isDeleted,
     builder: (column) => ColumnOrderings(column),
@@ -11143,6 +12178,12 @@ class $$LocalInventoryItemsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
@@ -11219,6 +12260,8 @@ class $$LocalInventoryItemsTableTableManager
                 Value<String> stockStatus = const Value.absent(),
                 Value<String> expiryStatus = const Value.absent(),
                 Value<int?> daysUntilExpiry = const Value.absent(),
+                Value<String?> barcode = const Value.absent(),
+                Value<String?> productId = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<bool> isLocalOnly = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -11245,6 +12288,8 @@ class $$LocalInventoryItemsTableTableManager
                 stockStatus: stockStatus,
                 expiryStatus: expiryStatus,
                 daysUntilExpiry: daysUntilExpiry,
+                barcode: barcode,
+                productId: productId,
                 isDeleted: isDeleted,
                 isLocalOnly: isLocalOnly,
                 updatedAt: updatedAt,
@@ -11273,6 +12318,8 @@ class $$LocalInventoryItemsTableTableManager
                 Value<String> stockStatus = const Value.absent(),
                 Value<String> expiryStatus = const Value.absent(),
                 Value<int?> daysUntilExpiry = const Value.absent(),
+                Value<String?> barcode = const Value.absent(),
+                Value<String?> productId = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<bool> isLocalOnly = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -11299,6 +12346,8 @@ class $$LocalInventoryItemsTableTableManager
                 stockStatus: stockStatus,
                 expiryStatus: expiryStatus,
                 daysUntilExpiry: daysUntilExpiry,
+                barcode: barcode,
+                productId: productId,
                 isDeleted: isDeleted,
                 isLocalOnly: isLocalOnly,
                 updatedAt: updatedAt,
@@ -11927,6 +12976,8 @@ typedef $$LocalShoppingListItemsTableCreateCompanionBuilder =
       Value<String?> completedByName,
       Value<String?> completedAt,
       Value<String?> notes,
+      Value<String?> barcode,
+      Value<String?> productId,
       Value<bool> isLocalOnly,
       Value<bool> isDeleted,
       Value<DateTime?> updatedAt,
@@ -11949,6 +13000,8 @@ typedef $$LocalShoppingListItemsTableUpdateCompanionBuilder =
       Value<String?> completedByName,
       Value<String?> completedAt,
       Value<String?> notes,
+      Value<String?> barcode,
+      Value<String?> productId,
       Value<bool> isLocalOnly,
       Value<bool> isDeleted,
       Value<DateTime?> updatedAt,
@@ -12036,6 +13089,16 @@ class $$LocalShoppingListItemsTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12139,6 +13202,16 @@ class $$LocalShoppingListItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isLocalOnly => $composableBuilder(
     column: $table.isLocalOnly,
     builder: (column) => ColumnOrderings(column),
@@ -12229,6 +13302,12 @@ class $$LocalShoppingListItemsTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
   GeneratedColumn<bool> get isLocalOnly => $composableBuilder(
     column: $table.isLocalOnly,
     builder: (column) => column,
@@ -12302,6 +13381,8 @@ class $$LocalShoppingListItemsTableTableManager
                 Value<String?> completedByName = const Value.absent(),
                 Value<String?> completedAt = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String?> barcode = const Value.absent(),
+                Value<String?> productId = const Value.absent(),
                 Value<bool> isLocalOnly = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -12322,6 +13403,8 @@ class $$LocalShoppingListItemsTableTableManager
                 completedByName: completedByName,
                 completedAt: completedAt,
                 notes: notes,
+                barcode: barcode,
+                productId: productId,
                 isLocalOnly: isLocalOnly,
                 isDeleted: isDeleted,
                 updatedAt: updatedAt,
@@ -12344,6 +13427,8 @@ class $$LocalShoppingListItemsTableTableManager
                 Value<String?> completedByName = const Value.absent(),
                 Value<String?> completedAt = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String?> barcode = const Value.absent(),
+                Value<String?> productId = const Value.absent(),
                 Value<bool> isLocalOnly = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -12364,6 +13449,8 @@ class $$LocalShoppingListItemsTableTableManager
                 completedByName: completedByName,
                 completedAt: completedAt,
                 notes: notes,
+                barcode: barcode,
+                productId: productId,
                 isLocalOnly: isLocalOnly,
                 isDeleted: isDeleted,
                 updatedAt: updatedAt,
@@ -14475,6 +15562,387 @@ typedef $$LocalProductOffersTableProcessedTableManager =
       LocalProductOffer,
       PrefetchHooks Function()
     >;
+typedef $$LocalProductsTableCreateCompanionBuilder =
+    LocalProductsCompanion Function({
+      required String id,
+      Value<String?> barcode,
+      Value<String> barcodeType,
+      required String name,
+      required String normalizedName,
+      Value<String?> brand,
+      Value<String?> categoryId,
+      Value<String> categoryName,
+      Value<double?> packageSize,
+      Value<String> unit,
+      Value<String?> imageUrl,
+      Value<String> source,
+      Value<DateTime?> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalProductsTableUpdateCompanionBuilder =
+    LocalProductsCompanion Function({
+      Value<String> id,
+      Value<String?> barcode,
+      Value<String> barcodeType,
+      Value<String> name,
+      Value<String> normalizedName,
+      Value<String?> brand,
+      Value<String?> categoryId,
+      Value<String> categoryName,
+      Value<double?> packageSize,
+      Value<String> unit,
+      Value<String?> imageUrl,
+      Value<String> source,
+      Value<DateTime?> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalProductsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalProductsTable> {
+  $$LocalProductsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barcodeType => $composableBuilder(
+    column: $table.barcodeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get normalizedName => $composableBuilder(
+    column: $table.normalizedName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categoryName => $composableBuilder(
+    column: $table.categoryName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get packageSize => $composableBuilder(
+    column: $table.packageSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalProductsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalProductsTable> {
+  $$LocalProductsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get barcodeType => $composableBuilder(
+    column: $table.barcodeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get normalizedName => $composableBuilder(
+    column: $table.normalizedName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categoryName => $composableBuilder(
+    column: $table.categoryName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get packageSize => $composableBuilder(
+    column: $table.packageSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalProductsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalProductsTable> {
+  $$LocalProductsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
+
+  GeneratedColumn<String> get barcodeType => $composableBuilder(
+    column: $table.barcodeType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get normalizedName => $composableBuilder(
+    column: $table.normalizedName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get brand =>
+      $composableBuilder(column: $table.brand, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get categoryName => $composableBuilder(
+    column: $table.categoryName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get packageSize => $composableBuilder(
+    column: $table.packageSize,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<String> get imageUrl =>
+      $composableBuilder(column: $table.imageUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalProductsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalProductsTable,
+          LocalProduct,
+          $$LocalProductsTableFilterComposer,
+          $$LocalProductsTableOrderingComposer,
+          $$LocalProductsTableAnnotationComposer,
+          $$LocalProductsTableCreateCompanionBuilder,
+          $$LocalProductsTableUpdateCompanionBuilder,
+          (
+            LocalProduct,
+            BaseReferences<_$AppDatabase, $LocalProductsTable, LocalProduct>,
+          ),
+          LocalProduct,
+          PrefetchHooks Function()
+        > {
+  $$LocalProductsTableTableManager(_$AppDatabase db, $LocalProductsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalProductsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalProductsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalProductsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> barcode = const Value.absent(),
+                Value<String> barcodeType = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> normalizedName = const Value.absent(),
+                Value<String?> brand = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
+                Value<String> categoryName = const Value.absent(),
+                Value<double?> packageSize = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalProductsCompanion(
+                id: id,
+                barcode: barcode,
+                barcodeType: barcodeType,
+                name: name,
+                normalizedName: normalizedName,
+                brand: brand,
+                categoryId: categoryId,
+                categoryName: categoryName,
+                packageSize: packageSize,
+                unit: unit,
+                imageUrl: imageUrl,
+                source: source,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> barcode = const Value.absent(),
+                Value<String> barcodeType = const Value.absent(),
+                required String name,
+                required String normalizedName,
+                Value<String?> brand = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
+                Value<String> categoryName = const Value.absent(),
+                Value<double?> packageSize = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalProductsCompanion.insert(
+                id: id,
+                barcode: barcode,
+                barcodeType: barcodeType,
+                name: name,
+                normalizedName: normalizedName,
+                brand: brand,
+                categoryId: categoryId,
+                categoryName: categoryName,
+                packageSize: packageSize,
+                unit: unit,
+                imageUrl: imageUrl,
+                source: source,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalProductsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalProductsTable,
+      LocalProduct,
+      $$LocalProductsTableFilterComposer,
+      $$LocalProductsTableOrderingComposer,
+      $$LocalProductsTableAnnotationComposer,
+      $$LocalProductsTableCreateCompanionBuilder,
+      $$LocalProductsTableUpdateCompanionBuilder,
+      (
+        LocalProduct,
+        BaseReferences<_$AppDatabase, $LocalProductsTable, LocalProduct>,
+      ),
+      LocalProduct,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -14515,4 +15983,6 @@ class $AppDatabaseManager {
       $$SyncMetadataEntriesTableTableManager(_db, _db.syncMetadataEntries);
   $$LocalProductOffersTableTableManager get localProductOffers =>
       $$LocalProductOffersTableTableManager(_db, _db.localProductOffers);
+  $$LocalProductsTableTableManager get localProducts =>
+      $$LocalProductsTableTableManager(_db, _db.localProducts);
 }

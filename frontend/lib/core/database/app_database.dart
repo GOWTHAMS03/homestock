@@ -95,6 +95,8 @@ class LocalInventoryItems extends Table {
   TextColumn get stockStatus => text().withDefault(const Constant('IN_STOCK'))();
   TextColumn get expiryStatus => text().withDefault(const Constant('SAFE'))();
   IntColumn get daysUntilExpiry => integer().nullable()();
+  TextColumn get barcode => text().nullable()();
+  TextColumn get productId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
   /// True if this item was created locally and hasn't been synced yet
   BoolColumn get isLocalOnly => boolean().withDefault(const Constant(false))();
@@ -152,6 +154,8 @@ class LocalShoppingListItems extends Table {
   TextColumn get completedByName => text().nullable()();
   TextColumn get completedAt => text().nullable()();
   TextColumn get notes => text().nullable()();
+  TextColumn get barcode => text().nullable()();
+  TextColumn get productId => text().nullable()();
   BoolColumn get isLocalOnly => boolean().withDefault(const Constant(false))();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt => dateTime().nullable()();
@@ -271,6 +275,27 @@ class LocalProductOffers extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Cached canonical products (from barcode scanning & central catalog)
+class LocalProducts extends Table {
+  TextColumn get id => text()();
+  TextColumn get barcode => text().nullable()();
+  TextColumn get barcodeType => text().withDefault(const Constant('EAN_13'))();
+  TextColumn get name => text()();
+  TextColumn get normalizedName => text()();
+  TextColumn get brand => text().nullable()();
+  TextColumn get categoryId => text().nullable()();
+  TextColumn get categoryName => text().withDefault(const Constant('General'))();
+  RealColumn get packageSize => real().nullable()();
+  TextColumn get unit => text().withDefault(const Constant('pcs'))();
+  TextColumn get imageUrl => text().nullable()();
+  TextColumn get source => text().withDefault(const Constant('LOCAL'))();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // ──────────────────────────────────────────────────
 //  DATABASE CLASS
 // ──────────────────────────────────────────────────
@@ -291,6 +316,7 @@ class LocalProductOffers extends Table {
   SyncQueueEntries,
   SyncMetadataEntries,
   LocalProductOffers,
+  LocalProducts,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -299,7 +325,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -310,6 +336,13 @@ class AppDatabase extends _$AppDatabase {
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
           await m.createTable(localProductOffers);
+        }
+        if (from < 3) {
+          await m.createTable(localProducts);
+          await m.addColumn(localInventoryItems, localInventoryItems.barcode);
+          await m.addColumn(localInventoryItems, localInventoryItems.productId);
+          await m.addColumn(localShoppingListItems, localShoppingListItems.barcode);
+          await m.addColumn(localShoppingListItems, localShoppingListItems.productId);
         }
       },
     );

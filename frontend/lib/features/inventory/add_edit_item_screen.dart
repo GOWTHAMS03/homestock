@@ -7,14 +7,16 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_text_field.dart';
 import '../home_switcher/home_controller.dart';
+import '../barcode/widgets/barcode_scanner_widget.dart';
 import 'category_model.dart';
 import 'inventory_controller.dart';
 import 'inventory_model.dart';
 
 class AddEditItemScreen extends ConsumerStatefulWidget {
   final InventoryItemModel? initialItem;
+  final String? initialBarcode;
 
-  const AddEditItemScreen({super.key, this.initialItem});
+  const AddEditItemScreen({super.key, this.initialItem, this.initialBarcode});
 
   @override
   ConsumerState<AddEditItemScreen> createState() => _AddEditItemScreenState();
@@ -27,6 +29,7 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
   late TextEditingController _quantityController;
   late TextEditingController _minQtyController;
   late TextEditingController _brandController;
+  late TextEditingController _barcodeController;
   late TextEditingController _locationController;
   late TextEditingController _priceController;
   late TextEditingController _notesController;
@@ -47,6 +50,7 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
     _quantityController = TextEditingController(text: item != null ? item.quantity.toString() : '1.0');
     _minQtyController = TextEditingController(text: item != null ? item.minimumQuantity.toString() : '1.0');
     _brandController = TextEditingController(text: item?.brand ?? '');
+    _barcodeController = TextEditingController(text: item?.barcode ?? widget.initialBarcode ?? '');
     _locationController = TextEditingController(text: item?.storageLocation ?? '');
     _priceController = TextEditingController(text: item?.purchasePrice != null ? item!.purchasePrice.toString() : '');
     _notesController = TextEditingController(text: item?.notes ?? '');
@@ -67,6 +71,7 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
     _quantityController.dispose();
     _minQtyController.dispose();
     _brandController.dispose();
+    _barcodeController.dispose();
     _locationController.dispose();
     _priceController.dispose();
     _notesController.dispose();
@@ -101,6 +106,7 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
       'unit': _unit,
       'minimumQuantity': double.tryParse(_minQtyController.text) ?? 1.0,
       'brand': _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
+      'barcode': _barcodeController.text.trim().isEmpty ? null : _barcodeController.text.trim(),
       'storageLocation': _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
       'purchasePrice': double.tryParse(_priceController.text),
       'expiryDate': _expiryDate != null ? DateFormat('yyyy-MM-dd').format(_expiryDate!) : null,
@@ -283,6 +289,23 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
                 controller: _brandController,
                 label: 'Brand (Optional)',
                 hint: 'e.g. Fortune, Aashirvaad, Dettol',
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              AppTextField(
+                controller: _barcodeController,
+                label: 'Barcode (Optional)',
+                hint: 'e.g. 8901725181222',
+                keyboardType: TextInputType.number,
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary),
+                  tooltip: 'Scan Barcode',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BarcodeScannerWidget(),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
 
