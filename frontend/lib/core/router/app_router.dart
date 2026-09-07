@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/analytics/analytics_screen.dart';
 import '../../features/auth/auth_controller.dart';
+import '../../features/auth/auth_state.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
@@ -20,30 +21,49 @@ final _shoppingNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shopping');
 final _analyticsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'analytics');
 final _profileNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 
+class RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  RouterNotifier(this._ref) {
+    _ref.listen<AuthState>(
+      authControllerProvider,
+      (previous, next) => notifyListeners(),
+    );
+  }
+
+  String? redirect(BuildContext context, GoRouterState state) {
+    final authState = _ref.read(authControllerProvider);
+    if (authState.isLoading) {
+      return state.matchedLocation == '/splash' ? null : '/splash';
+    }
+
+    final isAuth = authState.isAuthenticated;
+    final isAuthRoute = state.matchedLocation == '/login' || state.matchedLocation == '/register';
+
+    if (!isAuth) {
+      return isAuthRoute ? null : '/login';
+    }
+
+    if (isAuth && (isAuthRoute || state.matchedLocation == '/splash')) {
+      return '/';
+    }
+
+    return null;
+  }
+}
+
+final routerNotifierProvider = Provider<RouterNotifier>((ref) {
+  return RouterNotifier(ref);
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authControllerProvider);
+  final notifier = ref.watch(routerNotifierProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
+    refreshListenable: notifier,
     initialLocation: '/splash',
-    redirect: (context, state) {
-      if (authState.isLoading) {
-        return state.matchedLocation == '/splash' ? null : '/splash';
-      }
-
-      final isAuth = authState.isAuthenticated;
-      final isAuthRoute = state.matchedLocation == '/login' || state.matchedLocation == '/register';
-
-      if (!isAuth) {
-        return isAuthRoute ? null : '/login';
-      }
-
-      if (isAuth && (isAuthRoute || state.matchedLocation == '/splash')) {
-        return '/';
-      }
-
-      return null;
-    },
+    redirect: notifier.redirect,
     routes: [
       GoRoute(
         path: '/splash',

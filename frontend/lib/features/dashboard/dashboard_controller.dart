@@ -69,10 +69,14 @@ class DashboardController extends StateNotifier<DashboardState> {
 
     try {
       final summary = await _repo.getSummary(_homeId, homeName: _homeName ?? 'My Home');
-      state = state.copyWith(isLoading: false, summary: summary);
+      if (mounted) {
+        state = state.copyWith(isLoading: false, summary: summary);
+      }
     } catch (e) {
-      // Even if both fail, keep existing summary if any
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      if (mounted) {
+        // Even if both fail, keep existing summary if any
+        state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      }
     }
   }
 
@@ -80,9 +84,13 @@ class DashboardController extends StateNotifier<DashboardState> {
     if (_homeId == null) return;
     try {
       final recs = await _repo.getRecommendations(_homeId);
-      state = state.copyWith(recommendations: recs);
+      if (mounted) {
+        state = state.copyWith(recommendations: recs);
+      }
     } catch (e) {
-      state = state.copyWith(errorMessage: e.toString());
+      if (mounted) {
+        state = state.copyWith(errorMessage: e.toString());
+      }
     }
   }
 }
