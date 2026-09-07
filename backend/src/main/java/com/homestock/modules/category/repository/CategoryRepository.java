@@ -17,4 +17,7 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
     Optional<Category> findByHomeIdAndNameIgnoreCase(UUID homeId, String name);
     boolean existsByHomeIdAndNameIgnoreCase(UUID homeId, String name);
+
+    @Query("SELECT c FROM Category c WHERE (c.home.id = :homeId OR c.home IS NULL) AND c.updatedAt > :since ORDER BY c.displayOrder ASC, c.name ASC")
+    List<Category> findByHomeIdAndUpdatedAtAfter(@Param("homeId") UUID homeId, @Param("since") java.time.Instant since);
 }

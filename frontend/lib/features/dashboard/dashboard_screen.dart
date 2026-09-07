@@ -7,10 +7,12 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/sync_status_bar.dart';
 import '../auth/auth_controller.dart';
 import '../home_switcher/create_home_dialog.dart';
 import '../home_switcher/home_controller.dart';
 import '../home_switcher/join_home_dialog.dart';
+import '../inventory/category_model.dart';
 import '../inventory/inventory_controller.dart';
 import '../notifications/notification_controller.dart';
 import '../shopping/shopping_controller.dart';
@@ -143,12 +145,16 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await ref.read(dashboardControllerProvider.notifier).loadDashboard();
-          await ref.read(inventoryControllerProvider.notifier).loadData();
-        },
-        child: ListView(
+      body: Column(
+        children: [
+          const SyncStatusBar(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(dashboardControllerProvider.notifier).loadDashboard();
+                await ref.read(inventoryControllerProvider.notifier).loadData();
+              },
+              child: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             // Friendly Greeting & Smart Action Header
@@ -367,6 +373,9 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
       ),
+    ),
+  ],
+),
     );
   }
 
@@ -516,7 +525,10 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _buildCategoryRow(BuildContext context, WidgetRef ref) {
     final invState = ref.watch(inventoryControllerProvider);
-    final categories = invState.categories;
+    final homeState = ref.watch(homeControllerProvider);
+    final categories = invState.categories.isNotEmpty
+        ? invState.categories
+        : CategoryModel.defaultCategories(homeState.activeHome?.id);
 
     if (categories.isEmpty) {
       return const SizedBox.shrink();

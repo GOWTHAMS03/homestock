@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/sync/sync_providers.dart';
 import '../auth/auth_controller.dart';
 import '../home_switcher/home_controller.dart';
 import 'analytics_model.dart';
@@ -6,7 +7,8 @@ import 'analytics_repository.dart';
 
 final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
   final client = ref.watch(apiClientProvider);
-  return AnalyticsRepository(apiClient: client);
+  final connectivity = ref.watch(connectivityMonitorProvider);
+  return AnalyticsRepository(apiClient: client, connectivity: connectivity);
 });
 
 class AnalyticsState {

@@ -1,13 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../auth/auth_controller.dart';
+import '../../core/sync/sync_providers.dart';
+import '../auth/auth_controller.dart' show apiClientProvider;
 import '../home_switcher/home_controller.dart';
 import 'category_model.dart';
 import 'inventory_model.dart';
 import 'inventory_repository.dart';
 
+export '../../core/sync/sync_providers.dart' show inventoryDaoProvider, syncDaoProvider;
+
+/// Provider for the offline-first InventoryRepository.
 final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return InventoryRepository(apiClient: client);
+  return InventoryRepository(
+    inventoryDao: ref.watch(inventoryDaoProvider),
+    syncDao: ref.watch(syncDaoProvider),
+    apiClient: ref.watch(apiClientProvider),
+    connectivity: ref.watch(connectivityMonitorProvider),
+    syncEngine: ref.watch(syncEngineProvider),
+  );
 });
 
 enum InventoryFilterType { all, lowStock, expiringSoon, outOfStock }
@@ -79,33 +90,80 @@ final inventoryControllerProvider = StateNotifierProvider<InventoryController, I
 class InventoryController extends StateNotifier<InventoryState> {
   final InventoryRepository _repo;
   final String? _homeId;
+  StreamSubscription? _itemsSub;
+  StreamSubscription? _categoriesSub;
 
-  InventoryController(this._repo, this._homeId) : super(const InventoryState()) {
+  InventoryController(this._repo, this._homeId)
+      : super(InventoryState(
+          categories: CategoryModel.defaultCategories(_homeId),
+        )) {
     if (_homeId != null) {
-      loadData();
+      _subscribeToLocalData();
+      _fetchServerDataInBackground();
     }
   }
 
-  Future<void> loadData() async {
+  /// Subscribe to reactive Drift streams for instant local data display.
+  void _subscribeToLocalData() {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: true, errorMessage: null);
+
+    // Watch categories from local DB
+    _categoriesSub = _repo.watchCategories(_homeId).listen((categories) {
+      if (mounted) {
+        state = state.copyWith(
+          categories: categories.isNotEmpty
+              ? categories
+              : CategoryModel.defaultCategories(_homeId),
+        );
+      }
+    });
+
+    // Watch items from local DB (filtered by current search/category)
+    _watchItems();
+  }
+
+  void _watchItems() {
+    _itemsSub?.cancel();
+    if (_homeId == null) return;
+
+    final selectedCat = state.categories.cast<CategoryModel?>().firstWhere(
+          (c) => c?.id == state.selectedCategoryId,
+          orElse: () => null,
+        );
+
+    _itemsSub = _repo
+        .watchItems(
+          _homeId,
+          categoryId: state.selectedCategoryId,
+          categoryName: selectedCat?.name,
+          query: state.searchQuery.isEmpty ? null : state.searchQuery,
+        )
+        .listen((items) {
+      if (mounted) {
+        state = state.copyWith(items: items, isLoading: false);
+      }
+    });
+  }
+
+  /// Fetch server data in background (non-blocking).
+  /// Local data is displayed immediately from SQLite.
+  Future<void> _fetchServerDataInBackground() async {
+    if (_homeId == null) return;
+    state = state.copyWith(isLoading: state.items.isEmpty);
 
     try {
-      final categories = await _repo.getCategories(_homeId);
-      final items = await _repo.getItems(
-        _homeId,
-        categoryId: state.selectedCategoryId,
-        query: state.searchQuery,
-      );
-
-      state = state.copyWith(
-        isLoading: false,
-        categories: categories,
-        items: items,
-      );
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      await _repo.fetchAndCacheCategories(_homeId);
+      await _repo.fetchAndCacheFromServer(_homeId);
+    } catch (_) {
+      // Server fetch failures are non-fatal — local data still shows
     }
+  }
+
+  /// Manually trigger a refresh (pull-to-refresh).
+  Future<void> loadData() async {
+    if (_homeId == null) return;
+    state = state.copyWith(isLoading: state.items.isEmpty, errorMessage: null);
+    await _fetchServerDataInBackground();
   }
 
   void selectCategory(String? categoryId) {
@@ -114,35 +172,41 @@ class InventoryController extends StateNotifier<InventoryState> {
     } else {
       state = state.copyWith(selectedCategoryId: categoryId);
     }
-    loadData();
+    _watchItems(); // Re-subscribe with new filter
   }
 
   void setSearchQuery(String query) {
     state = state.copyWith(searchQuery: query);
-    loadData();
+    _watchItems(); // Re-subscribe with new search
   }
 
   void setFilterType(InventoryFilterType type) {
     state = state.copyWith(filterType: type);
   }
 
+  /// Update stock: local-first with sync queue.
   Future<bool> updateStock(String itemId, String transactionType, double quantityChange, [String? reason]) async {
     if (_homeId == null) return false;
     try {
-      final updated = await _repo.updateStock(
+      await _repo.updateStock(
         _homeId,
         itemId,
         transactionType: transactionType,
         quantityChange: quantityChange,
         reason: reason,
       );
-
-      final updatedList = state.items.map((i) => i.id == itemId ? updated : i).toList();
-      state = state.copyWith(items: updatedList);
+      // UI updates automatically via Drift stream subscription
       return true;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
       return false;
     }
+  }
+
+  @override
+  void dispose() {
+    _itemsSub?.cancel();
+    _categoriesSub?.cancel();
+    super.dispose();
   }
 }

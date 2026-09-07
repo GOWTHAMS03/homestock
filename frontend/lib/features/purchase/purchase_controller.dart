@@ -1,12 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/sync/sync_providers.dart';
 import '../auth/auth_controller.dart';
 import '../home_switcher/home_controller.dart';
 import 'purchase_model.dart';
 import 'purchase_repository.dart';
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return PurchaseRepository(apiClient: client);
+  return PurchaseRepository(
+    purchaseDao: ref.watch(purchaseDaoProvider),
+    inventoryDao: ref.watch(inventoryDaoProvider),
+    syncDao: ref.watch(syncDaoProvider),
+    apiClient: ref.watch(apiClientProvider),
+    syncEngine: ref.watch(syncEngineProvider),
+  );
 });
 
 class PurchaseState {
@@ -46,36 +54,57 @@ final purchaseControllerProvider = StateNotifierProvider<PurchaseController, Pur
 class PurchaseController extends StateNotifier<PurchaseState> {
   final PurchaseRepository _repo;
   final String? _homeId;
+  StreamSubscription? _purchasesSub;
+  StreamSubscription? _storesSub;
 
   PurchaseController(this._repo, this._homeId) : super(const PurchaseState()) {
     if (_homeId != null) {
-      loadPurchases();
+      _subscribeToLocalData();
+      _fetchServerDataInBackground();
     }
+  }
+
+  /// Subscribe to local DB streams.
+  void _subscribeToLocalData() {
+    if (_homeId == null) return;
+
+    _purchasesSub = _repo.watchPurchases(_homeId).listen((purchases) {
+      if (mounted) {
+        state = state.copyWith(purchases: purchases, isLoading: false);
+      }
+    });
+
+    _storesSub = _repo.watchStores(_homeId).listen((stores) {
+      if (mounted) {
+        state = state.copyWith(stores: stores);
+      }
+    });
+  }
+
+  Future<void> _fetchServerDataInBackground() async {
+    if (_homeId == null) return;
+    state = state.copyWith(isLoading: state.purchases.isEmpty);
+
+    try {
+      await _repo.fetchAndCacheFromServer(_homeId);
+    } catch (_) {}
   }
 
   Future<void> loadPurchases() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: true, errorMessage: null);
-
-    try {
-      final stores = await _repo.getStores(_homeId);
-      final purchases = await _repo.getPurchases(_homeId);
-      state = state.copyWith(isLoading: false, purchases: purchases, stores: stores);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
-    }
+    state = state.copyWith(isLoading: state.purchases.isEmpty, errorMessage: null);
+    await _fetchServerDataInBackground();
   }
 
+  /// Record purchase: local-first with atomic local transaction.
   Future<bool> recordPurchase(Map<String, dynamic> data) async {
     if (_homeId == null) return false;
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final newPurchase = await _repo.recordPurchase(_homeId, data);
-      state = state.copyWith(
-        isLoading: false,
-        purchases: [newPurchase, ...state.purchases],
-      );
+      await _repo.recordPurchase(_homeId, data);
+      state = state.copyWith(isLoading: false);
+      // UI updates automatically via Drift stream
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
@@ -87,11 +116,18 @@ class PurchaseController extends StateNotifier<PurchaseState> {
     if (_homeId == null) return null;
     try {
       final newStore = await _repo.createStore(_homeId, name, location);
-      state = state.copyWith(stores: [...state.stores, newStore]);
+      // Store list updates via Drift stream
       return newStore;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
       return null;
     }
+  }
+
+  @override
+  void dispose() {
+    _purchasesSub?.cancel();
+    _storesSub?.cancel();
+    super.dispose();
   }
 }

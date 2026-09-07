@@ -5,6 +5,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/sync_status_bar.dart';
 import '../purchase/add_purchase_screen.dart';
 import 'add_shopping_item_dialog.dart';
 import 'shopping_controller.dart';
@@ -30,22 +31,26 @@ class ShoppingScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: shoppingState.isLoading
-          ? ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: 6,
-              separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) => const SkeletonItemCard(),
-            )
-          : (list == null || list.items.isEmpty)
-              ? EmptyStateView(
-                  icon: Icons.shopping_bag_outlined,
-                  title: 'Your shopping list is empty',
-                  message: "Looks like you're all set! Items running low in your inventory will also appear here automatically.",
-                  actionLabel: 'Add Item',
-                  onAction: () => AddShoppingItemDialog.show(context),
-                )
-              : RefreshIndicator(
+      body: Column(
+        children: [
+          const SyncStatusBar(),
+          Expanded(
+            child: (shoppingState.isLoading && list == null)
+                ? ListView.separated(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    itemCount: 6,
+                    separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (context, index) => const SkeletonItemCard(),
+                  )
+                : (list == null || list.items.isEmpty)
+                    ? EmptyStateView(
+                        icon: Icons.shopping_bag_outlined,
+                        title: 'Your shopping list is empty',
+                        message: "Looks like you're all set! Items running low in your inventory will also appear here automatically.",
+                        actionLabel: 'Add Item',
+                        onAction: () => AddShoppingItemDialog.show(context),
+                      )
+                    : RefreshIndicator(
                   onRefresh: () => ref.read(shoppingControllerProvider.notifier).loadShoppingList(),
                   child: ListView(
                     padding: const EdgeInsets.all(AppSpacing.lg),
@@ -113,6 +118,9 @@ class ShoppingScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => AddShoppingItemDialog.show(context),
         icon: const Icon(Icons.add_rounded),

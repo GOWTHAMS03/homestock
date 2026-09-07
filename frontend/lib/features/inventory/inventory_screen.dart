@@ -6,7 +6,9 @@ import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/quantity_stepper.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/stock_status_badge.dart';
+import '../../core/widgets/sync_status_bar.dart';
 import 'add_edit_item_screen.dart';
+import 'category_model.dart';
 import 'inventory_controller.dart';
 import 'inventory_model.dart';
 import 'item_detail_screen.dart';
@@ -76,6 +78,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Widget build(BuildContext context) {
     final invState = ref.watch(inventoryControllerProvider);
     final displayedItems = invState.filteredItems;
+    final categories = invState.categories.isNotEmpty
+        ? invState.categories
+        : CategoryModel.defaultCategories();
 
     // Counts for filter chips
     final lowStockCount = invState.items
@@ -92,6 +97,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ),
       body: Column(
         children: [
+          const SyncStatusBar(),
           // Search Box with Clean Clear Action
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
@@ -147,14 +153,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
           ),
 
-          // Category Chips (Tier 2)
-          if (invState.categories.isNotEmpty) ...[
+          // Category Chips (Tier 2) - Always visible in offline and online modes
+          if (categories.isNotEmpty) ...[
             SizedBox(
               height: 38,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 scrollDirection: Axis.horizontal,
-                itemCount: invState.categories.length + 1,
+                itemCount: categories.length + 1,
                 separatorBuilder: (context, index) => const SizedBox(width: AppSpacing.xs),
                 itemBuilder: (context, index) {
                   if (index == 0) {
@@ -175,7 +181,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     );
                   }
 
-                  final cat = invState.categories[index - 1];
+                  final cat = categories[index - 1];
                   final isSelected = invState.selectedCategoryId == cat.id;
 
                   return FilterChip(
@@ -201,7 +207,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
           // Items List with Layout-Stable Skeletons
           Expanded(
-            child: invState.isLoading
+            child: (invState.isLoading && invState.items.isEmpty)
                 ? ListView.separated(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     itemCount: 5,
@@ -313,10 +319,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
+                  color: item.categoryColorParsed.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 ),
-                child: const Icon(Icons.inventory_2_rounded, size: 22, color: AppColors.primary),
+                child: Icon(item.categoryIconData, size: 22, color: item.categoryColorParsed),
               ),
               const SizedBox(width: AppSpacing.md),
 
@@ -342,6 +348,33 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        // Dedicated Category Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: item.categoryColorParsed.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: item.categoryColorParsed.withValues(alpha: 0.25),
+                              width: 0.6,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(item.categoryIconData, size: 10, color: item.categoryColorParsed),
+                              const SizedBox(width: 3),
+                              Text(
+                                item.categoryName,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: item.categoryColorParsed,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         StockStatusBadge.fromString(item.stockStatus, compact: true),
                         ExpiryUrgencyBadge(expiryDateStr: item.expiryDate, compact: true),
                         if (item.storageLocation != null && item.storageLocation!.isNotEmpty)

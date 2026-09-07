@@ -7,6 +7,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_text_field.dart';
 import '../home_switcher/home_controller.dart';
+import 'category_model.dart';
 import 'inventory_controller.dart';
 import 'inventory_model.dart';
 
@@ -79,9 +80,23 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
 
     setState(() => _isLoading = true);
 
+    final homeState = ref.read(homeControllerProvider);
+    final invState = ref.read(inventoryControllerProvider);
+    final allCategories = invState.categories.isNotEmpty
+        ? invState.categories
+        : CategoryModel.defaultCategories(homeState.activeHome?.id);
+
+    final selectedCat = allCategories.cast<CategoryModel?>().firstWhere(
+      (c) => c?.id == _categoryId,
+      orElse: () => null,
+    );
+
     final data = {
       'name': _nameController.text.trim(),
       'categoryId': _categoryId,
+      'categoryName': selectedCat?.name ?? (widget.initialItem?.categoryName ?? 'General'),
+      'categoryIcon': selectedCat?.icon ?? (widget.initialItem?.categoryIcon ?? 'category'),
+      'categoryColor': selectedCat?.colorHex ?? (widget.initialItem?.categoryColor ?? '#6366F1'),
       'quantity': double.tryParse(_quantityController.text) ?? 1.0,
       'unit': _unit,
       'minimumQuantity': double.tryParse(_minQtyController.text) ?? 1.0,
@@ -115,8 +130,19 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
   @override
   Widget build(BuildContext context) {
     final invState = ref.watch(inventoryControllerProvider);
-    final categories = invState.categories;
+    final homeState = ref.watch(homeControllerProvider);
+    final categories = invState.categories.isNotEmpty
+        ? invState.categories
+        : CategoryModel.defaultCategories(homeState.activeHome?.id);
     final isEditing = widget.initialItem != null;
+
+    final categoryExists = categories.any((c) => c.id == _categoryId);
+    final effectiveCategoryId = categoryExists
+        ? _categoryId
+        : categories.cast<CategoryModel?>().firstWhere(
+            (c) => c?.name.toLowerCase() == widget.initialItem?.categoryName.toLowerCase(),
+            orElse: () => null,
+          )?.id;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -140,14 +166,14 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // Category Dropdown
+            // Category Dropdown - Always populated offline and online
             const Text(
               'Category',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
             ),
             const SizedBox(height: AppSpacing.xs),
             DropdownButtonFormField<String?>(
-              initialValue: _categoryId,
+              initialValue: effectiveCategoryId,
               decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
               hint: const Text('Select category'),
               items: [

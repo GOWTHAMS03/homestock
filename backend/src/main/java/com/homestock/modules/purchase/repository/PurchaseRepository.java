@@ -26,4 +26,6 @@ public interface PurchaseRepository extends JpaRepository<Purchase, UUID> {
             "FROM Purchase p WHERE p.home.id = :homeId AND p.store IS NOT NULL " +
             "GROUP BY p.store.name ORDER BY total DESC")
     List<Object[]> getSpendingByStore(@Param("homeId") UUID homeId);
+
+    List<Purchase> findByHomeIdAndUpdatedAtAfter(UUID homeId, java.time.Instant since);
 }

@@ -1,0 +1,240 @@
+import 'package:drift/drift.dart';
+import '../app_database.dart';
+import '../../../features/inventory/category_model.dart';
+
+/// Data access object for inventory items and stock transactions.
+/// Provides reactive streams and CRUD operations against local SQLite.
+class InventoryDao {
+  final AppDatabase _db;
+
+  InventoryDao(this._db);
+
+  // ──── READ ────
+
+  /// Watch all non-deleted items for a home, ordered by name.
+  Stream<List<LocalInventoryItem>> watchItems(String homeId) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) => t.homeId.equals(homeId) & t.isDeleted.equals(false))
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .watch();
+  }
+
+  /// Watch items filtered by category.
+  Stream<List<LocalInventoryItem>> watchItemsByCategory(
+      String homeId, String categoryId) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.homeId.equals(homeId) &
+              t.isDeleted.equals(false) &
+              t.categoryId.equals(categoryId))
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .watch();
+  }
+
+  /// Watch items matching a search query (name or brand) and/or category.
+  Stream<List<LocalInventoryItem>> watchItemsFiltered(
+    String homeId, {
+    String? categoryId,
+    String? categoryName,
+    String? query,
+  }) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) {
+            var condition = t.homeId.equals(homeId) & t.isDeleted.equals(false);
+            if (categoryId != null) {
+              if (categoryName != null && categoryName.isNotEmpty) {
+                condition = condition &
+                    (t.categoryId.equals(categoryId) |
+                        t.categoryName.lower().equals(categoryName.toLowerCase()));
+              } else {
+                condition = condition & t.categoryId.equals(categoryId);
+              }
+            }
+            if (query != null && query.isNotEmpty) {
+              final pattern = '%${query.toLowerCase()}%';
+              condition = condition &
+                  (t.name.lower().like(pattern) |
+                      t.brand.lower().like(pattern));
+            }
+            return condition;
+          })
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .watch();
+  }
+
+  /// Get a single item by ID.
+  Future<LocalInventoryItem?> getItemById(String id) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+  }
+
+  /// Get all items for a home (non-reactive, for sync use).
+  Future<List<LocalInventoryItem>> getAllItems(String homeId) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) => t.homeId.equals(homeId) & t.isDeleted.equals(false))
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .get();
+  }
+
+  /// Get item count for a home.
+  Future<int> getItemCount(String homeId) async {
+    final items = await getAllItems(homeId);
+    return items.length;
+  }
+
+  /// Get low stock items.
+  Future<List<LocalInventoryItem>> getLowStockItems(String homeId) async {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.homeId.equals(homeId) &
+              t.isDeleted.equals(false) &
+              (t.stockStatus.equals('LOW_STOCK') |
+                  t.stockStatus.equals('OUT_OF_STOCK'))))
+        .get();
+  }
+
+  /// Get expiring soon items.
+  Future<List<LocalInventoryItem>> getExpiringSoonItems(String homeId) async {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.homeId.equals(homeId) &
+              t.isDeleted.equals(false) &
+              (t.expiryStatus.equals('EXPIRING_SOON') |
+                  t.expiryStatus.equals('EXPIRED'))))
+        .get();
+  }
+
+  // ──── WRITE ────
+
+  /// Insert or update a single item.
+  Future<void> upsertItem(LocalInventoryItemsCompanion item) {
+    return _db
+        .into(_db.localInventoryItems)
+        .insertOnConflictUpdate(item);
+  }
+
+  /// Batch upsert items (for sync pull).
+  Future<void> upsertItems(List<LocalInventoryItemsCompanion> items) {
+    return _db.batch((batch) {
+      for (final item in items) {
+        batch.insert(_db.localInventoryItems, item,
+            onConflict: DoUpdate((_) => item));
+      }
+    });
+  }
+
+  /// Update stock quantity locally and recompute stock status.
+  Future<void> updateLocalStock(
+    String itemId,
+    double newQuantity,
+    String newStockStatus,
+  ) {
+    return (_db.update(_db.localInventoryItems)
+          ..where((t) => t.id.equals(itemId)))
+        .write(LocalInventoryItemsCompanion(
+      quantity: Value(newQuantity),
+      stockStatus: Value(newStockStatus),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Soft delete an item locally.
+  Future<void> softDeleteItem(String itemId) {
+    return (_db.update(_db.localInventoryItems)
+          ..where((t) => t.id.equals(itemId)))
+        .write(const LocalInventoryItemsCompanion(
+      isDeleted: Value(true),
+      updatedAt: Value(null),
+    ));
+  }
+
+  /// Clear all items for a home (for full re-sync).
+  Future<void> clearItemsForHome(String homeId) {
+    return (_db.delete(_db.localInventoryItems)
+          ..where((t) => t.homeId.equals(homeId)))
+        .go();
+  }
+
+  // ──── STOCK TRANSACTIONS ────
+
+  /// Watch transactions for a specific item.
+  Stream<List<LocalStockTransaction>> watchTransactions(String itemId) {
+    return (_db.select(_db.localStockTransactions)
+          ..where((t) => t.inventoryItemId.equals(itemId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .watch();
+  }
+
+  /// Get transactions for a specific item (non-reactive).
+  Future<List<LocalStockTransaction>> getTransactions(String itemId) {
+    return (_db.select(_db.localStockTransactions)
+          ..where((t) => t.inventoryItemId.equals(itemId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+  }
+
+  /// Insert a stock transaction.
+  Future<void> insertTransaction(LocalStockTransactionsCompanion tx) {
+    return _db.into(_db.localStockTransactions).insert(tx);
+  }
+
+  /// Batch upsert transactions (for sync pull).
+  Future<void> upsertTransactions(List<LocalStockTransactionsCompanion> txs) {
+    return _db.batch((batch) {
+      for (final tx in txs) {
+        batch.insert(_db.localStockTransactions, tx,
+            onConflict: DoUpdate((_) => tx));
+      }
+    });
+  }
+
+  // ──── CATEGORIES ────
+
+  /// Watch categories for a home.
+  Stream<List<LocalCategory>> watchCategories(String homeId) {
+    return (_db.select(_db.localCategories)
+          ..where((t) => t.homeId.equals(homeId))
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .watch();
+  }
+
+  /// Get categories for a home (non-reactive).
+  Future<List<LocalCategory>> getCategories(String homeId) {
+    return (_db.select(_db.localCategories)
+          ..where((t) => t.homeId.equals(homeId))
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .get();
+  }
+
+  /// Batch upsert categories.
+  Future<void> upsertCategories(List<LocalCategoriesCompanion> categories) {
+    return _db.batch((batch) {
+      for (final cat in categories) {
+        batch.insert(_db.localCategories, cat,
+            onConflict: DoUpdate((_) => cat));
+      }
+    });
+  }
+
+  /// Seed default household categories into SQLite if none exist for this home.
+  Future<void> seedDefaultCategories(String homeId) async {
+    final existing = await getCategories(homeId);
+    if (existing.isNotEmpty) return;
+
+    final defaults = CategoryModel.defaultCategories(homeId);
+    final companions = defaults.map((c) {
+      return LocalCategoriesCompanion(
+        id: Value(c.id),
+        homeId: Value(homeId),
+        name: Value(c.name),
+        iconName: Value(c.icon),
+        colorHex: Value(c.colorHex),
+        sortOrder: Value(c.displayOrder),
+        updatedAt: Value(DateTime.now()),
+      );
+    }).toList();
+
+    await upsertCategories(companions);
+  }
+}

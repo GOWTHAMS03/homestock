@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/sync/sync_providers.dart';
 import '../auth/auth_controller.dart';
 import '../home_switcher/home_controller.dart';
 import 'dashboard_model.dart';
@@ -6,7 +7,15 @@ import 'dashboard_repository.dart';
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   final client = ref.watch(apiClientProvider);
-  return DashboardRepository(apiClient: client);
+  final inventoryDao = ref.watch(inventoryDaoProvider);
+  final shoppingDao = ref.watch(shoppingDaoProvider);
+  final connectivity = ref.watch(connectivityMonitorProvider);
+  return DashboardRepository(
+    apiClient: client,
+    inventoryDao: inventoryDao,
+    shoppingDao: shoppingDao,
+    connectivity: connectivity,
+  );
 });
 
 class DashboardState {
@@ -40,14 +49,15 @@ class DashboardState {
 final dashboardControllerProvider = StateNotifierProvider<DashboardController, DashboardState>((ref) {
   final repo = ref.watch(dashboardRepositoryProvider);
   final homeState = ref.watch(homeControllerProvider);
-  return DashboardController(repo, homeState.activeHome?.id);
+  return DashboardController(repo, homeState.activeHome?.id, homeState.activeHome?.name);
 });
 
 class DashboardController extends StateNotifier<DashboardState> {
   final DashboardRepository _repo;
   final String? _homeId;
+  final String? _homeName;
 
-  DashboardController(this._repo, this._homeId) : super(const DashboardState()) {
+  DashboardController(this._repo, this._homeId, this._homeName) : super(const DashboardState()) {
     if (_homeId != null) {
       loadDashboard();
     }
@@ -55,12 +65,13 @@ class DashboardController extends StateNotifier<DashboardState> {
 
   Future<void> loadDashboard() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: state.summary == null, errorMessage: null);
 
     try {
-      final summary = await _repo.getSummary(_homeId);
+      final summary = await _repo.getSummary(_homeId, homeName: _homeName ?? 'My Home');
       state = state.copyWith(isLoading: false, summary: summary);
     } catch (e) {
+      // Even if both fail, keep existing summary if any
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }

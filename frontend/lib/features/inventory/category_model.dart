@@ -62,4 +62,57 @@ class CategoryModel {
         return Icons.inventory_2_rounded;
     }
   }
+
+  /// Standard default household categories matching the backend defaults.
+  /// Available immediately even when completely offline.
+  static List<CategoryModel> defaultCategories([String? homeId]) => [
+    CategoryModel(
+      id: 'default_kitchen_${homeId ?? "offline"}',
+      homeId: homeId,
+      name: 'Kitchen',
+      icon: 'restaurant',
+      colorHex: '#F59E0B',
+      displayOrder: 1,
+    ),
+    CategoryModel(
+      id: 'default_cleaning_${homeId ?? "offline"}',
+      homeId: homeId,
+      name: 'Cleaning',
+      icon: 'cleaning_services',
+      colorHex: '#3B82F6',
+      displayOrder: 2,
+    ),
+    CategoryModel(
+      id: 'default_bathroom_${homeId ?? "offline"}',
+      homeId: homeId,
+      name: 'Bathroom',
+      icon: 'bathtub',
+      colorHex: '#10B981',
+      displayOrder: 3,
+    ),
+    CategoryModel(
+      id: 'default_personal_care_${homeId ?? "offline"}',
+      homeId: homeId,
+      name: 'Personal Care',
+      icon: 'face',
+      colorHex: '#EC4899',
+      displayOrder: 4,
+    ),
+    CategoryModel(
+      id: 'default_pantry_${homeId ?? "offline"}',
+      homeId: homeId,
+      name: 'Pantry & Snacks',
+      icon: 'fastfood',
+      colorHex: '#8B5CF6',
+      displayOrder: 5,
+    ),
+    CategoryModel(
+      id: 'default_others_${homeId ?? "offline"}',
+      homeId: homeId,
+      name: 'Others',
+      icon: 'inventory_2',
+      colorHex: '#6B7280',
+      displayOrder: 6,
+    ),
+  ];
 }

@@ -1,12 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/sync/sync_providers.dart';
 import '../auth/auth_controller.dart';
 import '../home_switcher/home_controller.dart';
 import 'shopping_model.dart';
 import 'shopping_repository.dart';
 
 final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return ShoppingRepository(apiClient: client);
+  return ShoppingRepository(
+    shoppingDao: ref.watch(shoppingDaoProvider),
+    syncDao: ref.watch(syncDaoProvider),
+    apiClient: ref.watch(apiClientProvider),
+    syncEngine: ref.watch(syncEngineProvider),
+  );
 });
 
 class ShoppingState {
@@ -42,29 +49,52 @@ final shoppingControllerProvider = StateNotifierProvider<ShoppingController, Sho
 class ShoppingController extends StateNotifier<ShoppingState> {
   final ShoppingRepository _repo;
   final String? _homeId;
+  StreamSubscription? _listSub;
 
   ShoppingController(this._repo, this._homeId) : super(const ShoppingState()) {
     if (_homeId != null) {
-      loadShoppingList();
+      _subscribeToLocalData();
+      _fetchServerDataInBackground();
+    }
+  }
+
+  /// Subscribe to local DB stream for instant UI updates.
+  void _subscribeToLocalData() {
+    if (_homeId == null) return;
+
+    _listSub = _repo.watchDefaultList(_homeId).listen((list) {
+      if (mounted) {
+        state = state.copyWith(list: list, isLoading: false);
+      }
+    });
+  }
+
+  /// Fetch from server in background (non-blocking).
+  Future<void> _fetchServerDataInBackground() async {
+    if (_homeId == null) return;
+    state = state.copyWith(isLoading: state.list == null);
+
+    try {
+      await _repo.fetchAndCacheFromServer(_homeId);
+    } catch (_) {
+      // Server failures are non-fatal
     }
   }
 
   Future<void> loadShoppingList() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: true, errorMessage: null);
-
-    try {
-      final list = await _repo.getDefaultList(_homeId);
-      state = state.copyWith(isLoading: false, list: list);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
-    }
+    state = state.copyWith(isLoading: state.list == null, errorMessage: null);
+    await _fetchServerDataInBackground();
   }
 
+  /// Add item: local-first, no network wait.
   Future<bool> addItem({
     String? inventoryItemId,
     required String itemName,
     String? categoryId,
+    String? categoryName,
+    String? categoryIcon,
+    String? categoryColor,
     required double quantity,
     String unit = 'pcs',
     String? notes,
@@ -72,29 +102,20 @@ class ShoppingController extends StateNotifier<ShoppingState> {
     if (_homeId == null || state.list == null) return false;
 
     try {
-      final newItem = await _repo.addItem(
+      await _repo.addItem(
         _homeId,
         state.list!.id,
         inventoryItemId: inventoryItemId,
         itemName: itemName,
         categoryId: categoryId,
+        categoryName: categoryName,
+        categoryIcon: categoryIcon,
+        categoryColor: categoryColor,
         quantity: quantity,
         unit: unit,
         notes: notes,
       );
-
-      final updatedItems = [newItem, ...state.list!.items];
-      final updatedList = ShoppingListModel(
-        id: state.list!.id,
-        homeId: state.list!.homeId,
-        name: state.list!.name,
-        isDefault: state.list!.isDefault,
-        pendingCount: state.list!.pendingCount + 1,
-        completedCount: state.list!.completedCount,
-        items: updatedItems,
-      );
-
-      state = state.copyWith(list: updatedList);
+      // UI updates automatically via Drift stream
       return true;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
@@ -102,98 +123,44 @@ class ShoppingController extends StateNotifier<ShoppingState> {
     }
   }
 
+  /// Toggle item: local-first, no rollback needed.
   Future<void> toggleItem(String itemId) async {
     if (_homeId == null || state.list == null) return;
 
-    // 1. Optimistic UI update
-    final currentItems = state.list!.items;
-    final targetIndex = currentItems.indexWhere((i) => i.id == itemId);
-    if (targetIndex == -1) return;
-
-    final target = currentItems[targetIndex];
-    final willBeCompleted = !target.isCompleted;
-
-    final optimisticItem = target.copyWith(
-      isCompleted: willBeCompleted,
-      completedByName: willBeCompleted ? 'You' : null,
-    );
-
-    final updatedItems = List<ShoppingItemModel>.from(currentItems);
-    updatedItems[targetIndex] = optimisticItem;
-
-    final updatedList = ShoppingListModel(
-      id: state.list!.id,
-      homeId: state.list!.homeId,
-      name: state.list!.name,
-      isDefault: state.list!.isDefault,
-      pendingCount: state.list!.pendingCount + (willBeCompleted ? -1 : 1),
-      completedCount: state.list!.completedCount + (willBeCompleted ? 1 : -1),
-      items: updatedItems,
-    );
-
-    state = state.copyWith(list: updatedList);
-
-    // 2. Network sync
     try {
-      final serverItem = await _repo.toggleItem(_homeId, state.list!.id, itemId);
-      final syncedItems = state.list!.items.map((i) => i.id == itemId ? serverItem : i).toList();
-      state = state.copyWith(
-        list: ShoppingListModel(
-          id: state.list!.id,
-          homeId: state.list!.homeId,
-          name: state.list!.name,
-          isDefault: state.list!.isDefault,
-          pendingCount: syncedItems.where((i) => !i.isCompleted).count,
-          completedCount: syncedItems.where((i) => i.isCompleted).count,
-          items: syncedItems,
-        ),
-      );
+      await _repo.toggleItem(_homeId, state.list!.id, itemId);
+      // UI updates automatically via Drift stream
     } catch (e) {
-      // Rollback on network failure
-      loadShoppingList();
+      state = state.copyWith(errorMessage: e.toString());
     }
   }
 
+  /// Delete item: local-first.
   Future<void> deleteItem(String itemId) async {
     if (_homeId == null || state.list == null) return;
     try {
       await _repo.deleteItem(_homeId, state.list!.id, itemId);
-      final updatedItems = state.list!.items.where((i) => i.id != itemId).toList();
-      state = state.copyWith(
-        list: ShoppingListModel(
-          id: state.list!.id,
-          homeId: state.list!.homeId,
-          name: state.list!.name,
-          isDefault: state.list!.isDefault,
-          pendingCount: updatedItems.where((i) => !i.isCompleted).length,
-          completedCount: updatedItems.where((i) => i.isCompleted).length,
-          items: updatedItems,
-        ),
-      );
+      // UI updates automatically via Drift stream
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
     }
   }
 
+  /// Clear completed: local-first.
   Future<void> clearCompleted() async {
     if (_homeId == null || state.list == null) return;
     try {
       await _repo.clearCompleted(_homeId, state.list!.id);
-      final pendingOnly = state.list!.items.where((i) => !i.isCompleted).toList();
-      state = state.copyWith(
-        list: ShoppingListModel(
-          id: state.list!.id,
-          homeId: state.list!.homeId,
-          name: state.list!.name,
-          isDefault: state.list!.isDefault,
-          pendingCount: pendingOnly.length,
-          completedCount: 0,
-          items: pendingOnly,
-        ),
-      );
+      // UI updates automatically via Drift stream
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
     }
+  }
+
+  @override
+  void dispose() {
+    _listSub?.cancel();
+    super.dispose();
   }
 }
 

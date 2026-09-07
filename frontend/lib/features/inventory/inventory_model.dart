@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class InventoryItemModel {
   final String id;
   final String homeId;
@@ -75,6 +77,32 @@ class InventoryItemModel {
   bool get isLowStock => stockStatus == 'LOW_STOCK';
   bool get isExpiringSoon => expiryStatus == 'EXPIRING_SOON';
   bool get isExpired => expiryStatus == 'EXPIRED';
+
+  Color get categoryColorParsed {
+    try {
+      final hex = categoryColor.replaceAll('#', '');
+      return Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      return const Color(0xFF6366F1);
+    }
+  }
+
+  IconData get categoryIconData {
+    switch (categoryIcon) {
+      case 'restaurant':
+        return Icons.restaurant_rounded;
+      case 'cleaning_services':
+        return Icons.cleaning_services_rounded;
+      case 'bathtub':
+        return Icons.bathtub_rounded;
+      case 'face':
+        return Icons.face_rounded;
+      case 'fastfood':
+        return Icons.fastfood_rounded;
+      default:
+        return Icons.inventory_2_rounded;
+    }
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -44,4 +45,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
     @Query("SELECT COUNT(i) FROM InventoryItem i WHERE i.home.id = :homeId AND i.isArchived = false AND i.quantity = 0")
     long countOutOfStock(@Param("homeId") UUID homeId);
+
+    List<InventoryItem> findByHomeIdAndUpdatedAtAfter(UUID homeId, Instant since);
 }

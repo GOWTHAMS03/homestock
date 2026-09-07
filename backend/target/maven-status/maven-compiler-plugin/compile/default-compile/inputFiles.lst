@@ -102,6 +102,15 @@ D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\store\dto\Sto
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\store\entity\Store.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\store\repository\StoreRepository.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\store\service\StoreService.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\controller\SyncController.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\dto\SyncOperationDto.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\dto\SyncOperationResultDto.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\dto\SyncPullResponse.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\dto\SyncPushResponse.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\dto\SyncRequest.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\entity\ProcessedOperation.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\repository\ProcessedOperationRepository.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\sync\service\SyncService.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\user\controller\UserController.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\user\dto\DeviceTokenRequest.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\user\dto\UpdateProfileRequest.java
