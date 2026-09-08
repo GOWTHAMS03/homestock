@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.homestock.modules.sync.SyncServiceTest
 -------------------------------------------------------------------------------
-Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.084 s -- in com.homestock.modules.sync.SyncServiceTest
+Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.556 s -- in com.homestock.modules.sync.SyncServiceTest

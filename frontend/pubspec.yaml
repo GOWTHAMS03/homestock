@@ -66,6 +66,9 @@ dependencies:
   # Audio Recording for Voice Commands
   record: ^5.2.0
 
+  # Offline Speech Recognition (whisper.cpp via FFI — no API key, no internet needed)
+  whisper_cpp_flutter_plus: ^0.4.1
+
   # Barcode Scanning & Product Recognition
   mobile_scanner: ^7.4.0
 

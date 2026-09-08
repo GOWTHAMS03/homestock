@@ -12,6 +12,7 @@ import '../../inventory/inventory_controller.dart';
 import '../../shopping/shopping_controller.dart';
 import '../../../core/sync/sync_providers.dart' show connectivityMonitorProvider;
 import '../data/speech/hybrid_speech_engine.dart';
+import '../data/speech/offline_model_manager.dart';
 import '../data/speech/offline_speech_engine.dart';
 import '../data/speech/online_speech_engine.dart';
 import '../data/speech/speech_engine.dart';
@@ -30,8 +31,23 @@ final onlineSpeechEngineProvider = Provider<OnlineSpeechEngine>((ref) {
   return OnlineSpeechEngine(voiceRepo: repo);
 });
 
+final offlineModelManagerProvider = Provider<OfflineModelManager>((ref) {
+  final manager = OfflineModelManager();
+  // Check model status on creation
+  manager.isModelInstalled();
+  ref.onDispose(() => manager.dispose());
+  return manager;
+});
+
+final modelInfoProvider = StreamProvider<ModelInfo>((ref) async* {
+  final manager = ref.watch(offlineModelManagerProvider);
+  yield manager.currentModel;
+  yield* manager.statusStream;
+});
+
 final offlineSpeechEngineProvider = Provider<OfflineSpeechEngine>((ref) {
-  return OfflineSpeechEngine();
+  final modelManager = ref.watch(offlineModelManagerProvider);
+  return OfflineSpeechEngine(modelManager: modelManager);
 });
 
 final hybridSpeechEngineProvider = Provider<HybridSpeechEngine>((ref) {
@@ -91,6 +107,8 @@ class VoiceState {
   final String languageHint; // 'auto', 'ta', 'en'
   final SpeechEngineMode engineMode;
   final bool isOffline;
+  final bool isModelInstalled;
+  final double modelDownloadProgress;
 
   const VoiceState({
     this.status = VoiceStatus.idle,
@@ -106,6 +124,8 @@ class VoiceState {
     this.languageHint = 'auto',
     this.engineMode = SpeechEngineMode.auto,
     this.isOffline = false,
+    this.isModelInstalled = false,
+    this.modelDownloadProgress = 0.0,
   });
 
   bool get isRecording => status == VoiceStatus.listening;
@@ -126,6 +146,8 @@ class VoiceState {
     String? languageHint,
     SpeechEngineMode? engineMode,
     bool? isOffline,
+    bool? isModelInstalled,
+    double? modelDownloadProgress,
     bool clearError = false,
   }) {
     return VoiceState(
@@ -142,6 +164,8 @@ class VoiceState {
       languageHint: languageHint ?? this.languageHint,
       engineMode: engineMode ?? this.engineMode,
       isOffline: isOffline ?? this.isOffline,
+      isModelInstalled: isModelInstalled ?? this.isModelInstalled,
+      modelDownloadProgress: modelDownloadProgress ?? this.modelDownloadProgress,
     );
   }
 }
@@ -162,6 +186,7 @@ class VoiceController extends StateNotifier<VoiceState> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   Timer? _durationTimer;
   Timer? _amplitudeTimer;
+  StreamSubscription<ModelInfo>? _modelStatusSub;
   String? _currentRecordingPath;
 
   VoiceController(
@@ -169,7 +194,29 @@ class VoiceController extends StateNotifier<VoiceState> {
     this._voiceService,
     this._hybridSpeechEngine,
     this._homeId,
-  ) : super(const VoiceState());
+  ) : super(const VoiceState()) {
+    _initModelStatus();
+  }
+
+  void _initModelStatus() {
+    final modelManager = _ref.read(offlineModelManagerProvider);
+    state = state.copyWith(
+      isModelInstalled: modelManager.isModelReady,
+    );
+    _modelStatusSub = modelManager.statusStream.listen((info) {
+      if (mounted) {
+        state = state.copyWith(
+          isModelInstalled: info.status == ModelStatus.installed || info.status == ModelStatus.ready,
+          modelDownloadProgress: info.downloadProgress,
+        );
+      }
+    });
+    modelManager.isModelInstalled().then((installed) {
+      if (mounted) {
+        state = state.copyWith(isModelInstalled: installed);
+      }
+    });
+  }
 
   void setLanguageHint(String hint) {
     state = state.copyWith(languageHint: hint);
@@ -192,15 +239,30 @@ class VoiceController extends StateNotifier<VoiceState> {
         return false;
       }
 
+      // Pre-flight check: If offlineOnly and model is not installed
+      final modelManager = _ref.read(offlineModelManagerProvider);
+      final isInstalled = await modelManager.isModelInstalled();
+      state = state.copyWith(isModelInstalled: isInstalled);
+
+      if (!isInstalled && state.engineMode == SpeechEngineMode.offlineOnly) {
+        state = state.copyWith(
+          status: VoiceStatus.error,
+          errorMessage: 'Offline voice model is not installed. Please download it in Voice Settings.',
+        );
+        return false;
+      }
+
       final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/homestock_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final filePath = '${tempDir.path}/homestock_voice_${DateTime.now().millisecondsSinceEpoch}.wav';
       _currentRecordingPath = filePath;
 
+      // Record as WAV (16kHz mono PCM) — required format for whisper.cpp
       await _audioRecorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.aacLc,
+          encoder: AudioEncoder.wav,
           sampleRate: 16000,
-          bitRate: 64000,
+          numChannels: 1,
+          bitRate: 256000,
         ),
         path: filePath,
       );
@@ -486,6 +548,7 @@ class VoiceController extends StateNotifier<VoiceState> {
     state = VoiceState(
       engineMode: state.engineMode,
       languageHint: state.languageHint,
+      isModelInstalled: state.isModelInstalled,
     );
   }
 
@@ -500,6 +563,7 @@ class VoiceController extends StateNotifier<VoiceState> {
 
   @override
   void dispose() {
+    _modelStatusSub?.cancel();
     _durationTimer?.cancel();
     _amplitudeTimer?.cancel();
     _audioRecorder.dispose();

@@ -87,9 +87,13 @@ class LanDiscoveryService {
         }
       });
 
-      // Broadcast to standard 255.255.255.255
+      // Broadcast to standard 255.255.255.255 (may throw EPERM on Android if global broadcast is blocked)
       final bytes = utf8.encode(discoveryMessage);
-      socket.send(bytes, InternetAddress('255.255.255.255'), discoveryPort);
+      try {
+        socket.send(bytes, InternetAddress('255.255.255.255'), discoveryPort);
+      } catch (e) {
+        if (kDebugMode) print('[LanDiscovery] Global 255.255.255.255 broadcast ignored: $e');
+      }
 
       // Also broadcast to active local interfaces' broadcast addresses
       try {
