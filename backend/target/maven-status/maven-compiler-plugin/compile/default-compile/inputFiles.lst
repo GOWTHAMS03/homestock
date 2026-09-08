@@ -4,6 +4,7 @@ D:\New folder (3)\home\backend\src\main\java\com\homestock\core\common\PagedResp
 D:\New folder (3)\home\backend\src\main\java\com\homestock\core\config\OpenApiConfig.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\core\config\SecurityConfig.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\core\config\WebMvcConfig.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\core\discovery\LanDiscoveryService.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\core\exception\BusinessRuleException.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\core\exception\ErrorResponse.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\core\exception\GlobalExceptionHandler.java

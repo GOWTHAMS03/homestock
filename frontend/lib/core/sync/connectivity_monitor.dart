@@ -5,6 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 import '../constants/api_endpoints.dart';
+import '../network/lan_discovery_service.dart';
 import 'sync_status.dart';
 
 /// Monitors network connectivity and real server reachability.
@@ -71,6 +72,9 @@ class ConnectivityMonitor {
     await checkRealReachability();
   }
 
+  /// Callback invoked when an alternative backend URL is auto-discovered.
+  ValueChanged<String>? onServerUrlDiscovered;
+
   /// Actively probe real backend reachability with a fast timeout (default 1500ms).
   Future<bool> checkRealReachability({
     Duration timeout = const Duration(milliseconds: 1500),
@@ -105,6 +109,19 @@ class ConnectivityMonitor {
           client.close();
         } catch (_) {
           reachable = false;
+        }
+      }
+
+      // If currently configured baseUrl is unreachable, perform dynamic LAN discovery
+      if (!reachable) {
+        final discovered = await LanDiscoveryService.discoverServer();
+        if (discovered != null) {
+          reachable = true;
+          ApiEndpoints.setBaseUrl(discovered);
+          onServerUrlDiscovered?.call(discovered);
+          if (kDebugMode) {
+            print('[ConnectivityMonitor] Dynamic LAN auto-discovery found: $discovered');
+          }
         }
       }
 

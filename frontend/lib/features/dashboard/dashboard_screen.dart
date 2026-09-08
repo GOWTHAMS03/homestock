@@ -269,7 +269,7 @@ class DashboardScreen extends ConsumerWidget {
 
               // Circular User Avatar
               GestureDetector(
-                onTap: () => context.go('/profile'),
+                onTap: () => context.push('/profile'),
                 child: Container(
                   width: 38,
                   height: 38,

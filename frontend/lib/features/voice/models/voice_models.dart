@@ -1,20 +1,32 @@
+export 'command_result.dart';
+export 'normalized_voice_command.dart';
+export 'voice_entity.dart';
+export 'voice_transcript.dart';
+
 enum VoiceIntentType {
   addShoppingItem,
   removeShoppingItem,
   completeShoppingItem,
+  updateShoppingQuantity,
+  clearShoppingList,
   updateStock,
   stockIn,
   stockOut,
   getItemStatus,
   getShoppingList,
   getLowStockItems,
+  getOutOfStockItems,
   getExpiringItems,
+  getPurchaseHistory,
+  getSpending,
+  whatDoINeed,
   searchInventory,
   addInventoryItem,
   updateInventoryItem,
   openShoppingList,
   openInventory,
   openAnalytics,
+  startShoppingMode,
   smartPriceCheck,
   unknown;
 
@@ -22,25 +34,50 @@ enum VoiceIntentType {
     if (val == null) return VoiceIntentType.unknown;
     switch (val.toUpperCase()) {
       case 'ADD_SHOPPING_ITEM':
+      case 'ADD_TO_SHOPPING_LIST':
         return VoiceIntentType.addShoppingItem;
       case 'REMOVE_SHOPPING_ITEM':
+      case 'REMOVE_FROM_SHOPPING_LIST':
         return VoiceIntentType.removeShoppingItem;
       case 'COMPLETE_SHOPPING_ITEM':
+      case 'MARK_SHOPPING_ITEM_PURCHASED':
         return VoiceIntentType.completeShoppingItem;
+      case 'UPDATE_SHOPPING_QUANTITY':
+        return VoiceIntentType.updateShoppingQuantity;
+      case 'CLEAR_SHOPPING_ITEM':
+      case 'CLEAR_SHOPPING_LIST':
+        return VoiceIntentType.clearShoppingList;
       case 'UPDATE_STOCK':
         return VoiceIntentType.updateStock;
       case 'STOCK_IN':
+      case 'ADD_STOCK':
         return VoiceIntentType.stockIn;
       case 'STOCK_OUT':
+      case 'REMOVE_STOCK':
         return VoiceIntentType.stockOut;
       case 'GET_ITEM_STATUS':
+      case 'CHECK_STOCK':
         return VoiceIntentType.getItemStatus;
       case 'GET_SHOPPING_LIST':
+      case 'SHOW_SHOPPING_LIST':
         return VoiceIntentType.getShoppingList;
       case 'GET_LOW_STOCK_ITEMS':
+      case 'CHECK_LOW_STOCK':
         return VoiceIntentType.getLowStockItems;
+      case 'GET_OUT_OF_STOCK_ITEMS':
+      case 'CHECK_OUT_OF_STOCK':
+        return VoiceIntentType.getOutOfStockItems;
       case 'GET_EXPIRING_ITEMS':
+      case 'SHOW_EXPIRING_ITEMS':
         return VoiceIntentType.getExpiringItems;
+      case 'GET_PURCHASE_HISTORY':
+      case 'SHOW_PURCHASE_HISTORY':
+        return VoiceIntentType.getPurchaseHistory;
+      case 'GET_SPENDING':
+      case 'SHOW_SPENDING':
+        return VoiceIntentType.getSpending;
+      case 'WHAT_DO_I_NEED':
+        return VoiceIntentType.whatDoINeed;
       case 'SEARCH_INVENTORY':
         return VoiceIntentType.searchInventory;
       case 'ADD_INVENTORY_ITEM':
@@ -53,7 +90,11 @@ enum VoiceIntentType {
         return VoiceIntentType.openInventory;
       case 'OPEN_ANALYTICS':
         return VoiceIntentType.openAnalytics;
+      case 'START_SHOPPING_MODE':
+        return VoiceIntentType.startShoppingMode;
       case 'SMART_PRICE_CHECK':
+      case 'FIND_CHEAPEST_PRICE':
+      case 'COMPARE_PRICES':
         return VoiceIntentType.smartPriceCheck;
       default:
         return VoiceIntentType.unknown;
@@ -68,6 +109,10 @@ enum VoiceIntentType {
         return 'REMOVE_SHOPPING_ITEM';
       case VoiceIntentType.completeShoppingItem:
         return 'COMPLETE_SHOPPING_ITEM';
+      case VoiceIntentType.updateShoppingQuantity:
+        return 'UPDATE_SHOPPING_QUANTITY';
+      case VoiceIntentType.clearShoppingList:
+        return 'CLEAR_SHOPPING_LIST';
       case VoiceIntentType.updateStock:
         return 'UPDATE_STOCK';
       case VoiceIntentType.stockIn:
@@ -80,8 +125,16 @@ enum VoiceIntentType {
         return 'GET_SHOPPING_LIST';
       case VoiceIntentType.getLowStockItems:
         return 'GET_LOW_STOCK_ITEMS';
+      case VoiceIntentType.getOutOfStockItems:
+        return 'GET_OUT_OF_STOCK_ITEMS';
       case VoiceIntentType.getExpiringItems:
         return 'GET_EXPIRING_ITEMS';
+      case VoiceIntentType.getPurchaseHistory:
+        return 'GET_PURCHASE_HISTORY';
+      case VoiceIntentType.getSpending:
+        return 'GET_SPENDING';
+      case VoiceIntentType.whatDoINeed:
+        return 'WHAT_DO_I_NEED';
       case VoiceIntentType.searchInventory:
         return 'SEARCH_INVENTORY';
       case VoiceIntentType.addInventoryItem:
@@ -94,6 +147,8 @@ enum VoiceIntentType {
         return 'OPEN_INVENTORY';
       case VoiceIntentType.openAnalytics:
         return 'OPEN_ANALYTICS';
+      case VoiceIntentType.startShoppingMode:
+        return 'START_SHOPPING_MODE';
       case VoiceIntentType.smartPriceCheck:
         return 'SMART_PRICE_CHECK';
       case VoiceIntentType.unknown:
@@ -109,6 +164,10 @@ enum VoiceIntentType {
         return 'Remove from Shopping List';
       case VoiceIntentType.completeShoppingItem:
         return 'Mark Item as Bought';
+      case VoiceIntentType.updateShoppingQuantity:
+        return 'Update Quantity';
+      case VoiceIntentType.clearShoppingList:
+        return 'Clear Shopping List';
       case VoiceIntentType.updateStock:
         return 'Update Stock';
       case VoiceIntentType.stockIn:
@@ -121,8 +180,16 @@ enum VoiceIntentType {
         return 'View Shopping List';
       case VoiceIntentType.getLowStockItems:
         return 'Check Low Stock';
+      case VoiceIntentType.getOutOfStockItems:
+        return 'Check Out of Stock';
       case VoiceIntentType.getExpiringItems:
         return 'Check Expiring Items';
+      case VoiceIntentType.getPurchaseHistory:
+        return 'Purchase History';
+      case VoiceIntentType.getSpending:
+        return 'Spending Analytics';
+      case VoiceIntentType.whatDoINeed:
+        return 'What Do I Need?';
       case VoiceIntentType.searchInventory:
         return 'Search Inventory';
       case VoiceIntentType.addInventoryItem:
@@ -135,6 +202,8 @@ enum VoiceIntentType {
         return 'Open Inventory';
       case VoiceIntentType.openAnalytics:
         return 'Open Analytics';
+      case VoiceIntentType.startShoppingMode:
+        return 'In-Store Shopping Mode';
       case VoiceIntentType.smartPriceCheck:
         return 'Check Best Prices';
       case VoiceIntentType.unknown:

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/server_config_dialog.dart';
 import '../auth/auth_controller.dart';
 import '../home_switcher/create_home_dialog.dart';
 import '../home_switcher/home_controller.dart';
@@ -347,6 +348,13 @@ class ProfileScreen extends ConsumerWidget {
                     title: 'Alerts & Notifications',
                     subtitle: 'Low stock and expiry reminders',
                     onTap: () => context.push('/notifications'),
+                  ),
+                  _buildDottedDivider(),
+                  _buildListRow(
+                    icon: Icons.dns_outlined,
+                    title: 'Server & Connection Settings',
+                    subtitle: 'Switch between USB tunnel (127.0.0.1) & Wi-Fi',
+                    onTap: () => showServerConfigDialog(context, ref),
                   ),
                   _buildDottedDivider(),
                   _buildListRow(

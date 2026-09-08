@@ -49,6 +49,7 @@ com\homestock\modules\store\entity\Store.class
 com\homestock\core\config\WebMvcConfig.class
 com\homestock\modules\user\entity\User.class
 com\homestock\modules\category\dto\CategoryDto$CategoryDtoBuilder.class
+com\homestock\modules\voice\service\VoiceCommandExecutor$1.class
 com\homestock\modules\inventory\entity\InventoryItem$InventoryItemBuilder.class
 com\homestock\modules\category\repository\CategoryRepository.class
 com\homestock\core\exception\BusinessRuleException.class

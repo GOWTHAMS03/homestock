@@ -24,6 +24,10 @@ class ApiClient {
               ),
             ) {
     _setupInterceptors();
+    connectivityMonitor?.onServerUrlDiscovered = (discoveredUrl) {
+      updateBaseUrl(discoveredUrl);
+      secureStorage.saveBaseUrl(discoveredUrl);
+    };
   }
 
   void updateBaseUrl(String newBaseUrl) {

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../controllers/voice_controller.dart';
 import '../models/voice_models.dart';
+import 'voice_settings_dialog.dart';
 
 class VoiceBottomSheet extends ConsumerStatefulWidget {
   const VoiceBottomSheet({super.key});
@@ -151,59 +152,99 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
                 color: AppColors.textPrimary,
               ),
             ),
+            if (state.isOffline) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.lowStockBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.lowStockBorder),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.wifi_off, size: 11, color: AppColors.lowStockText),
+                    SizedBox(width: 3),
+                    Text(
+                      'Offline',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.lowStockText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
-        // Language mode badge
-        PopupMenuButton<String>(
-          initialValue: state.languageHint,
-          onSelected: (lang) {
-            ref.read(voiceControllerProvider.notifier).setLanguageHint(lang);
-          },
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.outline),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Settings button
+            IconButton(
+              icon: const Icon(Icons.tune, size: 18, color: AppColors.textSecondary),
+              tooltip: 'Voice Settings',
+              onPressed: () => VoiceSettingsDialog.show(context),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              constraints: const BoxConstraints(),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.language,
-                  size: 14,
-                  color: AppColors.textSecondary,
+            const SizedBox(width: 6),
+            // Language mode badge
+            PopupMenuButton<String>(
+              initialValue: state.languageHint,
+              onSelected: (lang) {
+                ref.read(voiceControllerProvider.notifier).setLanguageHint(lang);
+              },
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.outline),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  _getLangLabel(state.languageHint),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.language,
+                      size: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      _getLangLabel(state.languageHint),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
                 ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  size: 16,
-                  color: AppColors.textSecondary,
+              ),
+              itemBuilder: (ctx) => [
+                const PopupMenuItem(
+                  value: 'auto',
+                  child: Text('Auto (Tanglish/தமிழ்/En)'),
+                ),
+                const PopupMenuItem(
+                  value: 'en',
+                  child: Text('English Only'),
+                ),
+                const PopupMenuItem(
+                  value: 'ta',
+                  child: Text('தமிழ் மட்டும்'),
                 ),
               ],
-            ),
-          ),
-          itemBuilder: (ctx) => [
-            const PopupMenuItem(
-              value: 'auto',
-              child: Text('Auto (English / தமிழ்)'),
-            ),
-            const PopupMenuItem(
-              value: 'en',
-              child: Text('English Only'),
-            ),
-            const PopupMenuItem(
-              value: 'ta',
-              child: Text('தமிழ் மட்டும்'),
             ),
           ],
         ),

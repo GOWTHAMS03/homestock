@@ -18,8 +18,6 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _dashboardNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'dashboard');
 final _inventoryNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'inventory');
 final _shoppingNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shopping');
-final _analyticsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'analytics');
-final _profileNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
@@ -85,8 +83,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const NotificationsScreen(),
       ),
+      GoRoute(
+        path: '/profile',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/analytics',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AnalyticsScreen(),
+      ),
 
-      // Main 5-tab Bottom Navigation Shell
+      // Main 3-tab Bottom Navigation Shell (Home, Inventory, Shopping List)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainScaffold(navigationShell: navigationShell);
@@ -114,35 +122,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          // 3. Shopping Tab
+          // 3. Shopping List Tab
           StatefulShellBranch(
             navigatorKey: _shoppingNavigatorKey,
             routes: [
               GoRoute(
                 path: '/shopping',
                 builder: (context, state) => const ShoppingScreen(),
-              ),
-            ],
-          ),
-
-          // 4. Analytics Tab
-          StatefulShellBranch(
-            navigatorKey: _analyticsNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/analytics',
-                builder: (context, state) => const AnalyticsScreen(),
-              ),
-            ],
-          ),
-
-          // 5. Profile Tab
-          StatefulShellBranch(
-            navigatorKey: _profileNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/profile',
-                builder: (context, state) => const ProfileScreen(),
               ),
             ],
           ),

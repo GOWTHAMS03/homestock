@@ -35,13 +35,15 @@ void main() async {
 
   // 4. Initialize ConnectivityMonitor
   final connectivityMonitor = ConnectivityMonitor();
-  await connectivityMonitor.start();
 
-  // 5. Initialize ApiClient with fast reachability feedback
+  // 5. Initialize ApiClient with fast reachability feedback and discovery listener
   final apiClient = ApiClient(
     secureStorage: secureStorage,
     connectivityMonitor: connectivityMonitor,
   );
+
+  // 6. Start monitoring and dynamic server discovery
+  await connectivityMonitor.start();
 
   // 6. Initialize SyncEngine
   final syncEngine = SyncEngine(
