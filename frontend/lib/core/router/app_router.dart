@@ -8,6 +8,7 @@ import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/inventory/inventory_screen.dart';
+import '../../features/inventory/item_detail_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/shopping/shopping_screen.dart';
@@ -92,6 +93,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/analytics',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/inventory/detail/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final itemId = state.pathParameters['id'] ?? '';
+          return ItemDetailScreen(itemId: itemId);
+        },
       ),
 
       // Main 3-tab Bottom Navigation Shell (Home, Inventory, Shopping List)

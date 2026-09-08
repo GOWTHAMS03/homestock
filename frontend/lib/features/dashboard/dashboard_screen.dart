@@ -15,6 +15,7 @@ import '../inventory/category_model.dart';
 import '../inventory/consumption_model.dart';
 import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_model.dart';
+import '../inventory/item_detail_screen.dart';
 import '../inventory/smart_confirmation_sheet.dart';
 import '../notifications/notification_controller.dart';
 import '../shopping/shopping_controller.dart';
@@ -1138,7 +1139,13 @@ class DashboardScreen extends ConsumerWidget {
         );
       },
       child: InkWell(
-        onTap: () => context.push('/inventory/detail/${item.id}'),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ItemDetailScreen(itemId: item.id),
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
