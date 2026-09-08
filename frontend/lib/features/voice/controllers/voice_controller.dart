@@ -108,6 +108,7 @@ class VoiceState {
   final SpeechEngineMode engineMode;
   final bool isOffline;
   final bool isModelInstalled;
+  final bool isModelDownloading;
   final double modelDownloadProgress;
 
   const VoiceState({
@@ -125,6 +126,7 @@ class VoiceState {
     this.engineMode = SpeechEngineMode.auto,
     this.isOffline = false,
     this.isModelInstalled = false,
+    this.isModelDownloading = false,
     this.modelDownloadProgress = 0.0,
   });
 
@@ -147,6 +149,7 @@ class VoiceState {
     SpeechEngineMode? engineMode,
     bool? isOffline,
     bool? isModelInstalled,
+    bool? isModelDownloading,
     double? modelDownloadProgress,
     bool clearError = false,
   }) {
@@ -165,6 +168,7 @@ class VoiceState {
       engineMode: engineMode ?? this.engineMode,
       isOffline: isOffline ?? this.isOffline,
       isModelInstalled: isModelInstalled ?? this.isModelInstalled,
+      isModelDownloading: isModelDownloading ?? this.isModelDownloading,
       modelDownloadProgress: modelDownloadProgress ?? this.modelDownloadProgress,
     );
   }
@@ -202,12 +206,22 @@ class VoiceController extends StateNotifier<VoiceState> {
     final modelManager = _ref.read(offlineModelManagerProvider);
     state = state.copyWith(
       isModelInstalled: modelManager.isModelReady,
+      isModelDownloading: modelManager.currentModel.status == ModelStatus.downloading,
+      modelDownloadProgress: modelManager.currentModel.downloadProgress,
     );
     _modelStatusSub = modelManager.statusStream.listen((info) {
       if (mounted) {
+        final isDownloading = info.status == ModelStatus.downloading;
+        final isInstalled = info.status == ModelStatus.installed || info.status == ModelStatus.ready;
+        final wasModelError = state.status == VoiceStatus.error &&
+            (state.errorMessage?.toLowerCase().contains('model') ?? false);
+
         state = state.copyWith(
-          isModelInstalled: info.status == ModelStatus.installed || info.status == ModelStatus.ready,
+          isModelInstalled: isInstalled,
+          isModelDownloading: isDownloading,
           modelDownloadProgress: info.downloadProgress,
+          status: (isInstalled && wasModelError) ? VoiceStatus.idle : null,
+          clearError: isInstalled && wasModelError,
         );
       }
     });
@@ -216,6 +230,24 @@ class VoiceController extends StateNotifier<VoiceState> {
         state = state.copyWith(isModelInstalled: installed);
       }
     });
+  }
+
+  /// Triggers download of the offline Whisper model
+  void downloadOfflineModel([WhisperModelVariant? variant]) {
+    final modelManager = _ref.read(offlineModelManagerProvider);
+    state = state.copyWith(
+      isModelDownloading: true,
+      modelDownloadProgress: 0.01,
+      clearError: true,
+    );
+    modelManager.downloadModel(variant);
+  }
+
+  void promptModelDownload() {
+    state = state.copyWith(
+      status: VoiceStatus.error,
+      errorMessage: 'Offline voice model is not installed. Please download the free model once to use voice commands offline.',
+    );
   }
 
   void setLanguageHint(String hint) {
@@ -239,15 +271,16 @@ class VoiceController extends StateNotifier<VoiceState> {
         return false;
       }
 
-      // Pre-flight check: If offlineOnly and model is not installed
+      // Pre-flight check: If model is not installed and device is offline (or in offline-first mode)
       final modelManager = _ref.read(offlineModelManagerProvider);
       final isInstalled = await modelManager.isModelInstalled();
       state = state.copyWith(isModelInstalled: isInstalled);
 
-      if (!isInstalled && state.engineMode == SpeechEngineMode.offlineOnly) {
+      final isOnline = _hybridSpeechEngine.isOnline;
+      if (!isInstalled && (!isOnline || state.engineMode == SpeechEngineMode.offlineOnly)) {
         state = state.copyWith(
           status: VoiceStatus.error,
-          errorMessage: 'Offline voice model is not installed. Please download it in Voice Settings.',
+          errorMessage: 'Offline voice model is not installed. Please download the free model once to use voice commands offline.',
         );
         return false;
       }
@@ -549,6 +582,8 @@ class VoiceController extends StateNotifier<VoiceState> {
       engineMode: state.engineMode,
       languageHint: state.languageHint,
       isModelInstalled: state.isModelInstalled,
+      isModelDownloading: state.isModelDownloading,
+      modelDownloadProgress: state.modelDownloadProgress,
     );
   }
 

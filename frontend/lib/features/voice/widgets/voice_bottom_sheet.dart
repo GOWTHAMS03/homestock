@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../controllers/voice_controller.dart';
 import '../models/voice_models.dart';
+import 'voice_model_settings.dart';
 import 'voice_settings_dialog.dart';
 
 class VoiceBottomSheet extends ConsumerStatefulWidget {
@@ -39,9 +40,17 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    // Auto-start recording on bottom sheet presentation
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(voiceControllerProvider.notifier).startRecording();
+    // Auto-start recording only if voice model is already installed
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final modelManager = ref.read(offlineModelManagerProvider);
+      final installed = await modelManager.isModelInstalled();
+      if (!mounted) return;
+
+      if (!installed) {
+        ref.read(voiceControllerProvider.notifier).promptModelDownload();
+      } else {
+        ref.read(voiceControllerProvider.notifier).startRecording();
+      }
     });
   }
 
@@ -129,57 +138,64 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 16,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'HomeStock Voice',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            if (state.isOffline) ...[
-              const SizedBox(width: 8),
+        Expanded(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: AppColors.lowStockBg,
+                  color: AppColors.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.lowStockBorder),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.wifi_off, size: 11, color: AppColors.lowStockText),
-                    SizedBox(width: 3),
-                    Text(
-                      'Offline',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.lowStockText,
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.auto_awesome,
+                  size: 15,
+                  color: AppColors.primary,
                 ),
               ),
+              const SizedBox(width: 6),
+              const Flexible(
+                child: Text(
+                  'HomeStock Voice',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (state.isOffline) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.lowStockBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.lowStockBorder),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off, size: 10, color: AppColors.lowStockText),
+                      SizedBox(width: 2),
+                      Text(
+                        'Offline',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.lowStockText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
+        const SizedBox(width: 6),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -188,10 +204,10 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
               icon: const Icon(Icons.tune, size: 18, color: AppColors.textSecondary),
               tooltip: 'Voice Settings',
               onPressed: () => VoiceSettingsDialog.show(context),
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.all(4),
               constraints: const BoxConstraints(),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
             // Language mode badge
             PopupMenuButton<String>(
               initialValue: state.languageHint,
@@ -200,10 +216,10 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
               },
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.outline),
                 ),
                 child: Row(
@@ -211,21 +227,21 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
                   children: [
                     const Icon(
                       Icons.language,
-                      size: 13,
+                      size: 12,
                       color: AppColors.textSecondary,
                     ),
-                    const SizedBox(width: 3),
+                    const SizedBox(width: 2),
                     Text(
                       _getLangLabel(state.languageHint),
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
                       ),
                     ),
                     const Icon(
                       Icons.arrow_drop_down,
-                      size: 14,
+                      size: 13,
                       color: AppColors.textSecondary,
                     ),
                   ],
@@ -257,9 +273,9 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
       case 'ta':
         return 'தமிழ்';
       case 'en':
-        return 'English';
+        return 'EN';
       default:
-        return 'EN / தமிழ்';
+        return 'Auto';
     }
   }
 
@@ -278,7 +294,7 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
       case VoiceStatus.error:
         return _buildErrorView(state);
       case VoiceStatus.idle:
-        return _buildIdleView();
+        return _buildIdleView(state);
     }
   }
 
@@ -933,6 +949,14 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
   }
 
   Widget _buildErrorView(VoiceState state) {
+    final isModelIssue = !state.isModelInstalled ||
+        (state.errorMessage?.toLowerCase().contains('model') ?? false) ||
+        (state.errorMessage?.toLowerCase().contains('download') ?? false);
+
+    if (isModelIssue) {
+      return _buildModelDownloadCard(state);
+    }
+
     return Column(
       key: const ValueKey('error'),
       children: [
@@ -1008,7 +1032,140 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
     );
   }
 
-  Widget _buildIdleView() {
+  Widget _buildModelDownloadCard(VoiceState state) {
+    final isDownloading = state.isModelDownloading;
+    final progress = state.modelDownloadProgress;
+    final pct = (progress * 100).toInt();
+
+    return Column(
+      key: const ValueKey('model_download_card'),
+      children: [
+        const SizedBox(height: 12),
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDownloading
+                ? AppColors.primaryContainer.withAlpha(120)
+                : AppColors.lowStockBg,
+            border: Border.all(
+              color: isDownloading ? AppColors.primary : AppColors.lowStockBorder,
+            ),
+          ),
+          child: Icon(
+            isDownloading ? Icons.cloud_download : Icons.offline_bolt_outlined,
+            color: isDownloading ? AppColors.primary : AppColors.lowStockText,
+            size: 30,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          isDownloading ? 'Downloading Voice Model ($pct%)' : 'Offline Voice Model Required',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            isDownloading
+                ? 'Downloading free multilingual Whisper model (142 MB). Voice commands will work 100% offline once downloaded.'
+                : 'Download the free on-device voice model once (~142 MB) to enable 100% offline speech recognition without OpenAI or paid API keys.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (isDownloading) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress > 0 ? progress : null,
+                    backgroundColor: AppColors.outlineVariant.withAlpha(80),
+                    color: AppColors.primary,
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$pct% completed • Please wait',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Download in Background'),
+          ),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    ref.read(voiceControllerProvider.notifier).downloadOfflineModel();
+                  },
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text('Download (142 MB)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => VoiceModelSettingsDialog.show(context),
+            icon: const Icon(Icons.tune, size: 15, color: AppColors.textMuted),
+            label: const Text(
+              'Model Options (Tiny / Base / Small)',
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildIdleView(VoiceState state) {
+    if (!state.isModelInstalled) {
+      return _buildModelDownloadCard(state);
+    }
     return Column(
       key: const ValueKey('idle'),
       children: [
