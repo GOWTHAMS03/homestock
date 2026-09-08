@@ -1,8 +1,9 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  // Android emulator uses 10.0.2.2, desktop/web uses localhost, physical phone uses PC LAN IP
-  static const String defaultUrl = 'http://192.168.0.109:8080/api/v1';
+  // Android emulator uses 10.0.2.2, desktop/web uses localhost, physical phone uses PC LAN IP or 127.0.0.1 with adb reverse
+  static const String defaultUrl = 'http://172.20.10.2:8080/api/v1';
+  static const String usbAdbUrl = 'http://127.0.0.1:8080/api/v1';
   static String baseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: defaultUrl);
 
   static void setBaseUrl(String url) {
@@ -10,6 +11,7 @@ class ApiEndpoints {
   }
 
   // Auth
+  static const String ping = '/auth/ping';
   static const String register = '/auth/register';
   static const String login = '/auth/login';
   static const String inviteLogin = '/auth/invite-login';

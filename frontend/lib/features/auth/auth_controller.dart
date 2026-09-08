@@ -137,9 +137,29 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> loginWithInviteCode({
+    required String inviteCode,
+    required String fullName,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final user = await _repo.loginWithInviteCode(
+        inviteCode: inviteCode,
+        fullName: fullName,
+      );
+      state = state.copyWith(isLoading: false, isAuthenticated: true, user: user);
+      await _ref.read(homeControllerProvider.notifier).loadHomes();
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _repo.logout();
     _ref.read(homeControllerProvider.notifier).reset();
     state = const AuthState(isAuthenticated: false);
   }
 }
+

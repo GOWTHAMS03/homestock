@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/empty_state_view.dart';
+import '../../core/widgets/offline_wifi_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
-import '../../core/widgets/sync_status_bar.dart';
 import '../auth/auth_controller.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../home_switcher/create_home_dialog.dart';
@@ -34,8 +34,8 @@ class DashboardScreen extends ConsumerWidget {
     final activeHome = homeState.activeHome;
     final summary = dashboardState.summary;
 
-    // 1. Initial Home Loading State
-    if (homeState.isLoading || (dashboardState.isLoading && summary == null)) {
+    // 1. Initial Home Loading State (only if no active home is cached yet)
+    if (homeState.isLoading && activeHome == null) {
       return Scaffold(
         backgroundColor: const Color(0xFFF6F7F9),
         appBar: AppBar(
@@ -82,13 +82,12 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
 
-    // 3. Main Modern Dashboard Content
+    // 3. Main Modern Dashboard Content (Clean, Minimal, Non-disruptive)
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
       body: SafeArea(
         child: Column(
           children: [
-            const SyncStatusBar(),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
@@ -98,7 +97,7 @@ class DashboardScreen extends ConsumerWidget {
                 child: ListView(
                   padding: EdgeInsets.zero,
                   children: [
-                    // A. Lavender Header Area
+                    // A. Lavender Header Area with Non-disruptive Offline Wifi Icon
                     _buildHeader(context, ref, activeHome, notifState.unreadCount, authState.user?.fullName),
 
                     Padding(
@@ -108,23 +107,18 @@ class DashboardScreen extends ConsumerWidget {
                         children: [
                           const SizedBox(height: AppSpacing.md),
 
-                          // B. Dual Status Promo Cards
+                          // B. Dual Status Promo Cards (Shopping & Pantry)
                           _buildDualPromoCards(context, ref, summary),
-                          const SizedBox(height: AppSpacing.sm),
 
-                          // C. Green Checkmark Pills Sub-row
-                          _buildCheckmarkPillsRow(),
-                          const SizedBox(height: AppSpacing.md),
-
-                          // D. Highlight Banner
+                          // C. Subtle Low-Stock Alert Banner (only shown when low stock exists)
                           _buildSpecialNoticeBanner(context, ref, summary),
-                          const SizedBox(height: AppSpacing.xl),
+                          const SizedBox(height: AppSpacing.lg),
 
-                          // E. Fresh Categories Section
+                          // D. 3D-styled Categories Section
                           _buildCategoriesSection(context, ref),
                           const SizedBox(height: AppSpacing.xl),
 
-                          // F. Daily Essentials / Needs Attention Products
+                          // E. Daily Essentials / Pantry Products with Animated Smart Predict
                           _buildDailyEssentialsSection(context, ref, summary),
                           const SizedBox(height: AppSpacing.xxl),
                         ],
@@ -140,7 +134,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Top header with lavender gradient, status headline, location dropdown & search pill
+  /// Top header with lavender gradient, location dropdown, clean non-disruptive wifi badge & search pill
   Widget _buildHeader(
     BuildContext context,
     WidgetRef ref,
@@ -151,11 +145,7 @@ class DashboardScreen extends ConsumerWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFFEDE9FE), // Soft pastel lavender
-            Color(0xFFF5F3FF),
-            Color(0xFFF6F7F9),
-          ],
+          colors: [AppColors.headerGradientStart, AppColors.headerGradientEnd],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -164,7 +154,7 @@ class DashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row 1: ⚡ Status & Home Location Dropdown + Right Avatar/Actions
+          // Row 1: Status Headline, Home Switcher Dropdown, Offline Wifi Badge, Bell & Avatar
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -172,7 +162,7 @@ class DashboardScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ⚡ Bold Headline
+                    // Headline
                     const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -220,6 +210,9 @@ class DashboardScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+
+              // Simple non-disruptive Wi-Fi offline indicator
+              const OfflineWifiBadge(),
 
               // Notification bell
               Stack(
@@ -339,7 +332,7 @@ class DashboardScreen extends ConsumerWidget {
 
     return Row(
       children: [
-        // Card 1: Purple-tinted "0 FEES" style card
+        // Card 1: Purple-tinted Shopping List summary
         Expanded(
           child: InkWell(
             onTap: () => context.go('/shopping'),
@@ -350,6 +343,13 @@ class DashboardScreen extends ConsumerWidget {
                 color: const Color(0xFFF5F3FF),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFDDD6FE)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
@@ -370,7 +370,7 @@ class DashboardScreen extends ConsumerWidget {
                         Text(
                           pendingShopping > 0 ? '$pendingShopping TO BUY' : '0 PENDING',
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w900,
                             color: Color(0xFF5B21B6),
                             letterSpacing: -0.3,
@@ -391,7 +391,7 @@ class DashboardScreen extends ConsumerWidget {
         ),
         const SizedBox(width: 10),
 
-        // Card 2: Amber/Indigo-tinted "LOW PRICES" style card
+        // Card 2: Indigo-tinted Inventory count summary
         Expanded(
           child: InkWell(
             onTap: () => context.go('/inventory'),
@@ -402,6 +402,13 @@ class DashboardScreen extends ConsumerWidget {
                 color: const Color(0xFFEEF2FF),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFC7D2FE)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
@@ -422,7 +429,7 @@ class DashboardScreen extends ConsumerWidget {
                         Text(
                           '$totalInventory ITEMS',
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w900,
                             color: AppColors.primaryDark,
                             letterSpacing: -0.3,
@@ -445,63 +452,67 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Sub-row of green checkmarks
-  Widget _buildCheckmarkPillsRow() {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        _CheckmarkBadge(label: 'Real-Time Sync'),
-        _CheckmarkBadge(label: 'Family Shared'),
-        _CheckmarkBadge(label: 'Low-Stock Alerts'),
-      ],
-    );
-  }
-
-  /// Yellow Highlight Notice Banner
+  /// Minimal, non-intrusive alert banner (shown ONLY when items are running low)
   Widget _buildSpecialNoticeBanner(BuildContext context, WidgetRef ref, DashboardSummaryModel? summary) {
     final lowStock = summary?.lowStockCount ?? 0;
+    if (lowStock == 0) return const SizedBox.shrink();
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFFDE68A)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.circle, size: 14, color: Color(0xFFF59E0B)),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              lowStock > 0
-                  ? 'ATTENTION: $lowStock ITEM(S) RUNNING LOW IN PANTRY'
-                  : 'ALL HOUSEHOLD ITEMS AT OPTIMAL STOCK LEVELS',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF92400E),
-                letterSpacing: 0.2,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: InkWell(
+        onTap: () {
+          ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.lowStock);
+          context.go('/inventory');
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFDE68A), width: 0.9),
           ),
-          const SizedBox(width: 6),
-          const Icon(Icons.circle, size: 14, color: Color(0xFFF59E0B)),
-        ],
+          child: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFD97706)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$lowStock item(s) running low in pantry • Tap to restock',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFD97706)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  /// Categories Horizontal Scroll with badges
+  /// Categories Horizontal Scroll with rich 3D-styled badges
   Widget _buildCategoriesSection(BuildContext context, WidgetRef ref) {
     final invState = ref.watch(inventoryControllerProvider);
     final homeState = ref.watch(homeControllerProvider);
-    final categories = invState.categories.isNotEmpty
+    final rawCategories = invState.categories.isNotEmpty
         ? invState.categories
         : CategoryModel.defaultCategories(homeState.activeHome?.id);
+
+    // Deduplicate categories by normalized name
+    final categories = <CategoryModel>[];
+    final seen = <String>{};
+    for (final cat in rawCategories) {
+      final k = cat.name.trim().toLowerCase();
+      if (!seen.contains(k)) {
+        seen.add(k);
+        categories.add(cat);
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -510,27 +521,22 @@ class DashboardScreen extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'PANTRY ',
+                Text(
+                  'Pantry Categories',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF10B981),
-                    letterSpacing: -0.4,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.3,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    '@HOME',
-                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
-                  ),
+                SizedBox(height: 2),
+                Text(
+                  'Quick access to home supplies',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -539,35 +545,34 @@ class DashboardScreen extends ConsumerWidget {
                 ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.all);
                 context.go('/inventory');
               },
-              child: const Text(
-                'See All',
-                style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                child: Text(
+                  'See All',
+                  style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 2),
-        const Text(
-          'Handpicked daily household essentials',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
         const SizedBox(height: AppSpacing.md),
 
-        // Horizontal Category Pills
+        // Horizontal 3D-style Category Pills
         SizedBox(
-          height: 86,
+          height: 90,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: categories.length + 1,
             separatorBuilder: (context, index) => const SizedBox(width: 14),
             itemBuilder: (context, index) {
               if (index == 0) {
-                // Special Low Stock Badge
+                // Special Low Stock 3D Badge
+                final theme = _getCategoryTheme('Low Stock');
                 return _buildCategoryBadge(
-                  icon: Icons.flash_on_rounded,
+                  icon: theme.icon,
                   label: 'Low Stock',
-                  iconColor: Colors.white,
-                  bgColor: const Color(0xFFEC4899),
+                  gradientColors: theme.gradientColors,
+                  shadowColor: theme.shadowColor,
                   onTap: () {
                     ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.lowStock);
                     context.go('/inventory');
@@ -576,11 +581,12 @@ class DashboardScreen extends ConsumerWidget {
               }
 
               final cat = categories[index - 1];
+              final theme = _getCategoryTheme(cat.name);
               return _buildCategoryBadge(
-                icon: _getCategoryIcon(cat.name),
+                icon: theme.icon,
                 label: cat.name,
-                iconColor: AppColors.primary,
-                bgColor: AppColors.primaryContainer,
+                gradientColors: theme.gradientColors,
+                shadowColor: theme.shadowColor,
                 onTap: () {
                   ref.read(inventoryControllerProvider.notifier).selectCategory(cat.id);
                   context.go('/inventory');
@@ -593,11 +599,12 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  /// 3D-styled Category Badge with vivid gradients, subtle inner highlight and soft glow
   Widget _buildCategoryBadge({
     required IconData icon,
     required String label,
-    required Color iconColor,
-    required Color bgColor,
+    required List<Color> gradientColors,
+    required Color shadowColor,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -606,18 +613,32 @@ class DashboardScreen extends ConsumerWidget {
       child: Column(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.outline.withValues(alpha: 0.6)),
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: shadowColor,
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.35),
+                width: 1.2,
+              ),
             ),
-            child: Icon(icon, color: iconColor, size: 26),
+            child: Icon(icon, color: Colors.white, size: 26),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 7),
           SizedBox(
-            width: 64,
+            width: 68,
             child: Text(
               label,
               textAlign: TextAlign.center,
@@ -636,7 +657,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Daily Essentials / Needs Attention Products with action button
+  /// Daily Essentials / Needs Attention Products with animated Smart Predict button
   Widget _buildDailyEssentialsSection(BuildContext context, WidgetRef ref, DashboardSummaryModel? summary) {
     final invState = ref.watch(inventoryControllerProvider);
     final items = invState.items.take(6).toList();
@@ -669,7 +690,7 @@ class DashboardScreen extends ConsumerWidget {
               'Your Pantry Items',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2),
             ),
-            InkWell(
+            _AnimatedSmartPredictButton(
               onTap: () {
                 ref.read(dashboardControllerProvider.notifier).loadRecommendations();
                 showModalBottomSheet(
@@ -679,24 +700,6 @@ class DashboardScreen extends ConsumerWidget {
                   builder: (_) => const WhatDoINeedSheet(),
                 );
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.auto_awesome_rounded, size: 13, color: AppColors.primary),
-                    SizedBox(width: 4),
-                    Text(
-                      'Smart Predict',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
@@ -709,151 +712,296 @@ class DashboardScreen extends ConsumerWidget {
           itemCount: items.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.82,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.84,
           ),
           itemBuilder: (context, index) {
             final item = items[index];
-            return _buildProductCard(context, ref, item);
+            return _buildProductCard(context, ref, item, index);
           },
         ),
       ],
     );
   }
 
-  /// Individual Product Card with high-res icon, green status pill & action button
-  Widget _buildProductCard(BuildContext context, WidgetRef ref, InventoryItemModel item) {
+  /// Individual Product Card with subtle entrance micro-animation, title case, and animated button
+  Widget _buildProductCard(BuildContext context, WidgetRef ref, InventoryItemModel item, int index) {
     final isLow = item.isLowStock;
     final isOut = item.isOutOfStock;
+    final formattedName = _formatName(item.name);
+    final productIcon = _getProductIcon(item.name, item.categoryName);
+    final catTheme = _getCategoryTheme(item.categoryName);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 250 + (index * 50)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 12 * (1 - value)),
+            child: child,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Image / Icon Area
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Icon(
-                    _getCategoryIcon(item.categoryName),
-                    size: 40,
-                    color: isOut
-                        ? AppColors.outOfStockText
-                        : (isLow ? AppColors.lowStockText : AppColors.primary),
+        );
+      },
+      child: InkWell(
+        onTap: () => context.push('/inventory/detail/${item.id}'),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.outline.withValues(alpha: 0.75), width: 0.9),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Product Visual Container
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: catTheme.gradientColors.first.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: catTheme.gradientColors.first.withValues(alpha: 0.2),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      productIcon,
+                      size: 38,
+                      color: catTheme.gradientColors.last,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            // Item Name
-            Text(
-              item.name,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-
-            // Package / Unit description
-            Text(
-              '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 6),
-
-            // Bottom Row: Green status pill + Action Button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Green status pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.hsGreenBg,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.hsGreen.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    isOut ? 'Out of Stock' : (isLow ? 'Low Stock' : 'In Stock'),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.hsGreen,
-                    ),
-                  ),
+              // Item Name (Title Cased)
+              Text(
+                formattedName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
 
-                // Vibrant Action Button
-                InkWell(
-                  onTap: () async {
-                    // Quick add to shopping list with feedback
-                    final success = await ref.read(shoppingControllerProvider.notifier).addItem(
-                          inventoryItemId: item.id,
-                          itemName: item.name,
-                          quantity: 1.0,
-                        );
-                    if (context.mounted && success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Added "${item.name}" to Shopping List'),
-                          duration: const Duration(seconds: 1),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: 34,
-                    height: 34,
+              // Unit / Quantity
+              Text(
+                '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit} in pantry',
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+
+              // Bottom Row: Status Pill + Animated Add Button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Status Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFEC4899), width: 1.5),
+                      color: isOut
+                          ? const Color(0xFFFFF1F2)
+                          : (isLow ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5)),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isOut
+                            ? const Color(0xFFFECDD3)
+                            : (isLow ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0)),
+                        width: 0.8,
+                      ),
                     ),
-                    child: const Center(
-                      child: Icon(Icons.add_rounded, color: Color(0xFFEC4899), size: 20),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isOut
+                                ? const Color(0xFFE11D48)
+                                : (isLow ? const Color(0xFFD97706) : const Color(0xFF10B981)),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isOut ? 'Out' : (isLow ? 'Low' : 'In Stock'),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: isOut
+                                ? const Color(0xFFBE123C)
+                                : (isLow ? const Color(0xFFB45309) : const Color(0xFF047857)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+
+                  // Animated Add Action Button
+                  _AnimatedAddButton(
+                    onTap: () async {
+                      final success = await ref.read(shoppingControllerProvider.notifier).addItem(
+                            inventoryItemId: item.id,
+                            itemName: item.name,
+                            quantity: 1.0,
+                          );
+                      if (context.mounted && success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Added "$formattedName" to Shopping List'),
+                            duration: const Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.primary,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  IconData _getCategoryIcon(String catName) {
+  String _formatName(String raw) {
+    if (raw.trim().isEmpty) return '';
+    final words = raw.trim().split(RegExp(r'\s+'));
+    return words.map((w) {
+      if (w.isEmpty) return '';
+      return '${w[0].toUpperCase()}${w.substring(1)}';
+    }).join(' ');
+  }
+
+  IconData _getProductIcon(String name, String catName) {
+    final lower = '$name $catName'.toLowerCase();
+    if (lower.contains('rice') || lower.contains('grain') || lower.contains('biryani') || lower.contains('basmati')) {
+      return Icons.rice_bowl_rounded;
+    }
+    if (lower.contains('milk') || lower.contains('dairy') || lower.contains('curd') || lower.contains('cheese')) {
+      return Icons.local_drink_rounded;
+    }
+    if (lower.contains('oil') || lower.contains('ghee') || lower.contains('butter')) {
+      return Icons.opacity_rounded;
+    }
+    if (lower.contains('bread') || lower.contains('biscuit') || lower.contains('snack') || lower.contains('cookie')) {
+      return Icons.bakery_dining_rounded;
+    }
+    if (lower.contains('fruit') || lower.contains('apple') || lower.contains('banana') || lower.contains('mango')) {
+      return Icons.apple_rounded;
+    }
+    if (lower.contains('vegetable') || lower.contains('tomato') || lower.contains('potato') || lower.contains('onion')) {
+      return Icons.eco_rounded;
+    }
+    if (lower.contains('soap') || lower.contains('wash') || lower.contains('detergent') || lower.contains('clean')) {
+      return Icons.cleaning_services_rounded;
+    }
+    if (lower.contains('shampoo') || lower.contains('paste') || lower.contains('cream') || lower.contains('lotion')) {
+      return Icons.spa_rounded;
+    }
+    if (lower.contains('coffee') || lower.contains('tea')) {
+      return Icons.coffee_rounded;
+    }
+    if (lower.contains('water') || lower.contains('juice') || lower.contains('soda')) {
+      return Icons.water_drop_rounded;
+    }
+    return _getCategoryTheme(catName).icon;
+  }
+
+  _CategoryTheme _getCategoryTheme(String catName) {
     final lower = catName.toLowerCase();
-    if (lower.contains('milk') || lower.contains('dair')) return Icons.local_drink_outlined;
-    if (lower.contains('veg') || lower.contains('fruit')) return Icons.eco_outlined;
-    if (lower.contains('oil') || lower.contains('ghee')) return Icons.opacity_outlined;
-    if (lower.contains('spice') || lower.contains('salt')) return Icons.grain_outlined;
-    if (lower.contains('snack') || lower.contains('biscuit')) return Icons.fastfood_outlined;
-    if (lower.contains('beverag') || lower.contains('tea') || lower.contains('coffee')) return Icons.coffee_outlined;
-    return Icons.inventory_2_outlined;
+    if (lower.contains('low') || lower.contains('stock') || lower.contains('alert')) {
+      return const _CategoryTheme(
+        icon: Icons.bolt_rounded,
+        gradientColors: [Color(0xFFFF3366), Color(0xFFE11D48)],
+        shadowColor: Color(0x40FF3366),
+      );
+    }
+    if (lower.contains('kitchen') || lower.contains('cook') || lower.contains('dish')) {
+      return const _CategoryTheme(
+        icon: Icons.restaurant_rounded,
+        gradientColors: [Color(0xFFFB923C), Color(0xFFEA580C)],
+        shadowColor: Color(0x35FB923C),
+      );
+    }
+    if (lower.contains('clean') || lower.contains('wash') || lower.contains('detergent')) {
+      return const _CategoryTheme(
+        icon: Icons.auto_awesome_rounded,
+        gradientColors: [Color(0xFF38BDF8), Color(0xFF0284C7)],
+        shadowColor: Color(0x3538BDF8),
+      );
+    }
+    if (lower.contains('bath') || lower.contains('toilet') || lower.contains('shower')) {
+      return const _CategoryTheme(
+        icon: Icons.bathtub_rounded,
+        gradientColors: [Color(0xFF34D399), Color(0xFF059669)],
+        shadowColor: Color(0x3534D399),
+      );
+    }
+    if (lower.contains('person') || lower.contains('care') || lower.contains('beauty') || lower.contains('skin')) {
+      return const _CategoryTheme(
+        icon: Icons.spa_rounded,
+        gradientColors: [Color(0xFFF472B6), Color(0xFFDB2777)],
+        shadowColor: Color(0x35F472B6),
+      );
+    }
+    if (lower.contains('pantr') || lower.contains('snack') || lower.contains('biscuit') || lower.contains('sweet')) {
+      return const _CategoryTheme(
+        icon: Icons.cookie_rounded,
+        gradientColors: [Color(0xFFA78BFA), Color(0xFF7C3AED)],
+        shadowColor: Color(0x35A78BFA),
+      );
+    }
+    if (lower.contains('milk') || lower.contains('dair') || lower.contains('drink') || lower.contains('beverag')) {
+      return const _CategoryTheme(
+        icon: Icons.local_drink_rounded,
+        gradientColors: [Color(0xFF60A5FA), Color(0xFF2563EB)],
+        shadowColor: Color(0x3560A5FA),
+      );
+    }
+    if (lower.contains('oil') || lower.contains('ghee')) {
+      return const _CategoryTheme(
+        icon: Icons.opacity_rounded,
+        gradientColors: [Color(0xFFFBBF24), Color(0xFFD97706)],
+        shadowColor: Color(0x35FBBF24),
+      );
+    }
+    if (lower.contains('spice') || lower.contains('grain') || lower.contains('rice') || lower.contains('flour')) {
+      return const _CategoryTheme(
+        icon: Icons.rice_bowl_rounded,
+        gradientColors: [Color(0xFFF59E0B), Color(0xFFB45309)],
+        shadowColor: Color(0x35F59E0B),
+      );
+    }
+    return const _CategoryTheme(
+      icon: Icons.inventory_2_rounded,
+      gradientColors: [Color(0xFF818CF8), Color(0xFF4F46E5)],
+      shadowColor: Color(0x35818CF8),
+    );
   }
 
   void _showHomeSwitcher(BuildContext context, WidgetRef ref) {
@@ -927,9 +1075,10 @@ class DashboardScreen extends ConsumerWidget {
                       color: const Color(0xFFF3E8FF),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.group_add_rounded, color: Color(0xFF9333EA), size: 20),
+                    child: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF9333EA), size: 20),
                   ),
-                  title: const Text('Join Home with Invite Code', style: TextStyle(fontWeight: FontWeight.w600)),
+                  title: const Text('Join Home (Invite or QR Code)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Enter invite code or scan household QR', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   onTap: () {
                     Navigator.pop(context);
                     showDialog(context: context, builder: (_) => const JoinHomeDialog());
@@ -944,27 +1093,148 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _CheckmarkBadge extends StatelessWidget {
-  final String label;
+/// 3D Category Theme definition
+class _CategoryTheme {
+  final IconData icon;
+  final List<Color> gradientColors;
+  final Color shadowColor;
 
-  const _CheckmarkBadge({required this.label});
+  const _CategoryTheme({
+    required this.icon,
+    required this.gradientColors,
+    required this.shadowColor,
+  });
+}
+
+/// Animated Smart Predict button with gently pulsing and rotating sparkle icon
+class _AnimatedSmartPredictButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _AnimatedSmartPredictButton({required this.onTap});
+
+  @override
+  State<_AnimatedSmartPredictButton> createState() => _AnimatedSmartPredictButtonState();
+}
+
+class _AnimatedSmartPredictButtonState extends State<_AnimatedSmartPredictButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.hsGreen),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+    return InkWell(
+      onTap: widget.onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEEF2FF), Color(0xFFE0E7FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFC7D2FE), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                final scale = 1.0 + (_controller.value * 0.22);
+                final rotation = (_controller.value - 0.5) * 0.3;
+                return Transform.scale(
+                  scale: scale,
+                  child: Transform.rotate(
+                    angle: rotation,
+                    child: child,
+                  ),
+                );
+              },
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                size: 14,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 5),
+            const Text(
+              'Smart Predict',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated Plus Button with tactile spring feedback on tap
+class _AnimatedAddButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _AnimatedAddButton({required this.onTap});
+
+  @override
+  State<_AnimatedAddButton> createState() => _AnimatedAddButtonState();
+}
+
+class _AnimatedAddButtonState extends State<_AnimatedAddButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.88 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDF2F8),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFF472B6), width: 1.2),
+          ),
+          child: const Center(
+            child: Icon(Icons.add_rounded, color: Color(0xFFDB2777), size: 19),
           ),
         ),
-      ],
+      ),
     );
   }
 }

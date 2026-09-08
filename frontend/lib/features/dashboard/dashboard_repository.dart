@@ -30,47 +30,76 @@ class DashboardRepository {
         _shoppingDao = shoppingDao,
         _connectivity = connectivity;
 
-  /// Get dashboard summary. Checks server if online, falls back to local SQLite.
-  Future<DashboardSummaryModel> getSummary(String homeId, {String homeName = 'My Home'}) async {
-    if (_connectivity.isOnline) {
-      try {
-        final response = await _apiClient.dio.get(ApiEndpoints.dashboard(homeId));
-        final summary = DashboardSummaryModel.fromJson(response.data['data']);
-        _cachedSummary = summary;
-        return summary;
-      } catch (e) {
-        if (kDebugMode) print('[DashboardRepo] Remote fetch failed, falling back to local DB: $e');
-      }
-    }
+  bool get isOnline => _connectivity.isOnline;
 
-    if (!_connectivity.isOnline && _cachedSummary != null) {
-      return _cachedSummary!;
-    }
-
-    // Compute summary from local SQLite database
+  /// Instant local summary computation from SQLite (0ms wait, zero network).
+  Future<DashboardSummaryModel> getLocalSummary(String homeId, {String homeName = 'My Home'}) async {
     final local = await _computeLocalSummary(homeId, homeName);
     _cachedSummary = local;
     return local;
   }
 
-  /// Get smart recommendations. Checks server if online, falls back to local heuristics.
+  /// Remote background fetch (only if online, non-blocking).
+  Future<DashboardSummaryModel?> fetchRemoteSummary(String homeId) async {
+    if (!_connectivity.isOnline) return null;
+    try {
+      final response = await _apiClient.dio.get(ApiEndpoints.dashboard(homeId));
+      final summary = DashboardSummaryModel.fromJson(response.data['data']);
+      _cachedSummary = summary;
+      return summary;
+    } catch (e) {
+      if (kDebugMode) print('[DashboardRepo] Remote fetch failed: $e');
+      return null;
+    }
+  }
+
+  /// Get dashboard summary: returns cached or local immediately if offline, or checks server if online.
+  Future<DashboardSummaryModel> getSummary(String homeId, {String homeName = 'My Home'}) async {
+    if (_connectivity.isOnline) {
+      final remote = await fetchRemoteSummary(homeId);
+      if (remote != null) return remote;
+    }
+
+    if (_cachedSummary != null) {
+      return _cachedSummary!;
+    }
+
+    return getLocalSummary(homeId, homeName: homeName);
+  }
+
+  /// Instant local recommendations computation (0ms wait).
+  Future<WhatDoINeedModel> getLocalRecommendations(String homeId) async {
+    final local = await _computeLocalRecommendations(homeId);
+    _cachedRecommendations = local;
+    return local;
+  }
+
+  /// Remote recommendations fetch (only if online).
+  Future<WhatDoINeedModel?> fetchRemoteRecommendations(String homeId) async {
+    if (!_connectivity.isOnline) return null;
+    try {
+      final response = await _apiClient.dio.get(ApiEndpoints.whatDoINeed(homeId));
+      final recs = WhatDoINeedModel.fromJson(response.data['data']);
+      _cachedRecommendations = recs;
+      return recs;
+    } catch (e) {
+      if (kDebugMode) print('[DashboardRepo] Remote recommendations failed: $e');
+      return null;
+    }
+  }
+
+  /// Get smart recommendations.
   Future<WhatDoINeedModel> getRecommendations(String homeId) async {
     if (_connectivity.isOnline) {
-      try {
-        final response = await _apiClient.dio.get(ApiEndpoints.whatDoINeed(homeId));
-        final recs = WhatDoINeedModel.fromJson(response.data['data']);
-        _cachedRecommendations = recs;
-        return recs;
-      } catch (e) {
-        if (kDebugMode) print('[DashboardRepo] Remote recommendations failed, falling back to local: $e');
-      }
+      final remote = await fetchRemoteRecommendations(homeId);
+      if (remote != null) return remote;
     }
 
     if (_cachedRecommendations != null) {
       return _cachedRecommendations!;
     }
 
-    return _computeLocalRecommendations(homeId);
+    return getLocalRecommendations(homeId);
   }
 
   /// Compute dashboard metrics directly from SQLite.

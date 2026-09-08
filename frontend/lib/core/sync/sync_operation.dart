@@ -55,6 +55,7 @@ class SyncOperationType {
 
   // Shopping
   static const String addShoppingItem = 'ADD_SHOPPING_ITEM';
+  static const String updateShoppingItem = 'UPDATE_SHOPPING_ITEM';
   static const String toggleShoppingItem = 'TOGGLE_SHOPPING_ITEM';
   static const String deleteShoppingItem = 'DELETE_SHOPPING_ITEM';
   static const String clearCompletedShopping = 'CLEAR_COMPLETED_SHOPPING';

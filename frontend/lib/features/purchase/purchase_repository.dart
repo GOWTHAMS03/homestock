@@ -10,6 +10,7 @@ import '../../core/database/daos/inventory_dao.dart';
 import '../../core/database/daos/purchase_dao.dart';
 import '../../core/database/daos/sync_dao.dart';
 import '../../core/network/api_client.dart';
+import '../../core/sync/connectivity_monitor.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/sync/sync_operation.dart';
 import 'purchase_model.dart';
@@ -27,6 +28,7 @@ class PurchaseRepository {
   final SyncDao _syncDao;
   final ApiClient _apiClient;
   final SyncEngine _syncEngine;
+  final ConnectivityMonitor? _connectivity;
 
   PurchaseRepository({
     required PurchaseDao purchaseDao,
@@ -34,11 +36,15 @@ class PurchaseRepository {
     required SyncDao syncDao,
     required ApiClient apiClient,
     required SyncEngine syncEngine,
+    ConnectivityMonitor? connectivity,
   })  : _purchaseDao = purchaseDao,
         _inventoryDao = inventoryDao,
         _syncDao = syncDao,
         _apiClient = apiClient,
-        _syncEngine = syncEngine;
+        _syncEngine = syncEngine,
+        _connectivity = connectivity;
+
+  bool get isOnline => _connectivity?.isOnline ?? true;
 
   // ──── READ (always local) ────
 
@@ -226,6 +232,7 @@ class PurchaseRepository {
 
   /// Fetch from server and cache locally.
   Future<void> fetchAndCacheFromServer(String homeId) async {
+    if (_connectivity != null && !_connectivity.isOnline) return;
     try {
       // Fetch purchases
       final response = await _apiClient.dio.get(

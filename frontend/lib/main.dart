@@ -33,12 +33,15 @@ void main() async {
     }
   } catch (_) {}
 
-  // 4. Initialize ApiClient
-  final apiClient = ApiClient(secureStorage: secureStorage);
-
-  // 5. Initialize ConnectivityMonitor
+  // 4. Initialize ConnectivityMonitor
   final connectivityMonitor = ConnectivityMonitor();
   await connectivityMonitor.start();
+
+  // 5. Initialize ApiClient with fast reachability feedback
+  final apiClient = ApiClient(
+    secureStorage: secureStorage,
+    connectivityMonitor: connectivityMonitor,
+  );
 
   // 6. Initialize SyncEngine
   final syncEngine = SyncEngine(

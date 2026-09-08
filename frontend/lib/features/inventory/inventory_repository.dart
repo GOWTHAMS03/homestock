@@ -48,6 +48,8 @@ class InventoryRepository {
         _connectivity = connectivity,
         _syncEngine = syncEngine;
 
+  bool get isOnline => _connectivity.isOnline;
+
   // ──── READ (always local) ────
 
   /// Watch all items for a home as a reactive stream.
@@ -80,15 +82,30 @@ class InventoryRepository {
     return rows.map(_toModel).toList();
   }
 
+  List<CategoryModel> _deduplicateCategories(List<CategoryModel> categories) {
+    final uniqueMap = <String, CategoryModel>{};
+    for (final cat in categories) {
+      final key = cat.name.trim().toLowerCase();
+      if (!uniqueMap.containsKey(key)) {
+        uniqueMap[key] = cat;
+      } else if (uniqueMap[key]!.id.startsWith('default_') && !cat.id.startsWith('default_')) {
+        uniqueMap[key] = cat;
+      }
+    }
+    final list = uniqueMap.values.toList();
+    list.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    return list;
+  }
+
   /// Watch categories for a home. Auto-seeds defaults into SQLite if empty.
   Stream<List<CategoryModel>> watchCategories(String homeId) {
     return _inventoryDao.watchCategories(homeId).asyncMap(
           (rows) async {
             if (rows.isEmpty) {
               await _inventoryDao.seedDefaultCategories(homeId);
-              return CategoryModel.defaultCategories(homeId);
+              return _deduplicateCategories(CategoryModel.defaultCategories(homeId));
             }
-            return rows
+            final list = rows
                 .map((r) => CategoryModel(
                       id: r.id,
                       homeId: r.homeId,
@@ -98,6 +115,7 @@ class InventoryRepository {
                       displayOrder: r.sortOrder,
                     ))
                 .toList();
+            return _deduplicateCategories(list);
           },
         );
   }
@@ -109,10 +127,10 @@ class InventoryRepository {
       await _inventoryDao.seedDefaultCategories(homeId);
       rows = await _inventoryDao.getCategories(homeId);
       if (rows.isEmpty) {
-        return CategoryModel.defaultCategories(homeId);
+        return _deduplicateCategories(CategoryModel.defaultCategories(homeId));
       }
     }
-    return rows
+    final list = rows
         .map((r) => CategoryModel(
               id: r.id,
               homeId: r.homeId,
@@ -122,6 +140,7 @@ class InventoryRepository {
               displayOrder: r.sortOrder,
             ))
         .toList();
+    return _deduplicateCategories(list);
   }
 
   /// Watch stock transactions for an item.
@@ -458,6 +477,7 @@ class InventoryRepository {
 
   /// Fetch all items from server and populate local DB.
   Future<void> fetchAndCacheFromServer(String homeId) async {
+    if (!_connectivity.isOnline) return;
     try {
       final response = await _apiClient.dio.get(
         ApiEndpoints.items(homeId),
@@ -506,6 +526,7 @@ class InventoryRepository {
 
   /// Fetch categories from server and cache locally.
   Future<void> fetchAndCacheCategories(String homeId) async {
+    if (!_connectivity.isOnline) return;
     try {
       final response =
           await _apiClient.dio.get(ApiEndpoints.categories(homeId));
@@ -523,7 +544,10 @@ class InventoryRepository {
         );
       }).toList();
 
-      await _inventoryDao.upsertCategories(companions);
+      if (companions.isNotEmpty) {
+        await _inventoryDao.removeDefaultCategories(homeId);
+        await _inventoryDao.upsertCategories(companions);
+      }
     } catch (e) {
       if (kDebugMode) print('[InventoryRepo] Fetch categories failed: $e');
     }

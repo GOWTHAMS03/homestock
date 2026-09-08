@@ -123,6 +123,16 @@ class ShoppingDao {
     ));
   }
 
+  /// Update the quantity of a shopping item.
+  Future<void> updateShoppingItemQuantity(String itemId, double newQuantity) {
+    return (_db.update(_db.localShoppingListItems)
+          ..where((t) => t.id.equals(itemId)))
+        .write(LocalShoppingListItemsCompanion(
+      quantity: Value(newQuantity),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
   /// Soft delete a shopping item.
   Future<void> softDeleteShoppingItem(String itemId) {
     return (_db.update(_db.localShoppingListItems)

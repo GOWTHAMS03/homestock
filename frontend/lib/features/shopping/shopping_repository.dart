@@ -9,6 +9,7 @@ import '../../core/database/app_database.dart';
 import '../../core/database/daos/shopping_dao.dart';
 import '../../core/database/daos/sync_dao.dart';
 import '../../core/network/api_client.dart';
+import '../../core/sync/connectivity_monitor.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/sync/sync_operation.dart';
 import 'shopping_model.dart';
@@ -25,16 +26,21 @@ class ShoppingRepository {
   final SyncDao _syncDao;
   final ApiClient _apiClient;
   final SyncEngine _syncEngine;
+  final ConnectivityMonitor? _connectivity;
 
   ShoppingRepository({
     required ShoppingDao shoppingDao,
     required SyncDao syncDao,
     required ApiClient apiClient,
     required SyncEngine syncEngine,
+    ConnectivityMonitor? connectivity,
   })  : _shoppingDao = shoppingDao,
         _syncDao = syncDao,
         _apiClient = apiClient,
-        _syncEngine = syncEngine;
+        _syncEngine = syncEngine,
+        _connectivity = connectivity;
+
+  bool get isOnline => _connectivity?.isOnline ?? true;
 
   // ──── READ (always local) ────
 
@@ -237,6 +243,32 @@ class ShoppingRepository {
     _syncEngine.trySyncImmediate();
   }
 
+  /// Update a shopping item's quantity locally and queue for sync.
+  Future<void> updateQuantity(String homeId, String listId, String itemId, double newQuantity) async {
+    final operationId = _uuid.v4();
+    final now = DateTime.now();
+
+    // 1. Update locally
+    await _shoppingDao.updateShoppingItemQuantity(itemId, newQuantity);
+
+    // 2. Enqueue sync
+    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+      operationId: Value(operationId),
+      operationType: const Value(SyncOperationType.updateShoppingItem),
+      entityType: const Value(SyncEntityType.shoppingListItem),
+      entityId: Value(itemId),
+      payload: Value(jsonEncode({
+        'listId': listId,
+        'quantity': newQuantity,
+      })),
+      createdAt: Value(now),
+      homeId: Value(homeId),
+    ));
+
+    // 3. Background sync
+    _syncEngine.trySyncImmediate();
+  }
+
   /// Delete a shopping item locally and queue for sync.
   Future<void> deleteItem(String homeId, String listId, String itemId) async {
     final operationId = _uuid.v4();
@@ -285,6 +317,7 @@ class ShoppingRepository {
 
   /// Fetch from server and populate local DB.
   Future<void> fetchAndCacheFromServer(String homeId) async {
+    if (_connectivity != null && !_connectivity.isOnline) return;
     try {
       final response = await _apiClient.dio
           .get(ApiEndpoints.defaultShoppingList(homeId));

@@ -110,11 +110,22 @@ class InventoryController extends StateNotifier<InventoryState> {
     // Watch categories from local DB
     _categoriesSub = _repo.watchCategories(_homeId).listen((categories) {
       if (mounted) {
-        state = state.copyWith(
-          categories: categories.isNotEmpty
-              ? categories
-              : CategoryModel.defaultCategories(_homeId),
-        );
+        final list = categories.isNotEmpty
+            ? categories
+            : CategoryModel.defaultCategories(_homeId);
+        final uniqueMap = <String, CategoryModel>{};
+        for (final cat in list) {
+          final key = cat.name.trim().toLowerCase();
+          if (!uniqueMap.containsKey(key)) {
+            uniqueMap[key] = cat;
+          } else if (uniqueMap[key]!.id.startsWith('default_') && !cat.id.startsWith('default_')) {
+            uniqueMap[key] = cat;
+          }
+        }
+        final deduplicated = uniqueMap.values.toList()
+          ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+
+        state = state.copyWith(categories: deduplicated);
       }
     });
 
@@ -149,7 +160,7 @@ class InventoryController extends StateNotifier<InventoryState> {
   /// Local data is displayed immediately from SQLite.
   Future<void> _fetchServerDataInBackground() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: state.items.isEmpty);
+    if (!_repo.isOnline) return;
 
     try {
       await _repo.fetchAndCacheCategories(_homeId);
@@ -162,7 +173,6 @@ class InventoryController extends StateNotifier<InventoryState> {
   /// Manually trigger a refresh (pull-to-refresh).
   Future<void> loadData() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: state.items.isEmpty, errorMessage: null);
     await _fetchServerDataInBackground();
   }
 

@@ -14,6 +14,7 @@ final purchaseRepositoryProvider = Provider<PurchaseRepository>((ref) {
     syncDao: ref.watch(syncDaoProvider),
     apiClient: ref.watch(apiClientProvider),
     syncEngine: ref.watch(syncEngineProvider),
+    connectivity: ref.watch(connectivityMonitorProvider),
   );
 });
 
@@ -83,7 +84,7 @@ class PurchaseController extends StateNotifier<PurchaseState> {
 
   Future<void> _fetchServerDataInBackground() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: state.purchases.isEmpty);
+    if (!_repo.isOnline) return;
 
     try {
       await _repo.fetchAndCacheFromServer(_homeId);
@@ -92,7 +93,6 @@ class PurchaseController extends StateNotifier<PurchaseState> {
 
   Future<void> loadPurchases() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: state.purchases.isEmpty, errorMessage: null);
     await _fetchServerDataInBackground();
   }
 

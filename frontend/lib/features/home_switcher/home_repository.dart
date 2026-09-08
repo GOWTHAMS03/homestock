@@ -14,6 +14,13 @@ class HomeRepository {
 
   Future<List<HomeModel>> getMyHomes() async {
     final cached = storage.getCachedHomesSync();
+    if (apiClient.connectivityMonitor != null && !apiClient.connectivityMonitor!.isOnline) {
+      if (cached != null && cached.isNotEmpty) {
+        await _cacheHomesLocally(cached);
+        return cached;
+      }
+    }
+
     try {
       final response = await apiClient.dio.get(ApiEndpoints.homes);
       final list = response.data['data'] as List? ?? [];

@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
+import '../constants/api_endpoints.dart';
 import 'sync_status.dart';
 
-/// Monitors network connectivity and emits [NetworkStatus] changes.
-/// Automatically detects OFFLINE → ONLINE transitions for sync triggering.
+/// Monitors network connectivity and real server reachability.
+/// Automatically detects OFFLINE ↔ ONLINE transitions for instant sync triggering.
+/// Provides sub-1.5s active reachability checks and instant offline failover.
 class ConnectivityMonitor {
   final Connectivity _connectivity;
   final StreamController<NetworkStatus> _statusController =
@@ -14,6 +17,8 @@ class ConnectivityMonitor {
 
   NetworkStatus _currentStatus = NetworkStatus.offline;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
+  Timer? _heartbeatTimer;
+  bool _isCheckingReachability = false;
 
   ConnectivityMonitor({Connectivity? connectivity})
       : _connectivity = connectivity ?? Connectivity();
@@ -21,7 +26,7 @@ class ConnectivityMonitor {
   /// Current network status (synchronous read).
   NetworkStatus get currentStatus => _currentStatus;
 
-  /// Whether the device is currently online.
+  /// Whether the device is currently online and server is reachable.
   bool get isOnline => _currentStatus == NetworkStatus.online;
 
   /// Stream of network status changes.
@@ -30,44 +35,120 @@ class ConnectivityMonitor {
   /// Callback invoked when transitioning from offline to online.
   VoidCallback? onConnectivityRestored;
 
-  /// Start monitoring connectivity.
+  /// Start monitoring connectivity and reachability.
   Future<void> start() async {
-    // Check initial status
+    // 1. Initial quick hardware check & reachability probe
     try {
       final results = await _connectivity.checkConnectivity();
-      _updateStatus(results);
+      await _handleConnectivityChange(results);
     } catch (e) {
       if (kDebugMode) print('[ConnectivityMonitor] Initial check failed: $e');
-      _currentStatus = NetworkStatus.offline;
-      _statusController.add(_currentStatus);
+      _setOffline();
     }
 
-    // Listen for changes
+    // 2. Listen for network interface changes
     _subscription = _connectivity.onConnectivityChanged.listen(
-      _updateStatus,
+      _handleConnectivityChange,
       onError: (e) {
         if (kDebugMode) print('[ConnectivityMonitor] Stream error: $e');
       },
     );
+
+    // 3. Start non-intrusive background heartbeat check
+    _startHeartbeat();
   }
 
-  void _updateStatus(List<ConnectivityResult> results) {
-    final wasOffline = _currentStatus == NetworkStatus.offline;
-    final hasConnection = results.any((r) => r != ConnectivityResult.none);
+  Future<void> _handleConnectivityChange(List<ConnectivityResult> results) async {
+    final hasHardwareConnection = results.any((r) => r != ConnectivityResult.none);
 
-    final newStatus =
-        hasConnection ? NetworkStatus.online : NetworkStatus.offline;
+    // Instant failover: no Wi-Fi / no cellular -> definitely offline (0ms delay)
+    if (!hasHardwareConnection) {
+      _setOffline();
+      return;
+    }
 
-    if (newStatus != _currentStatus) {
-      _currentStatus = newStatus;
-      _statusController.add(_currentStatus);
+    // Has hardware connection: quickly verify if backend is reachable
+    await checkRealReachability();
+  }
 
-      if (kDebugMode) {
-        print('[ConnectivityMonitor] Status changed to: $newStatus');
+  /// Actively probe real backend reachability with a fast timeout (default 1500ms).
+  Future<bool> checkRealReachability({
+    Duration timeout = const Duration(milliseconds: 1500),
+  }) async {
+    if (_isCheckingReachability) return isOnline;
+    _isCheckingReachability = true;
+
+    try {
+      final uri = Uri.tryParse(ApiEndpoints.baseUrl);
+      if (uri == null || uri.host.isEmpty) {
+        _setOffline();
+        return false;
       }
 
-      // Trigger sync when going from offline to online
-      if (wasOffline && newStatus == NetworkStatus.online) {
+      final port = uri.port > 0 ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+
+      // Method 1: Ultra-fast TCP socket connect (typically <20ms on LAN/localhost)
+      bool reachable = false;
+      try {
+        final socket = await Socket.connect(uri.host, port, timeout: timeout);
+        socket.destroy();
+        reachable = true;
+      } catch (_) {
+        // Socket failed, try HTTP GET fallback with remaining timeout
+        try {
+          final client = HttpClient()..connectionTimeout = timeout;
+          final request = await client.getUrl(
+            Uri.parse('${ApiEndpoints.baseUrl}${ApiEndpoints.ping}'),
+          );
+          final response = await request.close().timeout(timeout);
+          reachable = response.statusCode == 200 || response.statusCode == 401;
+          client.close();
+        } catch (_) {
+          reachable = false;
+        }
+      }
+
+      if (reachable) {
+        _setOnline();
+        return true;
+      } else {
+        _setOffline();
+        return false;
+      }
+    } catch (_) {
+      _setOffline();
+      return false;
+    } finally {
+      _isCheckingReachability = false;
+    }
+  }
+
+  /// Immediately mark as offline (called instantly by ApiClient on network errors/timeouts).
+  void markOffline() {
+    _setOffline();
+  }
+
+  /// Immediately mark as online (called when any network request succeeds).
+  void markOnline() {
+    _setOnline();
+  }
+
+  void _setOffline() {
+    if (_currentStatus != NetworkStatus.offline) {
+      _currentStatus = NetworkStatus.offline;
+      _statusController.add(_currentStatus);
+      if (kDebugMode) print('[ConnectivityMonitor] Switched to OFFLINE');
+    }
+  }
+
+  void _setOnline() {
+    final wasOffline = _currentStatus == NetworkStatus.offline;
+    if (_currentStatus != NetworkStatus.online && _currentStatus != NetworkStatus.syncing) {
+      _currentStatus = NetworkStatus.online;
+      _statusController.add(_currentStatus);
+      if (kDebugMode) print('[ConnectivityMonitor] Switched to ONLINE');
+
+      if (wasOffline) {
         if (kDebugMode) {
           print('[ConnectivityMonitor] Connectivity restored — triggering sync');
         }
@@ -92,8 +173,18 @@ class ConnectivityMonitor {
     }
   }
 
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      // Don't interrupt while actively syncing
+      if (_currentStatus == NetworkStatus.syncing) return;
+      await checkRealReachability();
+    });
+  }
+
   /// Dispose all resources.
   void dispose() {
+    _heartbeatTimer?.cancel();
     _subscription?.cancel();
     _statusController.close();
   }

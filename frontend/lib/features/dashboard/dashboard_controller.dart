@@ -65,32 +65,47 @@ class DashboardController extends StateNotifier<DashboardState> {
 
   Future<void> loadDashboard() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: state.summary == null, errorMessage: null);
 
+    // 1. Instant local SQLite display (0ms wait, no loading screen)
     try {
-      final summary = await _repo.getSummary(_homeId, homeName: _homeName ?? 'My Home');
+      final localSummary = await _repo.getLocalSummary(_homeId, homeName: _homeName ?? 'My Home');
       if (mounted) {
-        state = state.copyWith(isLoading: false, summary: summary);
+        state = state.copyWith(summary: localSummary, isLoading: false, errorMessage: null);
       }
-    } catch (e) {
-      if (mounted) {
-        // Even if both fail, keep existing summary if any
-        state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    } catch (_) {}
+
+    // 2. If online: silently refresh from server in background without blocking UI
+    if (_repo.isOnline) {
+      try {
+        final remoteSummary = await _repo.fetchRemoteSummary(_homeId);
+        if (mounted && remoteSummary != null) {
+          state = state.copyWith(summary: remoteSummary);
+        }
+      } catch (e) {
+        // Keep existing local summary intact
       }
     }
   }
 
   Future<void> loadRecommendations() async {
     if (_homeId == null) return;
+
+    // 1. Instant local heuristics
     try {
-      final recs = await _repo.getRecommendations(_homeId);
+      final localRecs = await _repo.getLocalRecommendations(_homeId);
       if (mounted) {
-        state = state.copyWith(recommendations: recs);
+        state = state.copyWith(recommendations: localRecs);
       }
-    } catch (e) {
-      if (mounted) {
-        state = state.copyWith(errorMessage: e.toString());
-      }
+    } catch (_) {}
+
+    // 2. If online: fetch smart server recommendations in background
+    if (_repo.isOnline) {
+      try {
+        final remoteRecs = await _repo.fetchRemoteRecommendations(_homeId);
+        if (mounted && remoteRecs != null) {
+          state = state.copyWith(recommendations: remoteRecs);
+        }
+      } catch (_) {}
     }
   }
 }

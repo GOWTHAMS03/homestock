@@ -585,9 +585,10 @@ class ProfileScreen extends ConsumerWidget {
                       color: const Color(0xFFF3E8FF),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.group_add_rounded, color: Color(0xFF9333EA), size: 20),
+                    child: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF9333EA), size: 20),
                   ),
-                  title: const Text('Join Home with Invite Code', style: TextStyle(fontWeight: FontWeight.w600)),
+                  title: const Text('Join Home (Invite or QR Code)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Enter invite code or scan household QR', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   onTap: () {
                     Navigator.pop(context);
                     showDialog(context: context, builder: (_) => const JoinHomeDialog());

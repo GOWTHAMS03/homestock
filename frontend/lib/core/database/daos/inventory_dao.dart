@@ -237,13 +237,26 @@ class InventoryDao {
     });
   }
 
+  /// Delete placeholder default categories that have been superseded by server categories.
+  Future<void> removeDefaultCategories(String homeId) {
+    return (_db.delete(_db.localCategories)
+          ..where((t) => t.homeId.equals(homeId) & t.id.like('default_%')))
+        .go();
+  }
+
   /// Seed default household categories into SQLite if none exist for this home.
   Future<void> seedDefaultCategories(String homeId) async {
     final existing = await getCategories(homeId);
-    if (existing.isNotEmpty) return;
+    final existingNames = existing.map((e) => e.name.trim().toLowerCase()).toSet();
 
     final defaults = CategoryModel.defaultCategories(homeId);
-    final companions = defaults.map((c) {
+    final needed = defaults
+        .where((c) => !existingNames.contains(c.name.trim().toLowerCase()))
+        .toList();
+
+    if (needed.isEmpty) return;
+
+    final companions = needed.map((c) {
       return LocalCategoriesCompanion(
         id: Value(c.id),
         homeId: Value(homeId),

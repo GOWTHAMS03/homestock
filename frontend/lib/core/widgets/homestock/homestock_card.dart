@@ -25,39 +25,46 @@ class HomeStockCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardContent = Container(
-      margin: margin,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white,
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
-          color: borderColor ?? AppColors.outline.withValues(alpha: 0.75),
-          width: 0.8,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    final boxDecoration = BoxDecoration(
+      color: backgroundColor ?? Colors.white,
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(
+        color: borderColor ?? AppColors.outline.withValues(alpha: 0.75),
+        width: 0.8,
       ),
-      child: child,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.025),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+      ],
     );
 
     if (onTap != null) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(borderRadius),
-          child: cardContent,
+      return Container(
+        margin: margin,
+        decoration: boxDecoration,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(borderRadius),
+            child: Padding(
+              padding: padding ?? const EdgeInsets.all(16),
+              child: child,
+            ),
+          ),
         ),
       );
     }
 
-    return cardContent;
+    return Container(
+      margin: margin,
+      padding: padding,
+      decoration: boxDecoration,
+      child: child,
+    );
   }
 }
 

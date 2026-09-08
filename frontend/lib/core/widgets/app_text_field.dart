@@ -15,6 +15,7 @@ class AppTextField extends StatelessWidget {
   final int maxLines;
   final List<TextInputFormatter>? inputFormatters;
   final void Function(String)? onChanged;
+  final TextCapitalization textCapitalization;
 
   const AppTextField({
     super.key,
@@ -30,6 +31,7 @@ class AppTextField extends StatelessWidget {
     this.maxLines = 1,
     this.inputFormatters,
     this.onChanged,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   @override
@@ -51,6 +53,7 @@ class AppTextField extends StatelessWidget {
           initialValue: initialValue,
           obscureText: obscureText,
           keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
           validator: validator,
           maxLines: maxLines,
           inputFormatters: inputFormatters,

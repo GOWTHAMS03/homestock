@@ -13,6 +13,7 @@ final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
     syncDao: ref.watch(syncDaoProvider),
     apiClient: ref.watch(apiClientProvider),
     syncEngine: ref.watch(syncEngineProvider),
+    connectivity: ref.watch(connectivityMonitorProvider),
   );
 });
 
@@ -72,7 +73,7 @@ class ShoppingController extends StateNotifier<ShoppingState> {
   /// Fetch from server in background (non-blocking).
   Future<void> _fetchServerDataInBackground() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: state.list == null);
+    if (!_repo.isOnline) return;
 
     try {
       await _repo.fetchAndCacheFromServer(_homeId);
@@ -83,7 +84,6 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   Future<void> loadShoppingList() async {
     if (_homeId == null) return;
-    state = state.copyWith(isLoading: state.list == null, errorMessage: null);
     await _fetchServerDataInBackground();
   }
 
@@ -131,6 +131,22 @@ class ShoppingController extends StateNotifier<ShoppingState> {
     try {
       final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
       await _repo.toggleItem(_homeId, listId, itemId);
+      // UI updates automatically via Drift stream
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    }
+  }
+
+  /// Update item quantity: local-first.
+  Future<void> updateQuantity(String itemId, double newQuantity) async {
+    if (_homeId == null) return;
+    if (newQuantity <= 0) {
+      await deleteItem(itemId);
+      return;
+    }
+    try {
+      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
+      await _repo.updateQuantity(_homeId, listId, itemId, newQuantity);
       // UI updates automatically via Drift stream
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());

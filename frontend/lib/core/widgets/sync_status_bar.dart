@@ -105,8 +105,22 @@ class SyncStatusBar extends ConsumerWidget {
     return InkWell(
       onTap: syncState.isSyncing
           ? null
-          : () {
-              ref.read(syncEngineProvider).syncAll();
+          : () async {
+              if (syncState.isOffline) {
+                final reachable = await ref.read(connectivityMonitorProvider).checkRealReachability();
+                if (reachable) {
+                  ref.read(syncEngineProvider).syncAll();
+                } else if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Server is not reachable. Operating smoothly in offline mode.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } else {
+                ref.read(syncEngineProvider).syncAll();
+              }
             },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
@@ -140,12 +154,14 @@ class SyncStatusBar extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (syncState.isOffline && syncState.lastSyncedAt != null)
+              if (syncState.isOffline)
                 Text(
-                  syncState.lastSyncedAgo,
+                  'Tap to retry',
                   style: TextStyle(
                     fontSize: 11,
-                    color: textColor.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                    decoration: TextDecoration.underline,
                   ),
                 )
               else if (!syncState.isSyncing && syncState.pendingOperationsCount > 0)
@@ -156,6 +172,14 @@ class SyncStatusBar extends ConsumerWidget {
                     fontWeight: FontWeight.w600,
                     color: textColor,
                     decoration: TextDecoration.underline,
+                  ),
+                )
+              else if (syncState.lastSyncedAt != null)
+                Text(
+                  syncState.lastSyncedAgo,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textColor.withValues(alpha: 0.8),
                   ),
                 ),
             ],

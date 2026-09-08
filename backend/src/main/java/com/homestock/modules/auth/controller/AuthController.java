@@ -59,4 +59,11 @@ public class AuthController {
         }
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully", null));
     }
+
+    @GetMapping("/ping")
+    @Operation(summary = "Fast server reachability check")
+    public ResponseEntity<ApiResponse<String>> ping() {
+        return ResponseEntity.ok(ApiResponse.success("pong", "pong"));
+    }
 }
+

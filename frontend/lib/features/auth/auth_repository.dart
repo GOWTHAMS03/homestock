@@ -109,4 +109,27 @@ class AuthRepository {
     } catch (_) {}
     await storage.clearAll();
   }
+
+  Future<UserProfile> loginWithInviteCode({
+    required String inviteCode,
+    required String fullName,
+  }) async {
+    final response = await apiClient.dio.post(
+      ApiEndpoints.inviteLogin,
+      data: {
+        'inviteCode': inviteCode.trim().toUpperCase(),
+        'fullName': fullName.trim(),
+      },
+    );
+
+    final data = response.data['data'];
+    final accessToken = data['accessToken'] as String;
+    final refreshToken = data['refreshToken'] as String;
+    await storage.saveTokens(accessToken: accessToken, refreshToken: refreshToken);
+
+    final user = UserProfile.fromJson(data['user'] as Map<String, dynamic>);
+    await storage.saveUser(user);
+    return user;
+  }
 }
+

@@ -2,19 +2,21 @@ import 'package:dio/dio.dart';
 import '../../features/auth/auth_state.dart';
 import '../constants/api_endpoints.dart';
 import '../storage/secure_storage_service.dart';
+import '../sync/connectivity_monitor.dart';
 import 'api_exceptions.dart';
 
 class ApiClient {
   final Dio dio;
   final SecureStorageService secureStorage;
+  ConnectivityMonitor? connectivityMonitor;
 
-  ApiClient({Dio? customDio, required this.secureStorage})
+  ApiClient({Dio? customDio, required this.secureStorage, this.connectivityMonitor})
       : dio = customDio ??
             Dio(
               BaseOptions(
                 baseUrl: ApiEndpoints.baseUrl,
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 15),
+                connectTimeout: const Duration(milliseconds: 3500),
+                receiveTimeout: const Duration(seconds: 10),
                 headers: {
                   'Content-Type': 'application/json',
                   'Accept': 'application/json',
@@ -39,8 +41,21 @@ class ApiClient {
           }
           return handler.next(options);
         },
+        onResponse: (response, handler) {
+          // If a request succeeds, the server is definitively reachable and online
+          connectivityMonitor?.markOnline();
+          return handler.next(response);
+        },
         onError: (DioException error, handler) async {
+          // If connection timed out or host is unreachable, instantly mark offline
+          if (error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.sendTimeout ||
+              error.type == DioExceptionType.connectionError) {
+            connectivityMonitor?.markOffline();
+          }
+
           // If 401 Unauthorized and not already refreshing: try token refresh
+
           if (error.response?.statusCode == 401 &&
               !error.requestOptions.path.contains('/auth/')) {
             final refreshed = await tryRefreshToken();
