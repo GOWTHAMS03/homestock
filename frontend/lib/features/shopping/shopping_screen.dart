@@ -5,6 +5,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/homestock/homestock_pill_badge.dart';
+import '../../core/widgets/offline_wifi_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/sync_status_bar.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
@@ -13,7 +14,6 @@ import '../inventory/inventory_model.dart';
 import '../purchase/add_purchase_screen.dart';
 import '../purchase/purchases_screen.dart';
 import '../smart_shopping/smart_shopping_screen.dart';
-import '../voice/widgets/voice_bottom_sheet.dart';
 import '../voice/widgets/voice_input_button.dart';
 import 'add_shopping_item_dialog.dart';
 import 'shopping_controller.dart';
@@ -63,9 +63,7 @@ class ShoppingScreen extends ConsumerStatefulWidget {
 
 class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   _ShoppingFilter _filter = _ShoppingFilter.all;
-  final _quickAddController = TextEditingController();
-  final _quickAddFocusNode = FocusNode();
-  String _quickAddText = '';
+  final _searchController = TextEditingController();
   String _searchQuery = '';
   final Set<String> _selectedItemIds = {};
   bool _isSelectionMode = false;
@@ -73,8 +71,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
   @override
   void dispose() {
-    _quickAddController.dispose();
-    _quickAddFocusNode.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -127,19 +124,16 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     return 'pcs';
   }
 
-  Future<void> _submitQuickAdd() async {
-    final text = _quickAddController.text.trim();
+  Future<void> _submitQuickAdd([String? rawText]) async {
+    final text = (rawText ?? _searchController.text).trim();
     if (text.isEmpty) return;
 
     final parsed = _parseQuickInput(text);
     if (parsed.name.isEmpty) return;
 
     setState(() => _isAddingQuickItem = true);
-    _quickAddController.clear();
-    setState(() {
-      _quickAddText = '';
-      _searchQuery = '';
-    });
+    _searchController.clear();
+    setState(() => _searchQuery = '');
 
     final success = await ref.read(shoppingControllerProvider.notifier).addItem(
       itemName: parsed.name,
@@ -284,33 +278,12 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
       appBar: HomeStockAppBar(
-        title: 'Smart Shopping Hub',
+        title: 'Shopping List',
         subtitle: totalCount == 0
-            ? 'Plan items, compare live deals & restock'
+            ? '0 items • Offline ready'
             : '$pendingCount to buy • $completedCount completed',
         showBackButton: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bolt_rounded, color: Color(0xFFD97706)),
-            tooltip: 'Price Checking & Deals ⚡',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined, color: AppColors.textSecondary),
-            tooltip: 'Restocked Products & Receipts',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PurchasesScreen()),
-              );
-            },
-          ),
-          const VoiceInputButton(
-            tooltip: 'Voice shopping command',
-          ),
           if (completedCount > 0)
             TextButton(
               onPressed: () => ref.read(shoppingControllerProvider.notifier).clearCompleted(),
@@ -319,15 +292,16 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w700),
               ),
             ),
-          const SizedBox(width: 6),
+          const OfflineWifiBadge(),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
           const SyncStatusBar(),
 
-          // Persistent Smart Quick-Add Bar
-          _buildQuickAddBar(context, totalCount),
+          // Unified Existing Pill Search Bar (with camera barcode and voice search)
+          _buildExistingSearchBar(context),
 
           // Main scrollable content
           Expanded(
@@ -343,26 +317,23 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       children: [
-                        // 1. Dedicated Smart Shopping & Multi-Store Price Comparison Banner
-                        _buildPriceCheckerHero(context),
-
-                        // 2. Feature Shortcuts Grid (Price Check, Shop Mode, Restocked, Voice)
-                        _buildFeatureGrid(context),
+                        // 1. Single Non-Redundant Feature Actions Row (Price Deals, Shop Mode, Restocked)
+                        _buildFeatureActionsRow(context),
 
                         const SizedBox(height: 14),
 
-                        // 3. Pantry Auto-Restock Section (When kitchen is low on stock)
+                        // 2. Pantry Auto-Restock Section (Only when low stock items exist)
                         if (lowStockSuggestions.isNotEmpty) ...[
                           _buildPantryRestockSection(context, lowStockSuggestions),
                           const SizedBox(height: 14),
                         ],
 
-                        // 4. One-Tap Household Staples Carousel
+                        // 3. One-Tap Household Essentials Carousel
                         _buildStaplesCarousel(context),
 
                         const SizedBox(height: 16),
 
-                        // 5. Active Items Section OR Rich Empty Guide
+                        // 4. Active Items List OR Clean Non-Redundant Empty Guide
                         if (totalCount > 0) ...[
                           _buildActiveListSection(
                             context,
@@ -373,7 +344,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                             filteredItems: filteredItems,
                           ),
                         ] else ...[
-                          _buildEmptyShoppingGuide(context, lowStockSuggestions),
+                          _buildEmptyShoppingGuide(context),
                         ],
 
                         const SizedBox(height: 80),
@@ -383,15 +354,14 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         heroTag: 'shopping_add_btn',
-        onPressed: () => _showAddShoppingItemMenu(context),
-        icon: const Icon(Icons.add_rounded, size: 20),
-        label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+        onPressed: () => AddShoppingItemDialog.show(context),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+        tooltip: 'Add Shopping Item',
+        child: const Icon(Icons.add_rounded, size: 26),
       ),
       bottomNavigationBar: _selectedItemIds.isNotEmpty
           ? Container(
@@ -449,213 +419,88 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     );
   }
 
-  /// Persistent Top Quick-Add Bar with embedded Voice and Barcode actions
-  Widget _buildQuickAddBar(BuildContext context, int totalCount) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      child: Row(
-        children: [
-          const Icon(Icons.add_shopping_cart_rounded, color: AppColors.primary, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: _quickAddController,
-              focusNode: _quickAddFocusNode,
-              onSubmitted: (_) => _submitQuickAdd(),
-              onChanged: (v) {
-                setState(() {
-                  _quickAddText = v;
-                  if (totalCount > 0) {
-                    _searchQuery = v.trim();
-                  }
-                });
-              },
-              textInputAction: TextInputAction.done,
-              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-              decoration: InputDecoration(
-                hintText: totalCount > 0 && _quickAddText.isEmpty
-                    ? 'Search or quick-add (e.g. Milk 1L)...'
-                    : 'Quick-add item (e.g. Milk 1L, Rice 5kg)...',
-                hintStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w400, color: AppColors.textMuted),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
-          if (_quickAddText.isNotEmpty) ...[
-            IconButton(
-              icon: const Icon(Icons.clear_rounded, size: 18, color: AppColors.textMuted),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-              onPressed: () {
-                _quickAddController.clear();
-                setState(() {
-                  _quickAddText = '';
-                  _searchQuery = '';
-                });
-              },
-            ),
-            const SizedBox(width: 4),
-            InkWell(
-              onTap: _isAddingQuickItem ? null : _submitQuickAdd,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_isAddingQuickItem)
-                      const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    else ...[
-                      const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                      const SizedBox(width: 2),
-                      const Text('Add', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner_rounded, size: 20, color: AppColors.primary),
-              tooltip: 'Scan barcode',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: () => BarcodeScannerWidget.open(context),
-            ),
-            IconButton(
-              icon: const Icon(Icons.mic_rounded, size: 20, color: AppColors.hsPurple),
-              tooltip: 'Voice command',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: () => VoiceBottomSheet.show(context),
+  /// Unified Existing Search Bar from Inventory:
+  /// 48dp pill shape, integrated camera barcode scan + voice search in a single clean container
+  Widget _buildExistingSearchBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(50),
+          border: Border.all(color: AppColors.outline.withValues(alpha: 0.85)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.035),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  /// Price Checking & Smart Deals Hero Banner
-  Widget _buildPriceCheckerHero(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFDE68A)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD97706).withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
-            );
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+        child: TextField(
+          controller: _searchController,
+          onChanged: (val) => setState(() => _searchQuery = val.trim()),
+          onSubmitted: (val) => _submitQuickAdd(val),
+          textInputAction: TextInputAction.done,
+          style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Search or add shopping items...',
+            hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+            prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.primary),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD97706),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFD97706).withValues(alpha: 0.25),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                if (_searchController.text.isNotEmpty) ...[
+                  IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    tooltip: 'Clear search',
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
                   ),
-                  child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  InkWell(
+                    onTap: () => _submitQuickAdd(_searchController.text),
+                    borderRadius: BorderRadius.circular(50),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'Price Checking & Live Deals',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF92400E),
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Text('⚡', style: TextStyle(fontSize: 12)),
+                          if (_isAddingQuickItem)
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          else ...[
+                            const Icon(Icons.add_rounded, size: 14, color: Colors.white),
+                            const SizedBox(width: 2),
+                            const Text('Add', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                          ],
                         ],
                       ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Compare prices on Blinkit, Zepto, BigBasket, Amazon & Instamart',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFFB45309),
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD97706),
-                    borderRadius: BorderRadius.circular(50),
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 20, color: AppColors.primary),
+                    tooltip: 'Scan Barcode',
+                    onPressed: () => BarcodeScannerWidget.open(context),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Compare',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 9, color: Colors.white),
-                    ],
-                  ),
-                ),
+                  const VoiceInputButton(size: 20, tooltip: 'Voice shopping command'),
+                  const SizedBox(width: 4),
+                ],
               ],
             ),
           ),
@@ -664,57 +509,54 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     );
   }
 
-  /// 4 Feature Action Cards
-  Widget _buildFeatureGrid(BuildContext context) {
+  /// Single, clean, non-redundant feature row:
+  /// 1. Live Price Deals ⚡
+  /// 2. Shop Mode 🛒
+  /// 3. Restocked Receipts 🧾
+  Widget _buildFeatureActionsRow(BuildContext context) {
     return Row(
       children: [
+        // 1. Price Checker & Live Deals
         Expanded(
           child: _buildActionTile(
             icon: Icons.bolt_rounded,
             iconColor: const Color(0xFFD97706),
             iconBg: const Color(0xFFFEF3C7),
-            title: 'Live Deals',
-            subtitle: 'Store compare',
+            title: 'Price Deals ⚡',
+            subtitle: 'Compare stores',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
+
+        // 2. In-Store Shop Mode
         Expanded(
           child: _buildActionTile(
             icon: Icons.shopping_cart_checkout_rounded,
             iconColor: AppColors.hsGreen,
             iconBg: AppColors.hsGreenBg,
             title: 'Shop Mode',
-            subtitle: 'In-store run',
+            subtitle: 'Store checklist',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ShoppingModeScreen()),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
+
+        // 3. Restocked History
         Expanded(
           child: _buildActionTile(
             icon: Icons.receipt_long_rounded,
             iconColor: AppColors.primary,
             iconBg: AppColors.primaryContainer,
             title: 'Restocked',
-            subtitle: 'Receipts & bills',
+            subtitle: 'Bills & receipts',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const PurchasesScreen()),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildActionTile(
-            icon: Icons.mic_rounded,
-            iconColor: AppColors.hsPurple,
-            iconBg: AppColors.hsPurpleBg,
-            title: 'Voice Add',
-            subtitle: 'Tamil & Eng',
-            onTap: () => VoiceBottomSheet.show(context),
           ),
         ),
       ],
@@ -749,27 +591,28 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(7),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: iconBg,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icon, size: 18, color: iconColor),
+                  child: Icon(icon, size: 20, color: iconColor),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 7),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 9.5, color: AppColors.textSecondary),
+                  style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -803,7 +646,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             ),
             const SizedBox(width: 6),
             HomeStockPillBadge(
-              label: '${lowStockSuggestions.length} items',
+              label: '${lowStockSuggestions.length} low',
               variant: HomeStockPillVariant.yellow,
               fontSize: 10,
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -839,7 +682,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: lowStockSuggestions.length,
-            separatorBuilder: (_, i) => const SizedBox(width: 10),
+            separatorBuilder: (_, index) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
               final pantryItem = lowStockSuggestions[index];
               return _buildRestockSuggestionCard(pantryItem);
@@ -860,7 +703,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             Icon(Icons.flash_on_rounded, size: 15, color: AppColors.primary),
             SizedBox(width: 4),
             Text(
-              'Quick-Add Household Essentials',
+              'Quick-Add Essentials (1-Tap)',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
             ),
             SizedBox(width: 6),
@@ -928,7 +771,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Shopping Progress & Quick Actions Card
+        // Shopping Progress Card
         HomeStockCard(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -963,39 +806,19 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                       ],
                     ),
                   ),
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      if (pendingCount > 0)
-                        ElevatedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ShoppingModeScreen()),
-                          ),
-                          icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 13),
-                          label: const Text('Shop Mode', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.hsGreen,
-                            foregroundColor: Colors.white,
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                          ),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
-                        ),
-                        icon: const Icon(Icons.receipt_long_rounded, size: 13),
-                        label: const Text('Record', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                          minimumSize: Size.zero,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                        ),
-                      ),
-                    ],
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
+                    ),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 13),
+                    label: const Text('Record Bill', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                    ),
                   ),
                 ],
               ),
@@ -1119,17 +942,18 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     );
   }
 
-  /// Modern, friendly guide when the shopping list has 0 items
-  Widget _buildEmptyShoppingGuide(BuildContext context, List<InventoryItemModel> lowStockSuggestions) {
+  /// Clean, un-cluttered empty guide with ZERO duplicate buttons:
+  /// Barcode and Voice are already in the top search bar!
+  Widget _buildEmptyShoppingGuide(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1143,11 +967,11 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               color: AppColors.primaryContainer.withValues(alpha: 0.6),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.shopping_bag_outlined, size: 36, color: AppColors.primary),
+            child: const Icon(Icons.shopping_bag_outlined, size: 38, color: AppColors.primary),
           ),
           const SizedBox(height: 12),
           const Text(
-            'Your Shopping List is Ready!',
+            'Your Shopping List is Empty',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -1155,11 +979,11 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Add items using the quick bar above, tap any essential staple, or scan barcodes to find the lowest prices across stores.',
+              'Search or type above to add items, tap essentials, or compare live prices across stores.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -1168,47 +992,39 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // 3 Quick Options
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () => AddShoppingItemDialog.show(context),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Add Manually', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                  elevation: 1,
+          // Offline indicator badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(50),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.offline_pin_rounded, size: 14, color: AppColors.hsGreen),
+                SizedBox(width: 4),
+                Text(
+                  '100% Offline Ready • Changes saved locally',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.hsGreen),
                 ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => BarcodeScannerWidget.open(context),
-                icon: const Icon(Icons.qr_code_scanner_rounded, size: 16, color: AppColors.primary),
-                label: const Text('Scan Barcode', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w700)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => VoiceBottomSheet.show(context),
-                icon: const Icon(Icons.mic_rounded, size: 16, color: AppColors.hsPurple),
-                label: const Text('Voice Input', style: TextStyle(fontSize: 12, color: AppColors.hsPurple, fontWeight: FontWeight.w700)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: AppColors.hsPurple.withValues(alpha: 0.4)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                ),
-              ),
-            ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Single subtle button for detailed entry
+          TextButton.icon(
+            onPressed: () => AddShoppingItemDialog.show(context),
+            icon: const Icon(Icons.edit_note_rounded, size: 18, color: AppColors.primary),
+            label: const Text(
+              '+ Add with Category & Notes',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+            ),
           ),
         ],
       ),
@@ -1558,122 +1374,6 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               tooltip: 'Remove',
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddShoppingItemMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.outline,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Add to Shopping List',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.edit_note_rounded, color: AppColors.primary),
-                  ),
-                  title: const Text('Add Manually with Details', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Enter name, quantity, category, and unit', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    AddShoppingItemDialog.show(context);
-                  },
-                ),
-                const HomeStockDottedDivider(),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.secondary),
-                  ),
-                  title: const Text('Scan Packaging Barcode', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Camera scan to add verified product', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    BarcodeScannerWidget.open(context);
-                  },
-                ),
-                const HomeStockDottedDivider(),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.hsPurpleBg,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.mic_rounded, color: AppColors.hsPurple),
-                  ),
-                  title: const Text('Offline Voice Command', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Say "Add 2 litre cooking oil to shopping list"', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    VoiceBottomSheet.show(context);
-                  },
-                ),
-                const HomeStockDottedDivider(),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.bolt_rounded, color: Color(0xFFD97706)),
-                  ),
-                  title: const Text('Compare Live Store Deals ⚡', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Compare prices on Blinkit, Zepto, BigBasket, Amazon', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

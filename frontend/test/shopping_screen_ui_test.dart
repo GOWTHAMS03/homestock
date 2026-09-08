@@ -47,7 +47,7 @@ class MockShoppingController extends StateNotifier<ShoppingState>
 
 void main() {
   group('ShoppingScreen UI/UX Tests', () {
-    testWidgets('renders all smart features when shopping list is empty',
+    testWidgets('renders all smart features when shopping list is empty without duplication',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -87,34 +87,30 @@ void main() {
       await tester.pumpAndSettle();
 
       // 1. Check AppBar
-      expect(find.text('Smart Shopping Hub'), findsOneWidget);
-      expect(find.text('Plan items, compare live deals & restock'), findsOneWidget);
+      expect(find.text('Shopping List'), findsOneWidget);
+      expect(find.text('0 items • Offline ready'), findsOneWidget);
 
-      // 2. Check Persistent Quick-Add Bar
+      // 2. Check Unified Existing Search Bar
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('Quick-add item (e.g. Milk 1L, Rice 5kg)...'), findsOneWidget);
-      expect(find.byIcon(Icons.qr_code_scanner_rounded), findsWidgets);
-      expect(find.byIcon(Icons.mic_rounded), findsWidgets);
+      expect(find.text('Search or add shopping items...'), findsOneWidget);
+      expect(find.byIcon(Icons.qr_code_scanner_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.mic), findsOneWidget);
 
-      // 3. Check Price Checking Hero Card (Always visible)
-      expect(find.text('Price Checking & Live Deals'), findsOneWidget);
-      expect(find.text('Compare prices on Blinkit, Zepto, BigBasket, Amazon & Instamart'), findsOneWidget);
-
-      // 4. Check 4 Feature Action Cards
-      expect(find.text('Live Deals'), findsOneWidget);
+      // 3. Check 3 Non-Redundant Feature Action Cards (Exact 1 instance each!)
+      expect(find.text('Price Deals ⚡'), findsOneWidget);
       expect(find.text('Shop Mode'), findsOneWidget);
       expect(find.text('Restocked'), findsOneWidget);
-      expect(find.text('Voice Add'), findsOneWidget);
 
-      // 5. Check 1-Tap Household Essentials Carousel
-      expect(find.text('Quick-Add Household Essentials'), findsOneWidget);
+      // 4. Check 1-Tap Household Essentials Carousel
+      expect(find.text('Quick-Add Essentials (1-Tap)'), findsOneWidget);
       expect(find.text('1-Tap'), findsOneWidget);
       expect(find.textContaining('Milk'), findsWidgets);
       expect(find.textContaining('Eggs'), findsWidgets);
 
-      // 6. Check Ready Guide & FAB
-      expect(find.text('Your Shopping List is Ready!'), findsOneWidget);
-      expect(find.text('Add Item'), findsOneWidget);
+      // 5. Check Clean Empty Guide (No duplicate buttons) & FAB
+      expect(find.text('Your Shopping List is Empty'), findsOneWidget);
+      expect(find.text('100% Offline Ready • Changes saved locally'), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsOneWidget);
     });
 
     testWidgets('renders pantry low-stock suggestions with Restock All button',
