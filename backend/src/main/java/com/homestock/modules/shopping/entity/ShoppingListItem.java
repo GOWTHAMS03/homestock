@@ -70,4 +70,17 @@ public class ShoppingListItem extends BaseEntity {
 
     @Column(name = "notes")
     private String notes;
+
+    @Column(name = "preferred_brand", length = 100)
+    private String preferredBrand;
+
+    @Column(name = "preferred_package_size", length = 50)
+    private String preferredPackageSize;
+
+    @Column(name = "preferred_provider", length = 50)
+    private String preferredProvider;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "normalized_product_id")
+    private com.homestock.modules.product.entity.Product normalizedProduct;
 }

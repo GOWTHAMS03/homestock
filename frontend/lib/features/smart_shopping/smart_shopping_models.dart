@@ -257,3 +257,240 @@ class PriceComparisonResult {
     return '₹${diff.toStringAsFixed(0)} cheaper than the next option';
   }
 }
+
+class DuplicateWarningModel {
+  final String shoppingItemId;
+  final String itemName;
+  final double existingStockQuantity;
+  final String existingStockUnit;
+  final double? estimatedDaysRemaining;
+  final String message;
+
+  const DuplicateWarningModel({
+    required this.shoppingItemId,
+    required this.itemName,
+    required this.existingStockQuantity,
+    required this.existingStockUnit,
+    this.estimatedDaysRemaining,
+    required this.message,
+  });
+
+  factory DuplicateWarningModel.fromJson(Map<String, dynamic> json) {
+    return DuplicateWarningModel(
+      shoppingItemId: json['shoppingItemId']?.toString() ?? '',
+      itemName: json['itemName'] ?? '',
+      existingStockQuantity: (json['existingStockQuantity'] as num?)?.toDouble() ?? 0,
+      existingStockUnit: json['existingStockUnit'] ?? 'pcs',
+      estimatedDaysRemaining: (json['estimatedDaysRemaining'] as num?)?.toDouble(),
+      message: json['message'] ?? '',
+    );
+  }
+}
+
+class BasketItemModel {
+  final String shoppingItemId;
+  final String itemName;
+  final double quantity;
+  final String unit;
+  final String? provider;
+  final String? providerProductId;
+  final String? productTitle;
+  final double price;
+  final double? deliveryCharge;
+  final double effectivePrice;
+  final double? pricePerUnit;
+  final String? pricePerUnitLabel;
+  final String? matchType;
+  final double? matchConfidence;
+  final String? freshness;
+  final String? affiliateUrl;
+  final String? productUrl;
+  final String? imageUrl;
+
+  const BasketItemModel({
+    required this.shoppingItemId,
+    required this.itemName,
+    required this.quantity,
+    required this.unit,
+    this.provider,
+    this.providerProductId,
+    this.productTitle,
+    required this.price,
+    this.deliveryCharge,
+    required this.effectivePrice,
+    this.pricePerUnit,
+    this.pricePerUnitLabel,
+    this.matchType,
+    this.matchConfidence,
+    this.freshness,
+    this.affiliateUrl,
+    this.productUrl,
+    this.imageUrl,
+  });
+
+  factory BasketItemModel.fromJson(Map<String, dynamic> json) {
+    return BasketItemModel(
+      shoppingItemId: json['shoppingItemId']?.toString() ?? '',
+      itemName: json['itemName'] ?? '',
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 1,
+      unit: json['unit'] ?? 'pcs',
+      provider: json['provider'],
+      providerProductId: json['providerProductId'],
+      productTitle: json['productTitle'],
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+      deliveryCharge: (json['deliveryCharge'] as num?)?.toDouble(),
+      effectivePrice: (json['effectivePrice'] as num?)?.toDouble() ?? 0,
+      pricePerUnit: (json['pricePerUnit'] as num?)?.toDouble(),
+      pricePerUnitLabel: json['pricePerUnitLabel'],
+      matchType: json['matchType'],
+      matchConfidence: (json['matchConfidence'] as num?)?.toDouble(),
+      freshness: json['freshness'] ?? 'FRESH',
+      affiliateUrl: json['affiliateUrl'],
+      productUrl: json['productUrl'],
+      imageUrl: json['imageUrl'],
+    );
+  }
+}
+
+class BasketOptionModel {
+  final String optionType;
+  final String title;
+  final String storeName;
+  final double itemsSubtotal;
+  final double deliveryFeesTotal;
+  final double netTotal;
+  final double potentialSavings;
+  final String? recommendationReason;
+  final List<BasketItemModel> items;
+
+  const BasketOptionModel({
+    required this.optionType,
+    required this.title,
+    required this.storeName,
+    required this.itemsSubtotal,
+    required this.deliveryFeesTotal,
+    required this.netTotal,
+    required this.potentialSavings,
+    this.recommendationReason,
+    required this.items,
+  });
+
+  factory BasketOptionModel.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'] as List? ?? [];
+    return BasketOptionModel(
+      optionType: json['optionType'] ?? '',
+      title: json['title'] ?? '',
+      storeName: json['storeName'] ?? '',
+      itemsSubtotal: (json['itemsSubtotal'] as num?)?.toDouble() ?? 0,
+      deliveryFeesTotal: (json['deliveryFeesTotal'] as num?)?.toDouble() ?? 0,
+      netTotal: (json['netTotal'] as num?)?.toDouble() ?? 0,
+      potentialSavings: (json['potentialSavings'] as num?)?.toDouble() ?? 0,
+      recommendationReason: json['recommendationReason'],
+      items: rawItems.map((i) => BasketItemModel.fromJson(i)).toList(),
+    );
+  }
+
+  bool get isSplit => optionType == 'OPTION_A_INDIVIDUAL_BEST';
+  bool get isSingleStore => optionType == 'OPTION_B_SINGLE_STORE';
+}
+
+class BasketComparisonResult {
+  final List<BasketOptionModel> options;
+  final BasketOptionModel? recommendedOption;
+  final List<DuplicateWarningModel> duplicateWarnings;
+  final String? calculatedAt;
+
+  const BasketComparisonResult({
+    required this.options,
+    this.recommendedOption,
+    required this.duplicateWarnings,
+    this.calculatedAt,
+  });
+
+  factory BasketComparisonResult.fromJson(Map<String, dynamic> json) {
+    final rawOpts = json['options'] as List? ?? [];
+    final rawWarnings = json['duplicateWarnings'] as List? ?? [];
+
+    return BasketComparisonResult(
+      options: rawOpts.map((o) => BasketOptionModel.fromJson(o)).toList(),
+      recommendedOption: json['recommendedOption'] != null
+          ? BasketOptionModel.fromJson(json['recommendedOption'])
+          : null,
+      duplicateWarnings: rawWarnings.map((w) => DuplicateWarningModel.fromJson(w)).toList(),
+      calculatedAt: json['calculatedAt'],
+    );
+  }
+}
+
+class ProviderCapabilityModel {
+  final String name;
+  final String displayName;
+  final bool enabled;
+  final List<String> capabilities;
+
+  const ProviderCapabilityModel({
+    required this.name,
+    required this.displayName,
+    required this.enabled,
+    required this.capabilities,
+  });
+
+  factory ProviderCapabilityModel.fromJson(Map<String, dynamic> json) {
+    final rawCaps = json['capabilities'] as List? ?? [];
+    return ProviderCapabilityModel(
+      name: json['name'] ?? '',
+      displayName: json['displayName'] ?? '',
+      enabled: json['enabled'] ?? false,
+      capabilities: rawCaps.map((c) => c.toString()).toList(),
+    );
+  }
+
+  bool hasCapability(String cap) => capabilities.contains(cap);
+  bool get canMultiItemCart => hasCapability('MULTI_ITEM_CART');
+  bool get canDeepLink => hasCapability('DEEP_LINK');
+  bool get canAffiliateLink => hasCapability('AFFILIATE_LINK');
+}
+
+class ShoppingSessionModel {
+  final String id;
+  final String homeId;
+  final String userId;
+  final String startedAt;
+  final String? completedAt;
+  final String status;
+  final String? selectedProviders;
+  final double? estimatedTotal;
+  final double? actualTotal;
+  final double? potentialSavings;
+  final String? recommendedOption;
+
+  const ShoppingSessionModel({
+    required this.id,
+    required this.homeId,
+    required this.userId,
+    required this.startedAt,
+    this.completedAt,
+    required this.status,
+    this.selectedProviders,
+    this.estimatedTotal,
+    this.actualTotal,
+    this.potentialSavings,
+    this.recommendedOption,
+  });
+
+  factory ShoppingSessionModel.fromJson(Map<String, dynamic> json) {
+    return ShoppingSessionModel(
+      id: json['id']?.toString() ?? '',
+      homeId: json['homeId']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      startedAt: json['startedAt'] ?? '',
+      completedAt: json['completedAt'],
+      status: json['status'] ?? 'CREATED',
+      selectedProviders: json['selectedProviders'],
+      estimatedTotal: (json['estimatedTotal'] as num?)?.toDouble(),
+      actualTotal: (json['actualTotal'] as num?)?.toDouble(),
+      potentialSavings: (json['potentialSavings'] as num?)?.toDouble(),
+      recommendedOption: json['recommendedOption'],
+    );
+  }
+}

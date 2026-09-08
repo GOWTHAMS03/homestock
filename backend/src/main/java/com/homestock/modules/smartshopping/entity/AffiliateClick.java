@@ -40,4 +40,10 @@ public class AffiliateClick extends BaseEntity {
 
     @Column(name = "clicked_at", nullable = false)
     private Instant clickedAt;
+
+    @Column(name = "session_id")
+    private UUID sessionId;
+
+    @Column(name = "source_screen", length = 50)
+    private String sourceScreen;
 }

@@ -47,4 +47,23 @@ public class PriceHistory extends BaseEntity {
 
     @Column(name = "recorded_at", nullable = false)
     private Instant recordedAt;
+
+    @Column(name = "product_id")
+    private java.util.UUID productId;
+
+    @Column(name = "unit_price", precision = 12, scale = 4)
+    private BigDecimal unitPrice;
+
+    @Column(name = "availability", length = 50)
+    private String availability;
+
+    @Builder.Default
+    @Column(name = "is_user_reported", nullable = false)
+    private boolean isUserReported = false;
+
+    @Column(name = "reported_by")
+    private java.util.UUID reportedBy;
+
+    @Column(name = "store_name", length = 150)
+    private String storeName;
 }

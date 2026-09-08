@@ -12,8 +12,10 @@ import '../home_switcher/create_home_dialog.dart';
 import '../home_switcher/home_controller.dart';
 import '../home_switcher/join_home_dialog.dart';
 import '../inventory/category_model.dart';
+import '../inventory/consumption_model.dart';
 import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_model.dart';
+import '../inventory/smart_confirmation_sheet.dart';
 import '../notifications/notification_controller.dart';
 import '../shopping/shopping_controller.dart';
 import '../voice/widgets/voice_input_button.dart';
@@ -107,18 +109,28 @@ class DashboardScreen extends ConsumerWidget {
                         children: [
                           const SizedBox(height: AppSpacing.md),
 
-                          // B. Dual Status Promo Cards (Shopping & Pantry)
-                          _buildDualPromoCards(context, ref, summary),
+                          // 1. Return Experience Banner (if returning after an absence)
+                          if (dashboardState.returnSummary != null && dashboardState.returnSummary!.hasAbsence)
+                            _buildReturnExperienceBanner(context, ref, dashboardState.returnSummary!),
 
-                          // C. Subtle Low-Stock Alert Banner (only shown when low stock exists)
-                          _buildSpecialNoticeBanner(context, ref, summary),
+                          // 2. Dual Status Promo Cards (Shopping & Pantry)
+                          _buildDualPromoCards(context, ref, summary),
+                          const SizedBox(height: AppSpacing.md),
+
+                          // 3. Smart Things Needing Attention Section (Actionable confirmations or "Everything looks good 🌿")
+                          _buildThingsNeedingAttentionSection(context, ref, summary),
+
+                          // 4. HomeStock Habit & Consumption Insights Card
+                          if (dashboardState.homeInsight != null && dashboardState.homeInsight!.insights.isNotEmpty)
+                            _buildHomeStockInsightCard(context, ref, dashboardState.homeInsight!),
+
                           const SizedBox(height: AppSpacing.lg),
 
-                          // D. 3D-styled Categories Section
+                          // 5. 3D-styled Categories Section
                           _buildCategoriesSection(context, ref),
                           const SizedBox(height: AppSpacing.xl),
 
-                          // E. Daily Essentials / Pantry Products with Animated Smart Predict
+                          // 6. Daily Essentials / Pantry Products with Animated Smart Predict
                           _buildDailyEssentialsSection(context, ref, summary),
                           const SizedBox(height: AppSpacing.xxl),
                         ],
@@ -142,6 +154,15 @@ class DashboardScreen extends ConsumerWidget {
     int unreadNotifications,
     String? fullName,
   ) {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good morning'
+        : (hour < 17 ? 'Good afternoon' : 'Good evening');
+    final firstName = (fullName != null && fullName.trim().isNotEmpty)
+        ? fullName.trim().split(' ').first
+        : null;
+    final greetingText = firstName != null ? '$greeting, $firstName 👋' : '$greeting 👋';
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -162,19 +183,21 @@ class DashboardScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Headline
-                    const Row(
+                    // Dynamic Headline Greeting
+                    Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.bolt_rounded, size: 24, color: AppColors.textPrimary),
-                        SizedBox(width: 4),
-                        Text(
-                          'Home Stock Active',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                            letterSpacing: -0.4,
+                        Flexible(
+                          child: Text(
+                            greetingText,
+                            style: const TextStyle(
+                              fontSize: 18.5,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.4,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -452,45 +475,413 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Minimal, non-intrusive alert banner (shown ONLY when items are running low)
-  Widget _buildSpecialNoticeBanner(BuildContext context, WidgetRef ref, DashboardSummaryModel? summary) {
-    final lowStock = summary?.lowStockCount ?? 0;
-    if (lowStock == 0) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.md),
-      child: InkWell(
-        onTap: () {
-          ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.lowStock);
-          context.go('/inventory');
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFFBEB),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFDE68A), width: 0.9),
+  /// Return Experience Banner for users returning after an absence
+  Widget _buildReturnExperienceBanner(
+    BuildContext context,
+    WidgetRef ref,
+    ReturnSummaryModel returnSummary,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-          child: Row(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFD97706)),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDBEAFE),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.flight_land_rounded, size: 16, color: Color(0xFF1D4ED8)),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '$lowStock item(s) running low in pantry • Tap to restock',
+                  'While you were away (${returnSummary.daysAway} days)...',
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF92400E),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    color: Color(0xFF1E40AF),
                   ),
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFD97706)),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            returnSummary.message,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF1E3A8A), height: 1.3),
+          ),
+          if (returnSummary.flaggedItems.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: returnSummary.flaggedItems.map((name) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDBEAFE),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  name,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF1D4ED8)),
+                ),
+              )).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Things Needing Attention section with fast 1-tap confirmation or calm "Everything looks good 🌿" state
+  Widget _buildThingsNeedingAttentionSection(
+    BuildContext context,
+    WidgetRef ref,
+    DashboardSummaryModel? summary,
+  ) {
+    final invState = ref.watch(inventoryControllerProvider);
+    final items = summary?.needsAttention ?? [];
+
+    if (items.isEmpty) {
+      // Reassuring, zero-clutter calm card
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
         ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: Color(0xFFDCFCE7),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(child: Text('🌿', style: TextStyle(fontSize: 18))),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Everything looks good',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                      color: Color(0xFF166534),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'All household supplies are well stocked',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF15803D),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF59E0B),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${items.length} ${items.length == 1 ? 'Thing Needs' : 'Things Need'} Attention',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'Quick Confirm',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ...items.take(4).map((attentionItem) {
+          final matchedItem = invState.items.cast<InventoryItemModel?>().firstWhere(
+                (it) => it?.id == attentionItem.itemId,
+                orElse: () => null,
+              );
+
+          final itemToConfirm = matchedItem ??
+              InventoryItemModel(
+                id: attentionItem.itemId,
+                homeId: '',
+                categoryName: attentionItem.categoryName,
+                categoryIcon: 'inventory',
+                categoryColor: '#F59E0B',
+                name: attentionItem.name,
+                quantity: attentionItem.quantity,
+                unit: attentionItem.unit,
+                minimumQuantity: 1.0,
+                stockStatus: attentionItem.stockStatus,
+                expiryStatus: attentionItem.expiryStatus,
+                daysUntilExpiry: attentionItem.daysUntilExpiry,
+              );
+
+          final isOut = attentionItem.stockStatus == 'OUT_OF_STOCK';
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isOut ? const Color(0xFFFECDD3) : const Color(0xFFFDE68A),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: InkWell(
+              onTap: () => SmartConfirmationSheet.show(context, itemToConfirm),
+              borderRadius: BorderRadius.circular(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: isOut ? const Color(0xFFFFF1F2) : const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          isOut ? Icons.battery_alert_rounded : Icons.battery_2_bar_rounded,
+                          size: 18,
+                          color: isOut ? const Color(0xFFE11D48) : const Color(0xFFD97706),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _formatName(attentionItem.name),
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              attentionItem.reasonMessage.isNotEmpty
+                                  ? attentionItem.reasonMessage
+                                  : (isOut ? 'Out of stock' : 'Running low in pantry'),
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      // Action 1: Still Have Enough (One tap fast confirmation)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            try {
+                              final api = ref.read(apiClientProvider);
+                              await api.post('/items/${attentionItem.itemId}/confirm-status', data: {
+                                'action': 'STILL_HAVE_ENOUGH',
+                              });
+                              await ref.read(inventoryControllerProvider.notifier).loadData();
+                              await ref.read(dashboardControllerProvider.notifier).loadDashboard();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Confirmed "${attentionItem.name}" is stocked 👍'),
+                                    duration: const Duration(seconds: 1),
+                                    backgroundColor: AppColors.hsGreen,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (_) {}
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.hsGreen,
+                            side: const BorderSide(color: Color(0xFF86EFAC)),
+                            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: const Text(
+                            'Still have enough',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Action 2: Add to Shopping (One tap fast action)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final success = await ref.read(shoppingControllerProvider.notifier).addItem(
+                                  inventoryItemId: attentionItem.itemId,
+                                  itemName: attentionItem.name,
+                                  quantity: attentionItem.quantity > 0 ? attentionItem.quantity : 1.0,
+                                  unit: attentionItem.unit,
+                                );
+                            if (context.mounted && success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Added "${attentionItem.name}" to Shopping List 🛒'),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: AppColors.primary,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            visualDensity: VisualDensity.compact,
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            '+ Add to Shopping',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  /// HomeStock learned household habits and consumption insight card
+  Widget _buildHomeStockInsightCard(
+    BuildContext context,
+    WidgetRef ref,
+    HomeInsightModel homeInsight,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.md),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF5F3FF), Color(0xFFEDE9FE)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFDDD6FE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF8B5CF6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.lightbulb_outline_rounded, size: 14, color: Colors.white),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Household Stock Memory',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: Color(0xFF5B21B6),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...homeInsight.insights.take(2).map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('• ', style: TextStyle(color: Color(0xFF7C3AED), fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF4C1D95), height: 1.3),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
       ),
     );
   }
@@ -803,59 +1194,86 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 2),
 
-              // Unit / Quantity
-              Text(
-                '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit} in pantry',
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              // Human-friendly stock display (e.g. ~2 kg left or Likely enough for 3–4 days)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.humanQuantityDisplay,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: item.isEstimated ? const Color(0xFF92400E) : AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (item.isEstimated)
+                    Container(
+                      margin: const EdgeInsets.only(left: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Est.',
+                        style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 6),
 
-              // Bottom Row: Status Pill + Animated Add Button
+              // Bottom Row: Status Pill (tappable for 2-tap confirm) + Animated Add Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Status Pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isOut
-                          ? const Color(0xFFFFF1F2)
-                          : (isLow ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5)),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
+                  // Status Pill with 2-tap stock confirmation
+                  InkWell(
+                    onTap: () => SmartConfirmationSheet.show(context, item),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
                         color: isOut
-                            ? const Color(0xFFFECDD3)
-                            : (isLow ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0)),
-                        width: 0.8,
+                            ? const Color(0xFFFFF1F2)
+                            : (isLow ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5)),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isOut
+                              ? const Color(0xFFFECDD3)
+                              : (isLow ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0)),
+                          width: 0.8,
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isOut
-                                ? const Color(0xFFE11D48)
-                                : (isLow ? const Color(0xFFD97706) : const Color(0xFF10B981)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isOut
+                                  ? const Color(0xFFE11D48)
+                                  : (isLow ? const Color(0xFFD97706) : const Color(0xFF10B981)),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isOut ? 'Out' : (isLow ? 'Low' : 'In Stock'),
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: isOut
-                                ? const Color(0xFFBE123C)
-                                : (isLow ? const Color(0xFFB45309) : const Color(0xFF047857)),
+                          const SizedBox(width: 4),
+                          Text(
+                            isOut ? 'Out' : (isLow ? 'Low' : 'In Stock'),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: isOut
+                                  ? const Color(0xFFBE123C)
+                                  : (isLow ? const Color(0xFFB45309) : const Color(0xFF047857)),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 

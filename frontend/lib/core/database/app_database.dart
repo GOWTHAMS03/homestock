@@ -97,6 +97,13 @@ class LocalInventoryItems extends Table {
   IntColumn get daysUntilExpiry => integer().nullable()();
   TextColumn get barcode => text().nullable()();
   TextColumn get productId => text().nullable()();
+  TextColumn get quantityStatus => text().nullable()();
+  TextColumn get quantitySource => text().withDefault(const Constant('VERIFIED'))();
+  TextColumn get confidence => text().withDefault(const Constant('HIGH'))();
+  IntColumn get estimatedDaysRemaining => integer().nullable()();
+  RealColumn get estimatedDailyConsumption => real().nullable()();
+  DateTimeColumn get lastVerifiedAt => dateTime().nullable()();
+  DateTimeColumn get lastEstimatedAt => dateTime().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
   /// True if this item was created locally and hasn't been synced yet
   BoolColumn get isLocalOnly => boolean().withDefault(const Constant(false))();
@@ -296,6 +303,23 @@ class LocalProducts extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Cached consumption profiles learned by the consumption engine
+class LocalConsumptionProfiles extends Table {
+  TextColumn get id => text()();
+  TextColumn get homeId => text()();
+  TextColumn get inventoryItemId => text()();
+  TextColumn get itemName => text()();
+  RealColumn get averageDailyConsumption => real().withDefault(const Constant(0.0))();
+  RealColumn get weightedDailyConsumption => real().withDefault(const Constant(0.0))();
+  RealColumn get typicalIntervalDays => real().withDefault(const Constant(7.0))();
+  TextColumn get confidence => text().withDefault(const Constant('LOW'))();
+  IntColumn get estimatedDaysRemaining => integer().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // ──────────────────────────────────────────────────
 //  DATABASE CLASS
 // ──────────────────────────────────────────────────
@@ -317,6 +341,7 @@ class LocalProducts extends Table {
   SyncMetadataEntries,
   LocalProductOffers,
   LocalProducts,
+  LocalConsumptionProfiles,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -325,7 +350,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -343,6 +368,16 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(localInventoryItems, localInventoryItems.productId);
           await m.addColumn(localShoppingListItems, localShoppingListItems.barcode);
           await m.addColumn(localShoppingListItems, localShoppingListItems.productId);
+        }
+        if (from < 4) {
+          await m.createTable(localConsumptionProfiles);
+          await m.addColumn(localInventoryItems, localInventoryItems.quantityStatus);
+          await m.addColumn(localInventoryItems, localInventoryItems.quantitySource);
+          await m.addColumn(localInventoryItems, localInventoryItems.confidence);
+          await m.addColumn(localInventoryItems, localInventoryItems.estimatedDaysRemaining);
+          await m.addColumn(localInventoryItems, localInventoryItems.estimatedDailyConsumption);
+          await m.addColumn(localInventoryItems, localInventoryItems.lastVerifiedAt);
+          await m.addColumn(localInventoryItems, localInventoryItems.lastEstimatedAt);
         }
       },
     );

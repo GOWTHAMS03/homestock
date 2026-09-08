@@ -52,4 +52,19 @@ public class Product extends BaseEntity {
     @Builder.Default
     @Column(name = "source", nullable = false, length = 50)
     private String source = "INTERNAL";
+
+    @Column(name = "sub_category", length = 100)
+    private String subCategory;
+
+    @Column(name = "gtin", length = 50)
+    private String gtin;
+
+    @Column(name = "variant", length = 100)
+    private String variant;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "package_unit", length = 30)
+    private String packageUnit;
 }

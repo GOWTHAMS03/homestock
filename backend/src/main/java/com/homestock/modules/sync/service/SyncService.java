@@ -56,6 +56,7 @@ public class SyncService {
     private final UserRepository userRepository;
     private final ShoppingService shoppingService;
     private final ObjectMapper objectMapper;
+    private final com.homestock.modules.consumption.service.ConsumptionService consumptionService;
 
     /**
      * Process batch of offline operations idempotently.
@@ -113,6 +114,8 @@ public class SyncService {
                 case "CREATE_STORE" -> handleCreateStore(op, home, payload);
                 case "CLEAR_COMPLETED_SHOPPING" -> handleClearCompletedShopping(home);
                 case "CREATE_CATEGORY" -> handleCreateCategory(op, home, payload);
+                case "CONFIRM_STATUS" -> handleConfirmStatus(op, home, payload);
+                case "CONFIRM_QUANTITY" -> handleConfirmQuantity(op, home, payload);
                 default -> log.warn("Unknown sync operation type: {}", opType);
             }
 
@@ -327,6 +330,9 @@ public class SyncService {
                 .reason(payload.get("reason") != null ? payload.get("reason").toString() : "Offline sync update")
                 .build();
         stockTransactionRepository.save(tx);
+
+        // Recalculate consumption profile for the affected item
+        consumptionService.recalculateForItem(home, item.getId());
     }
 
     private void handleDeleteItem(SyncOperationDto op, Home home) {
@@ -485,9 +491,50 @@ public class SyncService {
                                 .reason("Purchase restock")
                                 .build();
                         stockTransactionRepository.save(tx);
+
+                        // Trigger consumption learning for the restocked item
+                        consumptionService.onPurchaseRecorded(home, linkedItem, qty, savedPurchase.getPurchaseDate());
                     }
                 }
             }
+        }
+    }
+
+    private void handleConfirmStatus(SyncOperationDto op, Home home, Map<String, Object> payload) {
+        if (op.getEntityId() == null) return;
+        try {
+            UUID itemId = UUID.fromString(op.getEntityId());
+            String statusStr = payload.get("status") != null ? payload.get("status").toString() : null;
+            String actionStr = payload.get("action") != null ? payload.get("action").toString() : null;
+            com.homestock.modules.consumption.entity.QuantityStatus status = null;
+            if (statusStr != null) {
+                try {
+                    status = com.homestock.modules.consumption.entity.QuantityStatus.valueOf(statusStr);
+                } catch (Exception ignored) {}
+            }
+            com.homestock.modules.consumption.dto.ConfirmStatusRequest req = com.homestock.modules.consumption.dto.ConfirmStatusRequest.builder()
+                    .status(status)
+                    .action(actionStr)
+                    .build();
+            consumptionService.confirmStatus(itemId, req);
+        } catch (Exception e) {
+            log.warn("Failed to process CONFIRM_STATUS sync operation: {}", e.getMessage());
+        }
+    }
+
+    private void handleConfirmQuantity(SyncOperationDto op, Home home, Map<String, Object> payload) {
+        if (op.getEntityId() == null) return;
+        try {
+            UUID itemId = UUID.fromString(op.getEntityId());
+            BigDecimal qty = toBigDecimal(payload.get("quantity"), BigDecimal.ZERO);
+            String unit = payload.get("unit") != null ? payload.get("unit").toString() : null;
+            com.homestock.modules.consumption.dto.ConfirmQuantityRequest req = com.homestock.modules.consumption.dto.ConfirmQuantityRequest.builder()
+                    .quantity(qty)
+                    .unit(unit)
+                    .build();
+            consumptionService.confirmQuantity(itemId, req);
+        } catch (Exception e) {
+            log.warn("Failed to process CONFIRM_QUANTITY sync operation: {}", e.getMessage());
         }
     }
 

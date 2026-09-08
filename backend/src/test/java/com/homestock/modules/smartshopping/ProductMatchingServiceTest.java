@@ -91,4 +91,78 @@ class ProductMatchingServiceTest {
         assertThat(result.matchType()).isEqualTo("NO_MATCH");
         assertThat(result.confidence()).isLessThan(0.75);
     }
+
+    @Test
+    @DisplayName("Variant protection: Never match Basmati Rice with Brown Rice")
+    void variantClashRice() {
+        ProductOfferDto offer = ProductOfferDto.builder()
+                .productName("India Gate Brown Rice")
+                .brand("India Gate")
+                .packageSize("1")
+                .unit("kg")
+                .build();
+
+        var result = matchingService.calculateMatch(
+                "Basmati Rice",
+                "India Gate",
+                new BigDecimal("1"),
+                "kg",
+                "Grains",
+                offer
+        );
+
+        assertThat(result.matchType()).isEqualTo("NO_MATCH");
+        assertThat(result.confidence()).isEqualTo(0.0);
+        assertThat(result.isAcceptableMatch()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Variant protection: Never match Sunflower Oil with Mustard Oil")
+    void variantClashOil() {
+        ProductOfferDto offer = ProductOfferDto.builder()
+                .productName("Fortune Mustard Oil 1L Pouch")
+                .brand("Fortune")
+                .packageSize("1")
+                .unit("L")
+                .build();
+
+        var result = matchingService.calculateMatch(
+                "Fortune Sunflower Oil",
+                "Fortune",
+                new BigDecimal("1"),
+                "L",
+                "Oils",
+                offer
+        );
+
+        assertThat(result.matchType()).isEqualTo("NO_MATCH");
+        assertThat(result.confidence()).isEqualTo(0.0);
+        assertThat(result.isAcceptableMatch()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Exact barcode match produces 1.0 confidence regardless of name difference")
+    void barcodeExactMatch() {
+        ProductOfferDto offer = ProductOfferDto.builder()
+                .productName("Aashirvaad Shudh Chakki Atta")
+                .brand("Aashirvaad")
+                .barcode("8901030383792")
+                .packageSize("5")
+                .unit("kg")
+                .build();
+
+        var result = matchingService.calculateMatch(
+                "Wheat Flour",
+                "ITC",
+                new BigDecimal("5"),
+                "kg",
+                "Groceries",
+                "8901030383792",
+                offer
+        );
+
+        assertThat(result.matchType()).isEqualTo("EXACT");
+        assertThat(result.confidence()).isEqualTo(1.0);
+        assertThat(result.isAcceptableMatch()).isTrue();
+    }
 }

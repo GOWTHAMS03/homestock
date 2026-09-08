@@ -65,6 +65,8 @@ public class AffiliateLinkService {
                 .shoppingItemId(request.getShoppingItemId())
                 .provider(request.getProvider())
                 .providerProductId(request.getProviderProductId())
+                .sessionId(request.getSessionId())
+                .sourceScreen(request.getSourceScreen())
                 .clickedAt(Instant.now())
                 .build();
 

@@ -31,6 +31,37 @@ class ApiClient {
     ApiEndpoints.setBaseUrl(newBaseUrl);
   }
 
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) =>
+      dio.get<T>(path, queryParameters: queryParameters, options: options);
+
+  Future<Response<T>> post<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) =>
+      dio.post<T>(path, data: data, queryParameters: queryParameters, options: options);
+
+  Future<Response<T>> put<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) =>
+      dio.put<T>(path, data: data, queryParameters: queryParameters, options: options);
+
+  Future<Response<T>> delete<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) =>
+      dio.delete<T>(path, data: data, queryParameters: queryParameters, options: options);
+
   void _setupInterceptors() {
     dio.interceptors.add(
       InterceptorsWrapper(

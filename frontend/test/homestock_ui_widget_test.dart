@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:homestock/core/constants/app_colors.dart';
 import 'package:homestock/core/network/api_client.dart';
 import 'package:homestock/core/storage/secure_storage_service.dart';
 import 'package:homestock/core/theme/app_theme.dart';

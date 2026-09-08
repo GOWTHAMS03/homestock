@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/sync/sync_providers.dart';
 import '../auth/auth_controller.dart';
 import '../home_switcher/home_controller.dart';
+import '../inventory/consumption_model.dart';
 import 'dashboard_model.dart';
 import 'dashboard_repository.dart';
 
@@ -22,12 +23,16 @@ class DashboardState {
   final bool isLoading;
   final DashboardSummaryModel? summary;
   final WhatDoINeedModel? recommendations;
+  final HomeInsightModel? homeInsight;
+  final ReturnSummaryModel? returnSummary;
   final String? errorMessage;
 
   const DashboardState({
     this.isLoading = false,
     this.summary,
     this.recommendations,
+    this.homeInsight,
+    this.returnSummary,
     this.errorMessage,
   });
 
@@ -35,12 +40,16 @@ class DashboardState {
     bool? isLoading,
     DashboardSummaryModel? summary,
     WhatDoINeedModel? recommendations,
+    HomeInsightModel? homeInsight,
+    ReturnSummaryModel? returnSummary,
     String? errorMessage,
   }) {
     return DashboardState(
       isLoading: isLoading ?? this.isLoading,
       summary: summary ?? this.summary,
       recommendations: recommendations ?? this.recommendations,
+      homeInsight: homeInsight ?? this.homeInsight,
+      returnSummary: returnSummary ?? this.returnSummary,
       errorMessage: errorMessage,
     );
   }
@@ -78,8 +87,14 @@ class DashboardController extends StateNotifier<DashboardState> {
     if (_repo.isOnline) {
       try {
         final remoteSummary = await _repo.fetchRemoteSummary(_homeId);
-        if (mounted && remoteSummary != null) {
-          state = state.copyWith(summary: remoteSummary);
+        final insights = await _repo.getHomeInsights(_homeId);
+        final returnSum = await _repo.getReturnSummary(_homeId);
+        if (mounted) {
+          state = state.copyWith(
+            summary: remoteSummary ?? state.summary,
+            homeInsight: insights,
+            returnSummary: returnSum,
+          );
         }
       } catch (e) {
         // Keep existing local summary intact

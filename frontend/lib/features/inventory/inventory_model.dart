@@ -24,6 +24,12 @@ class InventoryItemModel {
   final String stockStatus; // IN_STOCK, LOW_STOCK, OUT_OF_STOCK
   final String expiryStatus; // SAFE, EXPIRING_SOON, EXPIRED
   final int? daysUntilExpiry;
+  final String? quantityStatus; // ALMOST_FULL, MORE_THAN_HALF, ABOUT_HALF, LESS_THAN_HALF, ALMOST_EMPTY, EMPTY
+  final String quantitySource; // VERIFIED, ESTIMATED, UNKNOWN
+  final String confidence; // HIGH, MEDIUM, LOW
+  final int? estimatedDaysRemaining;
+  final double? estimatedDailyConsumption;
+  final String? lastVerifiedAt;
 
   InventoryItemModel({
     required this.id,
@@ -49,6 +55,12 @@ class InventoryItemModel {
     required this.stockStatus,
     required this.expiryStatus,
     this.daysUntilExpiry,
+    this.quantityStatus,
+    this.quantitySource = 'VERIFIED',
+    this.confidence = 'HIGH',
+    this.estimatedDaysRemaining,
+    this.estimatedDailyConsumption,
+    this.lastVerifiedAt,
   });
 
   factory InventoryItemModel.fromJson(Map<String, dynamic> json) {
@@ -76,6 +88,12 @@ class InventoryItemModel {
       stockStatus: json['stockStatus'] ?? 'IN_STOCK',
       expiryStatus: json['expiryStatus'] ?? 'SAFE',
       daysUntilExpiry: json['daysUntilExpiry'] as int?,
+      quantityStatus: json['quantityStatus'],
+      quantitySource: json['quantitySource'] ?? 'VERIFIED',
+      confidence: json['confidence'] ?? 'HIGH',
+      estimatedDaysRemaining: json['estimatedDaysRemaining'] as int?,
+      estimatedDailyConsumption: (json['estimatedDailyConsumption'] as num?)?.toDouble(),
+      lastVerifiedAt: json['lastVerifiedAt'],
     );
   }
 
@@ -83,6 +101,31 @@ class InventoryItemModel {
   bool get isLowStock => stockStatus == 'LOW_STOCK';
   bool get isExpiringSoon => expiryStatus == 'EXPIRING_SOON';
   bool get isExpired => expiryStatus == 'EXPIRED';
+  bool get isEstimated => quantitySource == 'ESTIMATED';
+
+  String get humanQuantityDisplay {
+    if (isOutOfStock) return 'Out of stock';
+    if (quantityStatus != null && quantityStatus!.isNotEmpty && quantitySource == 'VERIFIED') {
+      switch (quantityStatus) {
+        case 'ALMOST_FULL': return 'Almost full';
+        case 'MORE_THAN_HALF': return 'More than half';
+        case 'ABOUT_HALF': return 'About half';
+        case 'LESS_THAN_HALF': return 'Less than half';
+        case 'ALMOST_EMPTY': return 'Almost empty';
+        case 'EMPTY': return 'Empty';
+      }
+    }
+    final numStr = (quantity % 1 == 0) ? quantity.toInt().toString() : quantity.toStringAsFixed(1);
+    if (isEstimated) {
+      if (estimatedDaysRemaining != null && estimatedDaysRemaining! > 0 && estimatedDaysRemaining! <= 7) {
+        final minD = (estimatedDaysRemaining! - 1).clamp(1, 7);
+        final maxD = estimatedDaysRemaining! + 1;
+        return 'Likely enough for $minD–$maxD days';
+      }
+      return '~$numStr $unit left';
+    }
+    return '$numStr $unit';
+  }
 
   Color get categoryColorParsed {
     try {

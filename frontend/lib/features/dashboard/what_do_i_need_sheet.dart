@@ -129,22 +129,75 @@ class WhatDoINeedSheet extends ConsumerWidget {
   }
 
   Widget _buildItemTile(BuildContext context, WidgetRef ref, RecommendationModel item, {required bool isUrgent}) {
-    return Card(
+    final qtyStr = item.recommendedQuantity == item.recommendedQuantity.roundToDouble()
+        ? item.recommendedQuantity.toInt().toString()
+        : item.recommendedQuantity.toStringAsFixed(1);
+
+    return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        side: BorderSide(
-          color: isUrgent ? AppColors.outOfStockBorder : AppColors.lowStockBorder,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isUrgent ? const Color(0xFFFECDD3) : const Color(0xFFFDE68A),
+          width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: ListTile(
-        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-        subtitle: Text(
-          '${item.rationale} • Need ~${item.recommendedQuantity.toStringAsFixed(1)} ${item.unit}',
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item.name,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textPrimary),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isUrgent ? const Color(0xFFFFF1F2) : const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Buy ~$qtyStr ${item.unit}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: isUrgent ? const Color(0xFFBE123C) : const Color(0xFFB45309),
+                ),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            children: [
+              Icon(
+                isUrgent ? Icons.error_outline_rounded : Icons.schedule_rounded,
+                size: 13,
+                color: isUrgent ? const Color(0xFFE11D48) : const Color(0xFFD97706),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  item.rationale.isNotEmpty ? item.rationale : 'Predicted to run out soon based on household cycles',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.2),
+                ),
+              ),
+            ],
+          ),
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.add_shopping_cart_rounded, color: AppColors.primary, size: 20),
+          icon: const Icon(Icons.add_shopping_cart_rounded, color: AppColors.primary, size: 22),
           tooltip: 'Add to Shopping List',
           onPressed: () async {
             await ref.read(shoppingControllerProvider.notifier).addItem(
@@ -156,8 +209,10 @@ class WhatDoINeedSheet extends ConsumerWidget {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('${item.name} added to shopping list!'),
+                  content: Text('Added "${item.name}" to your shopping list!'),
                   duration: const Duration(seconds: 2),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
                 ),
               );
             }

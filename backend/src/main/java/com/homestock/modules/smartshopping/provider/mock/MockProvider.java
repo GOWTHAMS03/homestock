@@ -2,6 +2,7 @@ package com.homestock.modules.smartshopping.provider.mock;
 
 import com.homestock.modules.smartshopping.dto.ProductOfferDto;
 import com.homestock.modules.smartshopping.provider.ProductSearchRequest;
+import com.homestock.modules.smartshopping.provider.ProviderCapability;
 import com.homestock.modules.smartshopping.provider.ShoppingProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,19 @@ public class MockProvider implements ShoppingProvider {
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    @Override
+    public Set<ProviderCapability> getCapabilities() {
+        return Set.of(
+                ProviderCapability.SEARCH,
+                ProviderCapability.PRODUCT_DETAILS,
+                ProviderCapability.OFFERS,
+                ProviderCapability.PRICE,
+                ProviderCapability.AVAILABILITY,
+                ProviderCapability.DEEP_LINK,
+                ProviderCapability.AFFILIATE_LINK
+        );
     }
 
     @Override

@@ -67,6 +67,18 @@ class ApiEndpoints {
   // Smart Shopping — Price Comparison
   static String itemOffers(String homeId, String itemId) =>
       '/homes/$homeId/shopping-list/items/$itemId/offers';
+  static String basketCompare(String homeId) =>
+      '/homes/$homeId/shopping/compare/basket';
+  static String shoppingSessions(String homeId) =>
+      '/homes/$homeId/shopping/sessions';
+  static String completeShoppingSession(String homeId, String sessionId) =>
+      '/homes/$homeId/shopping/sessions/$sessionId/complete';
+  static String reportLocalPrice(String homeId) =>
+      '/homes/$homeId/shopping/local-price';
+  static String shoppingProviders(String homeId) =>
+      '/homes/$homeId/shopping/providers';
+  static String shoppingPriceHistory(String homeId) =>
+      '/homes/$homeId/shopping/price-history';
   static String affiliateClick(String homeId) =>
       '/homes/$homeId/affiliate/click';
   static const String shoppingCompare = '/shopping/compare';

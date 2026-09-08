@@ -60,6 +60,7 @@ public class PurchaseService {
     private final StockTransactionRepository stockTransactionRepository;
     private final ShoppingListRepository shoppingListRepository;
     private final ShoppingListItemRepository shoppingListItemRepository;
+    private final com.homestock.modules.consumption.service.ConsumptionService consumptionService;
 
     @Transactional
     public PurchaseDto recordPurchase(UUID homeId, CreatePurchaseRequest request) {
@@ -153,10 +154,14 @@ public class PurchaseService {
                                 log.info("Auto-completed shopping item '{}' after purchase", shoppingItem.getItemName());
                             });
                 }
+
+                // 3. Trigger Consumption Learning Engine
+                consumptionService.onPurchaseRecorded(home, inventoryItem, itemReq.getQuantity(), purchase.getPurchaseDate());
             }
         }
 
-        savedPurchase.setItems(purchaseItems);
+        savedPurchase.getItems().clear();
+        savedPurchase.getItems().addAll(purchaseItems);
         log.info("Purchase of {} items recorded successfully for home '{}' by user '{}'",
                 purchaseItems.size(), home.getName(), currentUser.getFullName());
 

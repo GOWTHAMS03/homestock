@@ -3,14 +3,13 @@ package com.homestock.modules.smartshopping.service;
 import com.homestock.core.exception.ResourceNotFoundException;
 import com.homestock.modules.shopping.entity.ShoppingListItem;
 import com.homestock.modules.shopping.repository.ShoppingListItemRepository;
-import com.homestock.modules.smartshopping.dto.PriceComparisonResponse;
+import com.homestock.modules.smartshopping.dto.*;
 import com.homestock.modules.smartshopping.dto.PriceComparisonResponse.*;
-import com.homestock.modules.smartshopping.dto.ProductOfferDto;
 import com.homestock.modules.smartshopping.provider.ProductSearchRequest;
 import com.homestock.modules.smartshopping.provider.ShoppingProvider;
+import com.homestock.modules.smartshopping.provider.ShoppingProviderRegistry;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -22,23 +21,22 @@ import java.util.stream.Collectors;
 
 /**
  * Core price comparison orchestrator.
- * <p>
- * Fans out search requests to all enabled providers in parallel,
- * applies product matching, calculates effective prices, and ranks results.
- * <p>
- * Ranking is always based on user value (effective price), never on commission.
+ * Fans out search requests across enabled providers, applies product matching with variant protection,
+ * calculates price per unit and freshness, and drives multi-item basket optimization.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PriceComparisonService {
 
-    private static final Logger log = LoggerFactory.getLogger(PriceComparisonService.class);
-
-    private final List<ShoppingProvider> providers;
+    private final ShoppingProviderRegistry providerRegistry;
     private final ProductMatchingService matchingService;
     private final UnitNormalizationService unitService;
     private final PriceCacheService cacheService;
     private final ShoppingListItemRepository shoppingItemRepository;
+    private final BasketOptimizationService basketOptimizationService;
+    private final DuplicateProtectionService duplicateProtectionService;
+    private final OfferRankingService offerRankingService;
 
     @Value("${app.smart-shopping.provider-timeout-seconds:5}")
     private int providerTimeoutSeconds;
@@ -47,27 +45,89 @@ public class PriceComparisonService {
      * Compare prices for a single shopping item across all enabled providers.
      */
     public PriceComparisonResponse compareItem(UUID homeId, UUID itemId) {
-        // Load shopping item
         ShoppingListItem shoppingItem = shoppingItemRepository.findById(itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("Shopping item not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Shopping item not found: " + itemId));
 
-        // Build shopping item summary
-        ShoppingItemSummary itemSummary = ShoppingItemSummary.builder()
-                .id(shoppingItem.getId().toString())
-                .name(shoppingItem.getItemName())
-                .quantity(shoppingItem.getQuantity())
-                .unit(shoppingItem.getUnit())
-                .brand(shoppingItem.getInventoryItem() != null ? shoppingItem.getInventoryItem().getBrand() : null)
-                .categoryName(shoppingItem.getCategory() != null ? shoppingItem.getCategory().getName() : null)
+        ShoppingItemSummary itemSummary = toSummary(shoppingItem);
+        List<ProductOfferDto> matchedOffers = fetchOffersForItem(shoppingItem, itemSummary);
+
+        return buildResponse(itemSummary, matchedOffers);
+    }
+
+    /**
+     * Compare multiple shopping items together to produce multi-provider basket optimizations
+     * (Option A split vs Option B single store), along with duplicate warnings.
+     */
+    public BasketComparisonResponse compareBasket(UUID homeId, BasketComparisonRequest request) {
+        List<ShoppingListItem> items;
+        if (request.getItemIds() != null && !request.getItemIds().isEmpty()) {
+            items = shoppingItemRepository.findAllById(request.getItemIds());
+        } else {
+            // Default to all active, uncompleted items for this home
+            items = shoppingItemRepository.findPendingItemsByHomeId(homeId);
+        }
+
+        if (items.isEmpty()) {
+            return BasketComparisonResponse.builder()
+                    .options(List.of())
+                    .duplicateWarnings(List.of())
+                    .calculatedAt(Instant.now())
+                    .build();
+        }
+
+        // 1. Run duplicate check
+        List<DuplicateWarningDto> duplicateWarnings = duplicateProtectionService.checkDuplicates(homeId, items);
+
+        // 2. Fetch offers for all items
+        Map<UUID, List<ProductOfferDto>> offersByItemId = new LinkedHashMap<>();
+        Map<UUID, ShoppingListItem> itemById = new LinkedHashMap<>();
+
+        for (ShoppingListItem item : items) {
+            itemById.put(item.getId(), item);
+            ShoppingItemSummary summary = toSummary(item);
+            List<ProductOfferDto> offers = fetchOffersForItem(item, summary);
+            offersByItemId.put(item.getId(), offers);
+        }
+
+        // 3. Run basket optimization (Option A split, Option B single-store)
+        List<BasketOptionDto> options = basketOptimizationService.computeBasketOptions(
+                offersByItemId, itemById, request.getPreferredStore()
+        );
+
+        // 4. Determine recommended option
+        BasketOptionDto recommended = null;
+        if (!options.isEmpty()) {
+            // Default recommended: Option B if difference is small, else Option A
+            BasketOptionDto optB = options.stream()
+                    .filter(o -> "OPTION_B_SINGLE_STORE".equals(o.getOptionType()))
+                    .findFirst().orElse(null);
+            BasketOptionDto optA = options.stream()
+                    .filter(o -> "OPTION_A_INDIVIDUAL_BEST".equals(o.getOptionType()))
+                    .findFirst().orElse(null);
+
+            if (optB != null && optA != null) {
+                BigDecimal diff = optB.getNetTotal().subtract(optA.getNetTotal());
+                recommended = diff.compareTo(BigDecimal.valueOf(50)) <= 0 ? optB : optA;
+            } else {
+                recommended = options.get(0);
+            }
+        }
+
+        return BasketComparisonResponse.builder()
+                .options(options)
+                .recommendedOption(recommended)
+                .duplicateWarnings(duplicateWarnings)
+                .calculatedAt(Instant.now())
                 .build();
+    }
 
-        // Build canonical ID for caching
+    private List<ProductOfferDto> fetchOffersForItem(ShoppingListItem shoppingItem, ShoppingItemSummary itemSummary) {
         String canonicalId = buildCanonicalId(itemSummary);
 
         // Check cache first
         List<ProductOfferDto> cachedOffers = cacheService.getCachedOffers(canonicalId);
         if (!cachedOffers.isEmpty()) {
-            return buildResponse(itemSummary, cachedOffers);
+            return cachedOffers;
         }
 
         // Build search request
@@ -77,16 +137,13 @@ public class PriceComparisonService {
                 .quantity(itemSummary.getQuantity())
                 .unit(itemSummary.getUnit())
                 .category(itemSummary.getCategoryName())
+                .barcode(shoppingItem.getBarcode())
                 .build();
 
-        // Fan out to all enabled providers in parallel
-        List<ShoppingProvider> enabledProviders = providers.stream()
-                .filter(ShoppingProvider::isEnabled)
-                .collect(Collectors.toList());
-
+        List<ShoppingProvider> enabledProviders = providerRegistry.getEnabledProviders();
         if (enabledProviders.isEmpty()) {
-            log.warn("[PriceComparison] No providers enabled");
-            return buildEmptyResponse(itemSummary);
+            log.warn("[PriceComparison] No shopping providers enabled");
+            return List.of();
         }
 
         ExecutorService executor = Executors.newFixedThreadPool(Math.min(enabledProviders.size(), 4));
@@ -107,46 +164,21 @@ public class PriceComparisonService {
             }));
         }
 
-        // Collect results with timeout
         List<ProductOfferDto> allOffers = new ArrayList<>();
-        Map<String, ProviderStatusDto> providerStatuses = new LinkedHashMap<>();
-
         for (Map.Entry<String, Future<ProviderResult>> entry : futures.entrySet()) {
-            String providerName = entry.getKey();
             try {
                 ProviderResult result = entry.getValue().get(providerTimeoutSeconds, TimeUnit.SECONDS);
                 allOffers.addAll(result.offers);
-                providerStatuses.put(providerName, ProviderStatusDto.builder()
-                        .provider(providerName)
-                        .status(result.status)
-                        .message(result.errorMessage)
-                        .offerCount(result.offers.size())
-                        .responseTimeMs(result.durationMs)
-                        .build());
             } catch (TimeoutException e) {
-                log.warn("[PriceComparison] Provider {} timed out after {}s", providerName, providerTimeoutSeconds);
+                log.warn("[PriceComparison] Provider {} timed out after {}s", entry.getKey(), providerTimeoutSeconds);
                 entry.getValue().cancel(true);
-                providerStatuses.put(providerName, ProviderStatusDto.builder()
-                        .provider(providerName)
-                        .status("TIMEOUT")
-                        .message("Provider response timed out")
-                        .offerCount(0)
-                        .responseTimeMs(providerTimeoutSeconds * 1000L)
-                        .build());
             } catch (Exception e) {
-                log.error("[PriceComparison] Error collecting results from {}: {}", providerName, e.getMessage());
-                providerStatuses.put(providerName, ProviderStatusDto.builder()
-                        .provider(providerName)
-                        .status("FAILED")
-                        .message(e.getMessage())
-                        .offerCount(0)
-                        .build());
+                log.error("[PriceComparison] Error from provider {}: {}", entry.getKey(), e.getMessage());
             }
         }
-
         executor.shutdown();
 
-        // Apply product matching
+        // Apply product matching & variant clash filtering
         List<ProductOfferDto> matchedOffers = allOffers.stream()
                 .map(offer -> {
                     ProductMatchingService.MatchResult match = matchingService.calculateMatch(
@@ -155,6 +187,7 @@ public class PriceComparisonService {
                             itemSummary.getQuantity(),
                             itemSummary.getUnit(),
                             itemSummary.getCategoryName(),
+                            shoppingItem.getBarcode(),
                             offer
                     );
                     matchingService.enrichWithMatch(offer, match);
@@ -174,23 +207,33 @@ public class PriceComparisonService {
 
                     return offer;
                 })
-                // Only include acceptable matches
                 .filter(offer -> offer.getMatchConfidence() != null && offer.getMatchConfidence() >= 0.5)
                 .collect(Collectors.toList());
 
-        // Cache the results
+        // Cache acceptable results
         if (!matchedOffers.isEmpty()) {
             cacheService.cacheOffers(canonicalId, matchedOffers);
         }
 
-        // Build response
-        PriceComparisonResponse response = buildResponse(itemSummary, matchedOffers);
-        response.setProviderStatuses(providerStatuses);
-        return response;
+        return matchedOffers;
+    }
+
+    private ShoppingItemSummary toSummary(ShoppingListItem shoppingItem) {
+        String brand = shoppingItem.getPreferredBrand();
+        if (brand == null && shoppingItem.getInventoryItem() != null) {
+            brand = shoppingItem.getInventoryItem().getBrand();
+        }
+        return ShoppingItemSummary.builder()
+                .id(shoppingItem.getId().toString())
+                .name(shoppingItem.getItemName())
+                .quantity(shoppingItem.getQuantity())
+                .unit(shoppingItem.getUnit())
+                .brand(brand)
+                .categoryName(shoppingItem.getCategory() != null ? shoppingItem.getCategory().getName() : null)
+                .build();
     }
 
     private PriceComparisonResponse buildResponse(ShoppingItemSummary item, List<ProductOfferDto> offers) {
-        // Sort by effective price (user value)
         offers.sort(Comparator.comparing(
                 o -> o.getEffectivePrice() != null ? o.getEffectivePrice() : BigDecimal.valueOf(Long.MAX_VALUE)));
 
@@ -200,16 +243,6 @@ public class PriceComparisonService {
                 .shoppingItem(item)
                 .offers(offers)
                 .bestOffer(bestOffer)
-                .lastUpdated(Instant.now())
-                .build();
-    }
-
-    private PriceComparisonResponse buildEmptyResponse(ShoppingItemSummary item) {
-        return PriceComparisonResponse.builder()
-                .shoppingItem(item)
-                .offers(List.of())
-                .bestOffer(null)
-                .providerStatuses(Map.of())
                 .lastUpdated(Instant.now())
                 .build();
     }

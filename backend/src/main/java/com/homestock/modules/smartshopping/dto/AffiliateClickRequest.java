@@ -26,4 +26,8 @@ public class AffiliateClickRequest {
 
     @NotBlank
     private String providerProductId;
+
+    private UUID sessionId;
+
+    private String sourceScreen;
 }

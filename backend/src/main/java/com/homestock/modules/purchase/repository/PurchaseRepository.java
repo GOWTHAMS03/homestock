@@ -18,6 +18,7 @@ import java.util.UUID;
 public interface PurchaseRepository extends JpaRepository<Purchase, UUID> {
     Page<Purchase> findAllByHomeIdOrderByPurchaseDateDescCreatedAtDesc(UUID homeId, Pageable pageable);
     Optional<Purchase> findByIdAndHomeId(UUID id, UUID homeId);
+    List<Purchase> findAllByHomeIdAndPurchaseDateBetween(UUID homeId, LocalDate startDate, LocalDate endDate);
 
     @Query("SELECT SUM(p.totalAmount) FROM Purchase p WHERE p.home.id = :homeId AND p.purchaseDate >= :startDate")
     BigDecimal calculateTotalSpendingSince(@Param("homeId") UUID homeId, @Param("startDate") LocalDate startDate);

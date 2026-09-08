@@ -4,6 +4,7 @@ import com.homestock.modules.smartshopping.dto.ProductOfferDto;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Abstraction for all shopping/affiliate providers.
@@ -17,7 +18,7 @@ import java.util.Optional;
 public interface ShoppingProvider {
 
     /**
-     * Unique provider identifier (e.g. "AMAZON", "FLIPKART", "MOCK").
+     * Unique provider identifier (e.g. "AMAZON", "FLIPKART", "MOCK", "LOCAL").
      */
     String getProviderName();
 
@@ -30,6 +31,12 @@ public interface ShoppingProvider {
      * Whether this provider is currently enabled and operational.
      */
     boolean isEnabled();
+
+    /**
+     * Declared capabilities for this provider.
+     * Capabilities are never assumed.
+     */
+    Set<ProviderCapability> getCapabilities();
 
     /**
      * Search for products matching the given request.
@@ -48,12 +55,25 @@ public interface ShoppingProvider {
     Optional<ProductOfferDto> getProduct(String providerProductId);
 
     /**
-     * Build an affiliate/deep link for the given product.
-     * The returned URL should include any affiliate tags, partner IDs, etc.
+     * Build an affiliate link for the given product.
+     * The returned URL includes any affiliate tags, partner IDs, etc.
      *
      * @param providerProductId the provider-specific product identifier
      * @param originalUrl       the original product URL
      * @return the affiliate-tagged URL
      */
     String buildAffiliateUrl(String providerProductId, String originalUrl);
+
+    /**
+     * Build a deep link directly opening the provider's mobile app if installed,
+     * falling back to the web affiliate URL.
+     *
+     * @param providerProductId the provider-specific product identifier
+     * @param fallbackUrl       the web affiliate URL fallback
+     * @return deep link URI scheme or fallback URL
+     */
+    default String buildDeepLink(String providerProductId, String fallbackUrl) {
+        return fallbackUrl;
+    }
 }
+

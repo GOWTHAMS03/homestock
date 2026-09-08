@@ -1,6 +1,6 @@
-com\homestock\HomeStockApplicationTests.class
-com\homestock\modules\sync\SyncServiceTest.class
 com\homestock\modules\smartshopping\UnitNormalizationServiceTest.class
 com\homestock\modules\smartshopping\ProductMatchingServiceTest.class
+com\homestock\HomeStockApplicationTests.class
+com\homestock\modules\sync\SyncServiceTest.class
 com\homestock\modules\smartshopping\MockProviderTest.class
 com\homestock\InventoryAndShoppingIntegrationTest.class

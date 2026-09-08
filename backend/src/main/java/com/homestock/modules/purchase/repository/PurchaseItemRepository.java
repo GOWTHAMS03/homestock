@@ -13,6 +13,8 @@ import java.util.UUID;
 public interface PurchaseItemRepository extends JpaRepository<PurchaseItem, UUID> {
     List<PurchaseItem> findAllByPurchaseId(UUID purchaseId);
 
+    List<PurchaseItem> findAllByInventoryItemId(UUID inventoryItemId);
+
     @Query("SELECT pi.itemName as name, COUNT(pi) as purchaseCount, SUM(pi.quantity) as totalQty " +
             "FROM PurchaseItem pi WHERE pi.purchase.home.id = :homeId " +
             "GROUP BY pi.itemName ORDER BY purchaseCount DESC")

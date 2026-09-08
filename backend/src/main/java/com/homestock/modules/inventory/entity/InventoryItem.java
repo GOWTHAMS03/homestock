@@ -77,6 +77,26 @@ public class InventoryItem extends BaseEntity {
     @Column(name = "is_archived", nullable = false)
     private Boolean isArchived = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quantity_status", length = 30)
+    private com.homestock.modules.consumption.entity.QuantityStatus quantityStatus;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quantity_source", length = 20)
+    private com.homestock.modules.consumption.entity.QuantitySource quantitySource = com.homestock.modules.consumption.entity.QuantitySource.VERIFIED;
+
+    @Column(name = "last_verified_at")
+    private java.time.Instant lastVerifiedAt;
+
+    @Column(name = "last_estimated_at")
+    private java.time.Instant lastEstimatedAt;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "confidence", length = 20)
+    private com.homestock.modules.consumption.entity.ConfidenceLevel confidence = com.homestock.modules.consumption.entity.ConfidenceLevel.HIGH;
+
     public StockStatus calculateStockStatus() {
         if (quantity.compareTo(BigDecimal.ZERO) == 0) {
             return StockStatus.OUT_OF_STOCK;

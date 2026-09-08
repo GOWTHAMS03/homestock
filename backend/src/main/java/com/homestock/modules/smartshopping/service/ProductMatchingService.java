@@ -70,6 +70,12 @@ public class ProductMatchingService {
             }
         }
 
+        // Variant clash protection: Never compare conflicting variants (Basmati vs Brown rice, Sunflower vs Mustard oil, Toned vs Full Cream milk)
+        if (hasVariantClash(itemName, offer.getProductName())) {
+            log.info("[ProductMatching] Strict variant clash: '{}' vs '{}'", itemName, offer.getProductName());
+            return new MatchResult(0.0, "NO_MATCH", false);
+        }
+
         double brandScore = scoreBrand(itemBrand, offer.getBrand());
         double nameScore = scoreName(itemName, offer.getProductName());
         double sizeScore = scoreSize(itemQuantity, itemUnit, offer.getPackageSize(), offer.getUnit());
@@ -265,6 +271,53 @@ public class ProductMatchingService {
         }
 
         return jaro + prefix * 0.1 * (1.0 - jaro);
+    }
+
+    // ──── Variant Clash Protection ────
+
+    private static final java.util.List<java.util.List<String>> MUTUALLY_EXCLUSIVE_VARIANT_GROUPS = java.util.List.of(
+            // Rice
+            java.util.List.of("basmati", "brown rice", "sona masoori", "ponni", "idli rice", "jasmine", "boiled rice", "raw rice", "jeera samba", "kolam"),
+            // Edible Oils
+            java.util.List.of("sunflower", "groundnut", "mustard", "olive", "sesame", "gingelly", "coconut", "palm oil", "rice bran", "canola"),
+            // Milk & Dairy
+            java.util.List.of("toned", "double toned", "full cream", "skimmed", "standardized", "cow milk", "buffalo milk"),
+            // Flour
+            java.util.List.of("whole wheat", "atta", "maida", "besan", "ragi", "rice flour", "sooji", "rava"),
+            // Sweeteners
+            java.util.List.of("white sugar", "brown sugar", "jaggery", "palm sugar", "honey"),
+            // Lentils / Pulses
+            java.util.List.of("toor dal", "moong dal", "urad dal", "chana dal", "masoor dal", "rajma", "chickpeas", "kabuli chana"),
+            // Salt
+            java.util.List.of("rock salt", "black salt", "sendha namak", "table salt", "pink salt")
+    );
+
+    private boolean hasVariantClash(String itemText, String offerText) {
+        if (itemText == null || offerText == null) return false;
+        String a = itemText.toLowerCase();
+        String b = offerText.toLowerCase();
+
+        for (java.util.List<String> group : MUTUALLY_EXCLUSIVE_VARIANT_GROUPS) {
+            String variantInA = null;
+            for (String variant : group) {
+                if (a.contains(variant)) {
+                    variantInA = variant;
+                    break;
+                }
+            }
+
+            if (variantInA != null) {
+                for (String variant : group) {
+                    if (b.contains(variant) && !variant.equals(variantInA)) {
+                        // Ensure one isn't just a substring of another (e.g., "toned" inside "double toned")
+                        if (!a.contains(variant)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     // ──── Result ────

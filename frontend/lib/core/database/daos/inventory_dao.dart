@@ -159,6 +159,59 @@ class InventoryDao {
     ));
   }
 
+  /// Update item qualitative status (e.g. About Half, More than half) in 2 taps.
+  Future<void> updateItemStatus(
+    String itemId,
+    String quantityStatus,
+    double newQuantity,
+    String newStockStatus,
+  ) {
+    return (_db.update(_db.localInventoryItems)
+          ..where((t) => t.id.equals(itemId)))
+        .write(LocalInventoryItemsCompanion(
+      quantityStatus: Value(quantityStatus),
+      quantity: Value(newQuantity),
+      quantitySource: const Value('VERIFIED'),
+      stockStatus: Value(newStockStatus),
+      lastVerifiedAt: Value(DateTime.now()),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Confirm exact item stock quantity.
+  Future<void> confirmItemQuantity(
+    String itemId,
+    double quantity,
+    String stockStatus,
+  ) {
+    return (_db.update(_db.localInventoryItems)
+          ..where((t) => t.id.equals(itemId)))
+        .write(LocalInventoryItemsCompanion(
+      quantity: Value(quantity),
+      quantitySource: const Value('VERIFIED'),
+      stockStatus: Value(stockStatus),
+      lastVerifiedAt: Value(DateTime.now()),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Watch consumption profiles for a home.
+  Stream<List<LocalConsumptionProfile>> watchConsumptionProfiles(String homeId) {
+    return (_db.select(_db.localConsumptionProfiles)
+          ..where((t) => t.homeId.equals(homeId)))
+        .watch();
+  }
+
+  /// Upsert consumption profiles in batch.
+  Future<void> upsertConsumptionProfiles(List<LocalConsumptionProfilesCompanion> profiles) {
+    return _db.batch((batch) {
+      for (final p in profiles) {
+        batch.insert(_db.localConsumptionProfiles, p,
+            onConflict: DoUpdate((_) => p));
+      }
+    });
+  }
+
   /// Soft delete an item locally.
   Future<void> softDeleteItem(String itemId) {
     return (_db.update(_db.localInventoryItems)

@@ -2302,6 +2302,86 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _quantityStatusMeta = const VerificationMeta(
+    'quantityStatus',
+  );
+  @override
+  late final GeneratedColumn<String> quantityStatus = GeneratedColumn<String>(
+    'quantity_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quantitySourceMeta = const VerificationMeta(
+    'quantitySource',
+  );
+  @override
+  late final GeneratedColumn<String> quantitySource = GeneratedColumn<String>(
+    'quantity_source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('VERIFIED'),
+  );
+  static const VerificationMeta _confidenceMeta = const VerificationMeta(
+    'confidence',
+  );
+  @override
+  late final GeneratedColumn<String> confidence = GeneratedColumn<String>(
+    'confidence',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('HIGH'),
+  );
+  static const VerificationMeta _estimatedDaysRemainingMeta =
+      const VerificationMeta('estimatedDaysRemaining');
+  @override
+  late final GeneratedColumn<int> estimatedDaysRemaining = GeneratedColumn<int>(
+    'estimated_days_remaining',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _estimatedDailyConsumptionMeta =
+      const VerificationMeta('estimatedDailyConsumption');
+  @override
+  late final GeneratedColumn<double> estimatedDailyConsumption =
+      GeneratedColumn<double>(
+        'estimated_daily_consumption',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastVerifiedAtMeta = const VerificationMeta(
+    'lastVerifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastVerifiedAt =
+      GeneratedColumn<DateTime>(
+        'last_verified_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _lastEstimatedAtMeta = const VerificationMeta(
+    'lastEstimatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastEstimatedAt =
+      GeneratedColumn<DateTime>(
+        'last_estimated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _isDeletedMeta = const VerificationMeta(
     'isDeleted',
   );
@@ -2368,6 +2448,13 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
     daysUntilExpiry,
     barcode,
     productId,
+    quantityStatus,
+    quantitySource,
+    confidence,
+    estimatedDaysRemaining,
+    estimatedDailyConsumption,
+    lastVerifiedAt,
+    lastEstimatedAt,
     isDeleted,
     isLocalOnly,
     updatedAt,
@@ -2558,6 +2645,66 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
         productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
       );
     }
+    if (data.containsKey('quantity_status')) {
+      context.handle(
+        _quantityStatusMeta,
+        quantityStatus.isAcceptableOrUnknown(
+          data['quantity_status']!,
+          _quantityStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quantity_source')) {
+      context.handle(
+        _quantitySourceMeta,
+        quantitySource.isAcceptableOrUnknown(
+          data['quantity_source']!,
+          _quantitySourceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('confidence')) {
+      context.handle(
+        _confidenceMeta,
+        confidence.isAcceptableOrUnknown(data['confidence']!, _confidenceMeta),
+      );
+    }
+    if (data.containsKey('estimated_days_remaining')) {
+      context.handle(
+        _estimatedDaysRemainingMeta,
+        estimatedDaysRemaining.isAcceptableOrUnknown(
+          data['estimated_days_remaining']!,
+          _estimatedDaysRemainingMeta,
+        ),
+      );
+    }
+    if (data.containsKey('estimated_daily_consumption')) {
+      context.handle(
+        _estimatedDailyConsumptionMeta,
+        estimatedDailyConsumption.isAcceptableOrUnknown(
+          data['estimated_daily_consumption']!,
+          _estimatedDailyConsumptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_verified_at')) {
+      context.handle(
+        _lastVerifiedAtMeta,
+        lastVerifiedAt.isAcceptableOrUnknown(
+          data['last_verified_at']!,
+          _lastVerifiedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_estimated_at')) {
+      context.handle(
+        _lastEstimatedAtMeta,
+        lastEstimatedAt.isAcceptableOrUnknown(
+          data['last_estimated_at']!,
+          _lastEstimatedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_deleted')) {
       context.handle(
         _isDeletedMeta,
@@ -2680,6 +2827,34 @@ class $LocalInventoryItemsTable extends LocalInventoryItems
         DriftSqlType.string,
         data['${effectivePrefix}product_id'],
       ),
+      quantityStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quantity_status'],
+      ),
+      quantitySource: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quantity_source'],
+      )!,
+      confidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}confidence'],
+      )!,
+      estimatedDaysRemaining: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}estimated_days_remaining'],
+      ),
+      estimatedDailyConsumption: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}estimated_daily_consumption'],
+      ),
+      lastVerifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_verified_at'],
+      ),
+      lastEstimatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_estimated_at'],
+      ),
       isDeleted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_deleted'],
@@ -2726,6 +2901,13 @@ class LocalInventoryItem extends DataClass
   final int? daysUntilExpiry;
   final String? barcode;
   final String? productId;
+  final String? quantityStatus;
+  final String quantitySource;
+  final String confidence;
+  final int? estimatedDaysRemaining;
+  final double? estimatedDailyConsumption;
+  final DateTime? lastVerifiedAt;
+  final DateTime? lastEstimatedAt;
   final bool isDeleted;
 
   /// True if this item was created locally and hasn't been synced yet
@@ -2755,6 +2937,13 @@ class LocalInventoryItem extends DataClass
     this.daysUntilExpiry,
     this.barcode,
     this.productId,
+    this.quantityStatus,
+    required this.quantitySource,
+    required this.confidence,
+    this.estimatedDaysRemaining,
+    this.estimatedDailyConsumption,
+    this.lastVerifiedAt,
+    this.lastEstimatedAt,
     required this.isDeleted,
     required this.isLocalOnly,
     this.updatedAt,
@@ -2808,6 +2997,25 @@ class LocalInventoryItem extends DataClass
     }
     if (!nullToAbsent || productId != null) {
       map['product_id'] = Variable<String>(productId);
+    }
+    if (!nullToAbsent || quantityStatus != null) {
+      map['quantity_status'] = Variable<String>(quantityStatus);
+    }
+    map['quantity_source'] = Variable<String>(quantitySource);
+    map['confidence'] = Variable<String>(confidence);
+    if (!nullToAbsent || estimatedDaysRemaining != null) {
+      map['estimated_days_remaining'] = Variable<int>(estimatedDaysRemaining);
+    }
+    if (!nullToAbsent || estimatedDailyConsumption != null) {
+      map['estimated_daily_consumption'] = Variable<double>(
+        estimatedDailyConsumption,
+      );
+    }
+    if (!nullToAbsent || lastVerifiedAt != null) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
+    }
+    if (!nullToAbsent || lastEstimatedAt != null) {
+      map['last_estimated_at'] = Variable<DateTime>(lastEstimatedAt);
     }
     map['is_deleted'] = Variable<bool>(isDeleted);
     map['is_local_only'] = Variable<bool>(isLocalOnly);
@@ -2866,6 +3074,24 @@ class LocalInventoryItem extends DataClass
       productId: productId == null && nullToAbsent
           ? const Value.absent()
           : Value(productId),
+      quantityStatus: quantityStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quantityStatus),
+      quantitySource: Value(quantitySource),
+      confidence: Value(confidence),
+      estimatedDaysRemaining: estimatedDaysRemaining == null && nullToAbsent
+          ? const Value.absent()
+          : Value(estimatedDaysRemaining),
+      estimatedDailyConsumption:
+          estimatedDailyConsumption == null && nullToAbsent
+          ? const Value.absent()
+          : Value(estimatedDailyConsumption),
+      lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastVerifiedAt),
+      lastEstimatedAt: lastEstimatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastEstimatedAt),
       isDeleted: Value(isDeleted),
       isLocalOnly: Value(isLocalOnly),
       updatedAt: updatedAt == null && nullToAbsent
@@ -2903,6 +3129,17 @@ class LocalInventoryItem extends DataClass
       daysUntilExpiry: serializer.fromJson<int?>(json['daysUntilExpiry']),
       barcode: serializer.fromJson<String?>(json['barcode']),
       productId: serializer.fromJson<String?>(json['productId']),
+      quantityStatus: serializer.fromJson<String?>(json['quantityStatus']),
+      quantitySource: serializer.fromJson<String>(json['quantitySource']),
+      confidence: serializer.fromJson<String>(json['confidence']),
+      estimatedDaysRemaining: serializer.fromJson<int?>(
+        json['estimatedDaysRemaining'],
+      ),
+      estimatedDailyConsumption: serializer.fromJson<double?>(
+        json['estimatedDailyConsumption'],
+      ),
+      lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
+      lastEstimatedAt: serializer.fromJson<DateTime?>(json['lastEstimatedAt']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       isLocalOnly: serializer.fromJson<bool>(json['isLocalOnly']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
@@ -2935,6 +3172,15 @@ class LocalInventoryItem extends DataClass
       'daysUntilExpiry': serializer.toJson<int?>(daysUntilExpiry),
       'barcode': serializer.toJson<String?>(barcode),
       'productId': serializer.toJson<String?>(productId),
+      'quantityStatus': serializer.toJson<String?>(quantityStatus),
+      'quantitySource': serializer.toJson<String>(quantitySource),
+      'confidence': serializer.toJson<String>(confidence),
+      'estimatedDaysRemaining': serializer.toJson<int?>(estimatedDaysRemaining),
+      'estimatedDailyConsumption': serializer.toJson<double?>(
+        estimatedDailyConsumption,
+      ),
+      'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
+      'lastEstimatedAt': serializer.toJson<DateTime?>(lastEstimatedAt),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'isLocalOnly': serializer.toJson<bool>(isLocalOnly),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
@@ -2965,6 +3211,13 @@ class LocalInventoryItem extends DataClass
     Value<int?> daysUntilExpiry = const Value.absent(),
     Value<String?> barcode = const Value.absent(),
     Value<String?> productId = const Value.absent(),
+    Value<String?> quantityStatus = const Value.absent(),
+    String? quantitySource,
+    String? confidence,
+    Value<int?> estimatedDaysRemaining = const Value.absent(),
+    Value<double?> estimatedDailyConsumption = const Value.absent(),
+    Value<DateTime?> lastVerifiedAt = const Value.absent(),
+    Value<DateTime?> lastEstimatedAt = const Value.absent(),
     bool? isDeleted,
     bool? isLocalOnly,
     Value<DateTime?> updatedAt = const Value.absent(),
@@ -3000,6 +3253,23 @@ class LocalInventoryItem extends DataClass
         : this.daysUntilExpiry,
     barcode: barcode.present ? barcode.value : this.barcode,
     productId: productId.present ? productId.value : this.productId,
+    quantityStatus: quantityStatus.present
+        ? quantityStatus.value
+        : this.quantityStatus,
+    quantitySource: quantitySource ?? this.quantitySource,
+    confidence: confidence ?? this.confidence,
+    estimatedDaysRemaining: estimatedDaysRemaining.present
+        ? estimatedDaysRemaining.value
+        : this.estimatedDaysRemaining,
+    estimatedDailyConsumption: estimatedDailyConsumption.present
+        ? estimatedDailyConsumption.value
+        : this.estimatedDailyConsumption,
+    lastVerifiedAt: lastVerifiedAt.present
+        ? lastVerifiedAt.value
+        : this.lastVerifiedAt,
+    lastEstimatedAt: lastEstimatedAt.present
+        ? lastEstimatedAt.value
+        : this.lastEstimatedAt,
     isDeleted: isDeleted ?? this.isDeleted,
     isLocalOnly: isLocalOnly ?? this.isLocalOnly,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
@@ -3055,6 +3325,27 @@ class LocalInventoryItem extends DataClass
           : this.daysUntilExpiry,
       barcode: data.barcode.present ? data.barcode.value : this.barcode,
       productId: data.productId.present ? data.productId.value : this.productId,
+      quantityStatus: data.quantityStatus.present
+          ? data.quantityStatus.value
+          : this.quantityStatus,
+      quantitySource: data.quantitySource.present
+          ? data.quantitySource.value
+          : this.quantitySource,
+      confidence: data.confidence.present
+          ? data.confidence.value
+          : this.confidence,
+      estimatedDaysRemaining: data.estimatedDaysRemaining.present
+          ? data.estimatedDaysRemaining.value
+          : this.estimatedDaysRemaining,
+      estimatedDailyConsumption: data.estimatedDailyConsumption.present
+          ? data.estimatedDailyConsumption.value
+          : this.estimatedDailyConsumption,
+      lastVerifiedAt: data.lastVerifiedAt.present
+          ? data.lastVerifiedAt.value
+          : this.lastVerifiedAt,
+      lastEstimatedAt: data.lastEstimatedAt.present
+          ? data.lastEstimatedAt.value
+          : this.lastEstimatedAt,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
       isLocalOnly: data.isLocalOnly.present
           ? data.isLocalOnly.value
@@ -3089,6 +3380,13 @@ class LocalInventoryItem extends DataClass
           ..write('daysUntilExpiry: $daysUntilExpiry, ')
           ..write('barcode: $barcode, ')
           ..write('productId: $productId, ')
+          ..write('quantityStatus: $quantityStatus, ')
+          ..write('quantitySource: $quantitySource, ')
+          ..write('confidence: $confidence, ')
+          ..write('estimatedDaysRemaining: $estimatedDaysRemaining, ')
+          ..write('estimatedDailyConsumption: $estimatedDailyConsumption, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('lastEstimatedAt: $lastEstimatedAt, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('isLocalOnly: $isLocalOnly, ')
           ..write('updatedAt: $updatedAt')
@@ -3121,6 +3419,13 @@ class LocalInventoryItem extends DataClass
     daysUntilExpiry,
     barcode,
     productId,
+    quantityStatus,
+    quantitySource,
+    confidence,
+    estimatedDaysRemaining,
+    estimatedDailyConsumption,
+    lastVerifiedAt,
+    lastEstimatedAt,
     isDeleted,
     isLocalOnly,
     updatedAt,
@@ -3152,6 +3457,13 @@ class LocalInventoryItem extends DataClass
           other.daysUntilExpiry == this.daysUntilExpiry &&
           other.barcode == this.barcode &&
           other.productId == this.productId &&
+          other.quantityStatus == this.quantityStatus &&
+          other.quantitySource == this.quantitySource &&
+          other.confidence == this.confidence &&
+          other.estimatedDaysRemaining == this.estimatedDaysRemaining &&
+          other.estimatedDailyConsumption == this.estimatedDailyConsumption &&
+          other.lastVerifiedAt == this.lastVerifiedAt &&
+          other.lastEstimatedAt == this.lastEstimatedAt &&
           other.isDeleted == this.isDeleted &&
           other.isLocalOnly == this.isLocalOnly &&
           other.updatedAt == this.updatedAt);
@@ -3181,6 +3493,13 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
   final Value<int?> daysUntilExpiry;
   final Value<String?> barcode;
   final Value<String?> productId;
+  final Value<String?> quantityStatus;
+  final Value<String> quantitySource;
+  final Value<String> confidence;
+  final Value<int?> estimatedDaysRemaining;
+  final Value<double?> estimatedDailyConsumption;
+  final Value<DateTime?> lastVerifiedAt;
+  final Value<DateTime?> lastEstimatedAt;
   final Value<bool> isDeleted;
   final Value<bool> isLocalOnly;
   final Value<DateTime?> updatedAt;
@@ -3209,6 +3528,13 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     this.daysUntilExpiry = const Value.absent(),
     this.barcode = const Value.absent(),
     this.productId = const Value.absent(),
+    this.quantityStatus = const Value.absent(),
+    this.quantitySource = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.estimatedDaysRemaining = const Value.absent(),
+    this.estimatedDailyConsumption = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.lastEstimatedAt = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.isLocalOnly = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3238,6 +3564,13 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     this.daysUntilExpiry = const Value.absent(),
     this.barcode = const Value.absent(),
     this.productId = const Value.absent(),
+    this.quantityStatus = const Value.absent(),
+    this.quantitySource = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.estimatedDaysRemaining = const Value.absent(),
+    this.estimatedDailyConsumption = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.lastEstimatedAt = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.isLocalOnly = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3269,6 +3602,13 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     Expression<int>? daysUntilExpiry,
     Expression<String>? barcode,
     Expression<String>? productId,
+    Expression<String>? quantityStatus,
+    Expression<String>? quantitySource,
+    Expression<String>? confidence,
+    Expression<int>? estimatedDaysRemaining,
+    Expression<double>? estimatedDailyConsumption,
+    Expression<DateTime>? lastVerifiedAt,
+    Expression<DateTime>? lastEstimatedAt,
     Expression<bool>? isDeleted,
     Expression<bool>? isLocalOnly,
     Expression<DateTime>? updatedAt,
@@ -3298,6 +3638,15 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
       if (daysUntilExpiry != null) 'days_until_expiry': daysUntilExpiry,
       if (barcode != null) 'barcode': barcode,
       if (productId != null) 'product_id': productId,
+      if (quantityStatus != null) 'quantity_status': quantityStatus,
+      if (quantitySource != null) 'quantity_source': quantitySource,
+      if (confidence != null) 'confidence': confidence,
+      if (estimatedDaysRemaining != null)
+        'estimated_days_remaining': estimatedDaysRemaining,
+      if (estimatedDailyConsumption != null)
+        'estimated_daily_consumption': estimatedDailyConsumption,
+      if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
+      if (lastEstimatedAt != null) 'last_estimated_at': lastEstimatedAt,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (isLocalOnly != null) 'is_local_only': isLocalOnly,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -3329,6 +3678,13 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     Value<int?>? daysUntilExpiry,
     Value<String?>? barcode,
     Value<String?>? productId,
+    Value<String?>? quantityStatus,
+    Value<String>? quantitySource,
+    Value<String>? confidence,
+    Value<int?>? estimatedDaysRemaining,
+    Value<double?>? estimatedDailyConsumption,
+    Value<DateTime?>? lastVerifiedAt,
+    Value<DateTime?>? lastEstimatedAt,
     Value<bool>? isDeleted,
     Value<bool>? isLocalOnly,
     Value<DateTime?>? updatedAt,
@@ -3358,6 +3714,15 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
       daysUntilExpiry: daysUntilExpiry ?? this.daysUntilExpiry,
       barcode: barcode ?? this.barcode,
       productId: productId ?? this.productId,
+      quantityStatus: quantityStatus ?? this.quantityStatus,
+      quantitySource: quantitySource ?? this.quantitySource,
+      confidence: confidence ?? this.confidence,
+      estimatedDaysRemaining:
+          estimatedDaysRemaining ?? this.estimatedDaysRemaining,
+      estimatedDailyConsumption:
+          estimatedDailyConsumption ?? this.estimatedDailyConsumption,
+      lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
+      lastEstimatedAt: lastEstimatedAt ?? this.lastEstimatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
       isLocalOnly: isLocalOnly ?? this.isLocalOnly,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -3437,6 +3802,31 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
     if (productId.present) {
       map['product_id'] = Variable<String>(productId.value);
     }
+    if (quantityStatus.present) {
+      map['quantity_status'] = Variable<String>(quantityStatus.value);
+    }
+    if (quantitySource.present) {
+      map['quantity_source'] = Variable<String>(quantitySource.value);
+    }
+    if (confidence.present) {
+      map['confidence'] = Variable<String>(confidence.value);
+    }
+    if (estimatedDaysRemaining.present) {
+      map['estimated_days_remaining'] = Variable<int>(
+        estimatedDaysRemaining.value,
+      );
+    }
+    if (estimatedDailyConsumption.present) {
+      map['estimated_daily_consumption'] = Variable<double>(
+        estimatedDailyConsumption.value,
+      );
+    }
+    if (lastVerifiedAt.present) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
+    }
+    if (lastEstimatedAt.present) {
+      map['last_estimated_at'] = Variable<DateTime>(lastEstimatedAt.value);
+    }
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
@@ -3478,6 +3868,13 @@ class LocalInventoryItemsCompanion extends UpdateCompanion<LocalInventoryItem> {
           ..write('daysUntilExpiry: $daysUntilExpiry, ')
           ..write('barcode: $barcode, ')
           ..write('productId: $productId, ')
+          ..write('quantityStatus: $quantityStatus, ')
+          ..write('quantitySource: $quantitySource, ')
+          ..write('confidence: $confidence, ')
+          ..write('estimatedDaysRemaining: $estimatedDaysRemaining, ')
+          ..write('estimatedDailyConsumption: $estimatedDailyConsumption, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('lastEstimatedAt: $lastEstimatedAt, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('isLocalOnly: $isLocalOnly, ')
           ..write('updatedAt: $updatedAt, ')
@@ -10644,6 +11041,674 @@ class LocalProductsCompanion extends UpdateCompanion<LocalProduct> {
   }
 }
 
+class $LocalConsumptionProfilesTable extends LocalConsumptionProfiles
+    with TableInfo<$LocalConsumptionProfilesTable, LocalConsumptionProfile> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalConsumptionProfilesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _homeIdMeta = const VerificationMeta('homeId');
+  @override
+  late final GeneratedColumn<String> homeId = GeneratedColumn<String>(
+    'home_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _inventoryItemIdMeta = const VerificationMeta(
+    'inventoryItemId',
+  );
+  @override
+  late final GeneratedColumn<String> inventoryItemId = GeneratedColumn<String>(
+    'inventory_item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _itemNameMeta = const VerificationMeta(
+    'itemName',
+  );
+  @override
+  late final GeneratedColumn<String> itemName = GeneratedColumn<String>(
+    'item_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _averageDailyConsumptionMeta =
+      const VerificationMeta('averageDailyConsumption');
+  @override
+  late final GeneratedColumn<double> averageDailyConsumption =
+      GeneratedColumn<double>(
+        'average_daily_consumption',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0.0),
+      );
+  static const VerificationMeta _weightedDailyConsumptionMeta =
+      const VerificationMeta('weightedDailyConsumption');
+  @override
+  late final GeneratedColumn<double> weightedDailyConsumption =
+      GeneratedColumn<double>(
+        'weighted_daily_consumption',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0.0),
+      );
+  static const VerificationMeta _typicalIntervalDaysMeta =
+      const VerificationMeta('typicalIntervalDays');
+  @override
+  late final GeneratedColumn<double> typicalIntervalDays =
+      GeneratedColumn<double>(
+        'typical_interval_days',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(7.0),
+      );
+  static const VerificationMeta _confidenceMeta = const VerificationMeta(
+    'confidence',
+  );
+  @override
+  late final GeneratedColumn<String> confidence = GeneratedColumn<String>(
+    'confidence',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('LOW'),
+  );
+  static const VerificationMeta _estimatedDaysRemainingMeta =
+      const VerificationMeta('estimatedDaysRemaining');
+  @override
+  late final GeneratedColumn<int> estimatedDaysRemaining = GeneratedColumn<int>(
+    'estimated_days_remaining',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    homeId,
+    inventoryItemId,
+    itemName,
+    averageDailyConsumption,
+    weightedDailyConsumption,
+    typicalIntervalDays,
+    confidence,
+    estimatedDaysRemaining,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_consumption_profiles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalConsumptionProfile> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('home_id')) {
+      context.handle(
+        _homeIdMeta,
+        homeId.isAcceptableOrUnknown(data['home_id']!, _homeIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_homeIdMeta);
+    }
+    if (data.containsKey('inventory_item_id')) {
+      context.handle(
+        _inventoryItemIdMeta,
+        inventoryItemId.isAcceptableOrUnknown(
+          data['inventory_item_id']!,
+          _inventoryItemIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_inventoryItemIdMeta);
+    }
+    if (data.containsKey('item_name')) {
+      context.handle(
+        _itemNameMeta,
+        itemName.isAcceptableOrUnknown(data['item_name']!, _itemNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemNameMeta);
+    }
+    if (data.containsKey('average_daily_consumption')) {
+      context.handle(
+        _averageDailyConsumptionMeta,
+        averageDailyConsumption.isAcceptableOrUnknown(
+          data['average_daily_consumption']!,
+          _averageDailyConsumptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('weighted_daily_consumption')) {
+      context.handle(
+        _weightedDailyConsumptionMeta,
+        weightedDailyConsumption.isAcceptableOrUnknown(
+          data['weighted_daily_consumption']!,
+          _weightedDailyConsumptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('typical_interval_days')) {
+      context.handle(
+        _typicalIntervalDaysMeta,
+        typicalIntervalDays.isAcceptableOrUnknown(
+          data['typical_interval_days']!,
+          _typicalIntervalDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('confidence')) {
+      context.handle(
+        _confidenceMeta,
+        confidence.isAcceptableOrUnknown(data['confidence']!, _confidenceMeta),
+      );
+    }
+    if (data.containsKey('estimated_days_remaining')) {
+      context.handle(
+        _estimatedDaysRemainingMeta,
+        estimatedDaysRemaining.isAcceptableOrUnknown(
+          data['estimated_days_remaining']!,
+          _estimatedDaysRemainingMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalConsumptionProfile map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalConsumptionProfile(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      homeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}home_id'],
+      )!,
+      inventoryItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}inventory_item_id'],
+      )!,
+      itemName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_name'],
+      )!,
+      averageDailyConsumption: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}average_daily_consumption'],
+      )!,
+      weightedDailyConsumption: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}weighted_daily_consumption'],
+      )!,
+      typicalIntervalDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}typical_interval_days'],
+      )!,
+      confidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}confidence'],
+      )!,
+      estimatedDaysRemaining: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}estimated_days_remaining'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $LocalConsumptionProfilesTable createAlias(String alias) {
+    return $LocalConsumptionProfilesTable(attachedDatabase, alias);
+  }
+}
+
+class LocalConsumptionProfile extends DataClass
+    implements Insertable<LocalConsumptionProfile> {
+  final String id;
+  final String homeId;
+  final String inventoryItemId;
+  final String itemName;
+  final double averageDailyConsumption;
+  final double weightedDailyConsumption;
+  final double typicalIntervalDays;
+  final String confidence;
+  final int? estimatedDaysRemaining;
+  final DateTime? updatedAt;
+  const LocalConsumptionProfile({
+    required this.id,
+    required this.homeId,
+    required this.inventoryItemId,
+    required this.itemName,
+    required this.averageDailyConsumption,
+    required this.weightedDailyConsumption,
+    required this.typicalIntervalDays,
+    required this.confidence,
+    this.estimatedDaysRemaining,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['home_id'] = Variable<String>(homeId);
+    map['inventory_item_id'] = Variable<String>(inventoryItemId);
+    map['item_name'] = Variable<String>(itemName);
+    map['average_daily_consumption'] = Variable<double>(
+      averageDailyConsumption,
+    );
+    map['weighted_daily_consumption'] = Variable<double>(
+      weightedDailyConsumption,
+    );
+    map['typical_interval_days'] = Variable<double>(typicalIntervalDays);
+    map['confidence'] = Variable<String>(confidence);
+    if (!nullToAbsent || estimatedDaysRemaining != null) {
+      map['estimated_days_remaining'] = Variable<int>(estimatedDaysRemaining);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  LocalConsumptionProfilesCompanion toCompanion(bool nullToAbsent) {
+    return LocalConsumptionProfilesCompanion(
+      id: Value(id),
+      homeId: Value(homeId),
+      inventoryItemId: Value(inventoryItemId),
+      itemName: Value(itemName),
+      averageDailyConsumption: Value(averageDailyConsumption),
+      weightedDailyConsumption: Value(weightedDailyConsumption),
+      typicalIntervalDays: Value(typicalIntervalDays),
+      confidence: Value(confidence),
+      estimatedDaysRemaining: estimatedDaysRemaining == null && nullToAbsent
+          ? const Value.absent()
+          : Value(estimatedDaysRemaining),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory LocalConsumptionProfile.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalConsumptionProfile(
+      id: serializer.fromJson<String>(json['id']),
+      homeId: serializer.fromJson<String>(json['homeId']),
+      inventoryItemId: serializer.fromJson<String>(json['inventoryItemId']),
+      itemName: serializer.fromJson<String>(json['itemName']),
+      averageDailyConsumption: serializer.fromJson<double>(
+        json['averageDailyConsumption'],
+      ),
+      weightedDailyConsumption: serializer.fromJson<double>(
+        json['weightedDailyConsumption'],
+      ),
+      typicalIntervalDays: serializer.fromJson<double>(
+        json['typicalIntervalDays'],
+      ),
+      confidence: serializer.fromJson<String>(json['confidence']),
+      estimatedDaysRemaining: serializer.fromJson<int?>(
+        json['estimatedDaysRemaining'],
+      ),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'homeId': serializer.toJson<String>(homeId),
+      'inventoryItemId': serializer.toJson<String>(inventoryItemId),
+      'itemName': serializer.toJson<String>(itemName),
+      'averageDailyConsumption': serializer.toJson<double>(
+        averageDailyConsumption,
+      ),
+      'weightedDailyConsumption': serializer.toJson<double>(
+        weightedDailyConsumption,
+      ),
+      'typicalIntervalDays': serializer.toJson<double>(typicalIntervalDays),
+      'confidence': serializer.toJson<String>(confidence),
+      'estimatedDaysRemaining': serializer.toJson<int?>(estimatedDaysRemaining),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  LocalConsumptionProfile copyWith({
+    String? id,
+    String? homeId,
+    String? inventoryItemId,
+    String? itemName,
+    double? averageDailyConsumption,
+    double? weightedDailyConsumption,
+    double? typicalIntervalDays,
+    String? confidence,
+    Value<int?> estimatedDaysRemaining = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => LocalConsumptionProfile(
+    id: id ?? this.id,
+    homeId: homeId ?? this.homeId,
+    inventoryItemId: inventoryItemId ?? this.inventoryItemId,
+    itemName: itemName ?? this.itemName,
+    averageDailyConsumption:
+        averageDailyConsumption ?? this.averageDailyConsumption,
+    weightedDailyConsumption:
+        weightedDailyConsumption ?? this.weightedDailyConsumption,
+    typicalIntervalDays: typicalIntervalDays ?? this.typicalIntervalDays,
+    confidence: confidence ?? this.confidence,
+    estimatedDaysRemaining: estimatedDaysRemaining.present
+        ? estimatedDaysRemaining.value
+        : this.estimatedDaysRemaining,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  LocalConsumptionProfile copyWithCompanion(
+    LocalConsumptionProfilesCompanion data,
+  ) {
+    return LocalConsumptionProfile(
+      id: data.id.present ? data.id.value : this.id,
+      homeId: data.homeId.present ? data.homeId.value : this.homeId,
+      inventoryItemId: data.inventoryItemId.present
+          ? data.inventoryItemId.value
+          : this.inventoryItemId,
+      itemName: data.itemName.present ? data.itemName.value : this.itemName,
+      averageDailyConsumption: data.averageDailyConsumption.present
+          ? data.averageDailyConsumption.value
+          : this.averageDailyConsumption,
+      weightedDailyConsumption: data.weightedDailyConsumption.present
+          ? data.weightedDailyConsumption.value
+          : this.weightedDailyConsumption,
+      typicalIntervalDays: data.typicalIntervalDays.present
+          ? data.typicalIntervalDays.value
+          : this.typicalIntervalDays,
+      confidence: data.confidence.present
+          ? data.confidence.value
+          : this.confidence,
+      estimatedDaysRemaining: data.estimatedDaysRemaining.present
+          ? data.estimatedDaysRemaining.value
+          : this.estimatedDaysRemaining,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalConsumptionProfile(')
+          ..write('id: $id, ')
+          ..write('homeId: $homeId, ')
+          ..write('inventoryItemId: $inventoryItemId, ')
+          ..write('itemName: $itemName, ')
+          ..write('averageDailyConsumption: $averageDailyConsumption, ')
+          ..write('weightedDailyConsumption: $weightedDailyConsumption, ')
+          ..write('typicalIntervalDays: $typicalIntervalDays, ')
+          ..write('confidence: $confidence, ')
+          ..write('estimatedDaysRemaining: $estimatedDaysRemaining, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    homeId,
+    inventoryItemId,
+    itemName,
+    averageDailyConsumption,
+    weightedDailyConsumption,
+    typicalIntervalDays,
+    confidence,
+    estimatedDaysRemaining,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalConsumptionProfile &&
+          other.id == this.id &&
+          other.homeId == this.homeId &&
+          other.inventoryItemId == this.inventoryItemId &&
+          other.itemName == this.itemName &&
+          other.averageDailyConsumption == this.averageDailyConsumption &&
+          other.weightedDailyConsumption == this.weightedDailyConsumption &&
+          other.typicalIntervalDays == this.typicalIntervalDays &&
+          other.confidence == this.confidence &&
+          other.estimatedDaysRemaining == this.estimatedDaysRemaining &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalConsumptionProfilesCompanion
+    extends UpdateCompanion<LocalConsumptionProfile> {
+  final Value<String> id;
+  final Value<String> homeId;
+  final Value<String> inventoryItemId;
+  final Value<String> itemName;
+  final Value<double> averageDailyConsumption;
+  final Value<double> weightedDailyConsumption;
+  final Value<double> typicalIntervalDays;
+  final Value<String> confidence;
+  final Value<int?> estimatedDaysRemaining;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const LocalConsumptionProfilesCompanion({
+    this.id = const Value.absent(),
+    this.homeId = const Value.absent(),
+    this.inventoryItemId = const Value.absent(),
+    this.itemName = const Value.absent(),
+    this.averageDailyConsumption = const Value.absent(),
+    this.weightedDailyConsumption = const Value.absent(),
+    this.typicalIntervalDays = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.estimatedDaysRemaining = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalConsumptionProfilesCompanion.insert({
+    required String id,
+    required String homeId,
+    required String inventoryItemId,
+    required String itemName,
+    this.averageDailyConsumption = const Value.absent(),
+    this.weightedDailyConsumption = const Value.absent(),
+    this.typicalIntervalDays = const Value.absent(),
+    this.confidence = const Value.absent(),
+    this.estimatedDaysRemaining = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       homeId = Value(homeId),
+       inventoryItemId = Value(inventoryItemId),
+       itemName = Value(itemName);
+  static Insertable<LocalConsumptionProfile> custom({
+    Expression<String>? id,
+    Expression<String>? homeId,
+    Expression<String>? inventoryItemId,
+    Expression<String>? itemName,
+    Expression<double>? averageDailyConsumption,
+    Expression<double>? weightedDailyConsumption,
+    Expression<double>? typicalIntervalDays,
+    Expression<String>? confidence,
+    Expression<int>? estimatedDaysRemaining,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (homeId != null) 'home_id': homeId,
+      if (inventoryItemId != null) 'inventory_item_id': inventoryItemId,
+      if (itemName != null) 'item_name': itemName,
+      if (averageDailyConsumption != null)
+        'average_daily_consumption': averageDailyConsumption,
+      if (weightedDailyConsumption != null)
+        'weighted_daily_consumption': weightedDailyConsumption,
+      if (typicalIntervalDays != null)
+        'typical_interval_days': typicalIntervalDays,
+      if (confidence != null) 'confidence': confidence,
+      if (estimatedDaysRemaining != null)
+        'estimated_days_remaining': estimatedDaysRemaining,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalConsumptionProfilesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? homeId,
+    Value<String>? inventoryItemId,
+    Value<String>? itemName,
+    Value<double>? averageDailyConsumption,
+    Value<double>? weightedDailyConsumption,
+    Value<double>? typicalIntervalDays,
+    Value<String>? confidence,
+    Value<int?>? estimatedDaysRemaining,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalConsumptionProfilesCompanion(
+      id: id ?? this.id,
+      homeId: homeId ?? this.homeId,
+      inventoryItemId: inventoryItemId ?? this.inventoryItemId,
+      itemName: itemName ?? this.itemName,
+      averageDailyConsumption:
+          averageDailyConsumption ?? this.averageDailyConsumption,
+      weightedDailyConsumption:
+          weightedDailyConsumption ?? this.weightedDailyConsumption,
+      typicalIntervalDays: typicalIntervalDays ?? this.typicalIntervalDays,
+      confidence: confidence ?? this.confidence,
+      estimatedDaysRemaining:
+          estimatedDaysRemaining ?? this.estimatedDaysRemaining,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (homeId.present) {
+      map['home_id'] = Variable<String>(homeId.value);
+    }
+    if (inventoryItemId.present) {
+      map['inventory_item_id'] = Variable<String>(inventoryItemId.value);
+    }
+    if (itemName.present) {
+      map['item_name'] = Variable<String>(itemName.value);
+    }
+    if (averageDailyConsumption.present) {
+      map['average_daily_consumption'] = Variable<double>(
+        averageDailyConsumption.value,
+      );
+    }
+    if (weightedDailyConsumption.present) {
+      map['weighted_daily_consumption'] = Variable<double>(
+        weightedDailyConsumption.value,
+      );
+    }
+    if (typicalIntervalDays.present) {
+      map['typical_interval_days'] = Variable<double>(
+        typicalIntervalDays.value,
+      );
+    }
+    if (confidence.present) {
+      map['confidence'] = Variable<String>(confidence.value);
+    }
+    if (estimatedDaysRemaining.present) {
+      map['estimated_days_remaining'] = Variable<int>(
+        estimatedDaysRemaining.value,
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalConsumptionProfilesCompanion(')
+          ..write('id: $id, ')
+          ..write('homeId: $homeId, ')
+          ..write('inventoryItemId: $inventoryItemId, ')
+          ..write('itemName: $itemName, ')
+          ..write('averageDailyConsumption: $averageDailyConsumption, ')
+          ..write('weightedDailyConsumption: $weightedDailyConsumption, ')
+          ..write('typicalIntervalDays: $typicalIntervalDays, ')
+          ..write('confidence: $confidence, ')
+          ..write('estimatedDaysRemaining: $estimatedDaysRemaining, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -10677,6 +11742,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $LocalProductOffersTable localProductOffers =
       $LocalProductOffersTable(this);
   late final $LocalProductsTable localProducts = $LocalProductsTable(this);
+  late final $LocalConsumptionProfilesTable localConsumptionProfiles =
+      $LocalConsumptionProfilesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -10698,6 +11765,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncMetadataEntries,
     localProductOffers,
     localProducts,
+    localConsumptionProfiles,
   ];
 }
 
@@ -11764,6 +12832,13 @@ typedef $$LocalInventoryItemsTableCreateCompanionBuilder =
       Value<int?> daysUntilExpiry,
       Value<String?> barcode,
       Value<String?> productId,
+      Value<String?> quantityStatus,
+      Value<String> quantitySource,
+      Value<String> confidence,
+      Value<int?> estimatedDaysRemaining,
+      Value<double?> estimatedDailyConsumption,
+      Value<DateTime?> lastVerifiedAt,
+      Value<DateTime?> lastEstimatedAt,
       Value<bool> isDeleted,
       Value<bool> isLocalOnly,
       Value<DateTime?> updatedAt,
@@ -11794,6 +12869,13 @@ typedef $$LocalInventoryItemsTableUpdateCompanionBuilder =
       Value<int?> daysUntilExpiry,
       Value<String?> barcode,
       Value<String?> productId,
+      Value<String?> quantityStatus,
+      Value<String> quantitySource,
+      Value<String> confidence,
+      Value<int?> estimatedDaysRemaining,
+      Value<double?> estimatedDailyConsumption,
+      Value<DateTime?> lastVerifiedAt,
+      Value<DateTime?> lastEstimatedAt,
       Value<bool> isDeleted,
       Value<bool> isLocalOnly,
       Value<DateTime?> updatedAt,
@@ -11921,6 +13003,41 @@ class $$LocalInventoryItemsTableFilterComposer
 
   ColumnFilters<String> get productId => $composableBuilder(
     column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quantityStatus => $composableBuilder(
+    column: $table.quantityStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quantitySource => $composableBuilder(
+    column: $table.quantitySource,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get estimatedDaysRemaining => $composableBuilder(
+    column: $table.estimatedDaysRemaining,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get estimatedDailyConsumption => $composableBuilder(
+    column: $table.estimatedDailyConsumption,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastEstimatedAt => $composableBuilder(
+    column: $table.lastEstimatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12064,6 +13181,41 @@ class $$LocalInventoryItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get quantityStatus => $composableBuilder(
+    column: $table.quantityStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quantitySource => $composableBuilder(
+    column: $table.quantitySource,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get estimatedDaysRemaining => $composableBuilder(
+    column: $table.estimatedDaysRemaining,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get estimatedDailyConsumption => $composableBuilder(
+    column: $table.estimatedDailyConsumption,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastEstimatedAt => $composableBuilder(
+    column: $table.lastEstimatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
     column: $table.isDeleted,
     builder: (column) => ColumnOrderings(column),
@@ -12184,6 +13336,41 @@ class $$LocalInventoryItemsTableAnnotationComposer
   GeneratedColumn<String> get productId =>
       $composableBuilder(column: $table.productId, builder: (column) => column);
 
+  GeneratedColumn<String> get quantityStatus => $composableBuilder(
+    column: $table.quantityStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get quantitySource => $composableBuilder(
+    column: $table.quantitySource,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get estimatedDaysRemaining => $composableBuilder(
+    column: $table.estimatedDaysRemaining,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get estimatedDailyConsumption => $composableBuilder(
+    column: $table.estimatedDailyConsumption,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastEstimatedAt => $composableBuilder(
+    column: $table.lastEstimatedAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
@@ -12262,6 +13449,13 @@ class $$LocalInventoryItemsTableTableManager
                 Value<int?> daysUntilExpiry = const Value.absent(),
                 Value<String?> barcode = const Value.absent(),
                 Value<String?> productId = const Value.absent(),
+                Value<String?> quantityStatus = const Value.absent(),
+                Value<String> quantitySource = const Value.absent(),
+                Value<String> confidence = const Value.absent(),
+                Value<int?> estimatedDaysRemaining = const Value.absent(),
+                Value<double?> estimatedDailyConsumption = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<DateTime?> lastEstimatedAt = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<bool> isLocalOnly = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -12290,6 +13484,13 @@ class $$LocalInventoryItemsTableTableManager
                 daysUntilExpiry: daysUntilExpiry,
                 barcode: barcode,
                 productId: productId,
+                quantityStatus: quantityStatus,
+                quantitySource: quantitySource,
+                confidence: confidence,
+                estimatedDaysRemaining: estimatedDaysRemaining,
+                estimatedDailyConsumption: estimatedDailyConsumption,
+                lastVerifiedAt: lastVerifiedAt,
+                lastEstimatedAt: lastEstimatedAt,
                 isDeleted: isDeleted,
                 isLocalOnly: isLocalOnly,
                 updatedAt: updatedAt,
@@ -12320,6 +13521,13 @@ class $$LocalInventoryItemsTableTableManager
                 Value<int?> daysUntilExpiry = const Value.absent(),
                 Value<String?> barcode = const Value.absent(),
                 Value<String?> productId = const Value.absent(),
+                Value<String?> quantityStatus = const Value.absent(),
+                Value<String> quantitySource = const Value.absent(),
+                Value<String> confidence = const Value.absent(),
+                Value<int?> estimatedDaysRemaining = const Value.absent(),
+                Value<double?> estimatedDailyConsumption = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<DateTime?> lastEstimatedAt = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<bool> isLocalOnly = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -12348,6 +13556,13 @@ class $$LocalInventoryItemsTableTableManager
                 daysUntilExpiry: daysUntilExpiry,
                 barcode: barcode,
                 productId: productId,
+                quantityStatus: quantityStatus,
+                quantitySource: quantitySource,
+                confidence: confidence,
+                estimatedDaysRemaining: estimatedDaysRemaining,
+                estimatedDailyConsumption: estimatedDailyConsumption,
+                lastVerifiedAt: lastVerifiedAt,
+                lastEstimatedAt: lastEstimatedAt,
                 isDeleted: isDeleted,
                 isLocalOnly: isLocalOnly,
                 updatedAt: updatedAt,
@@ -15943,6 +17158,332 @@ typedef $$LocalProductsTableProcessedTableManager =
       LocalProduct,
       PrefetchHooks Function()
     >;
+typedef $$LocalConsumptionProfilesTableCreateCompanionBuilder =
+    LocalConsumptionProfilesCompanion Function({
+      required String id,
+      required String homeId,
+      required String inventoryItemId,
+      required String itemName,
+      Value<double> averageDailyConsumption,
+      Value<double> weightedDailyConsumption,
+      Value<double> typicalIntervalDays,
+      Value<String> confidence,
+      Value<int?> estimatedDaysRemaining,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalConsumptionProfilesTableUpdateCompanionBuilder =
+    LocalConsumptionProfilesCompanion Function({
+      Value<String> id,
+      Value<String> homeId,
+      Value<String> inventoryItemId,
+      Value<String> itemName,
+      Value<double> averageDailyConsumption,
+      Value<double> weightedDailyConsumption,
+      Value<double> typicalIntervalDays,
+      Value<String> confidence,
+      Value<int?> estimatedDaysRemaining,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalConsumptionProfilesTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalConsumptionProfilesTable> {
+  $$LocalConsumptionProfilesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get homeId => $composableBuilder(
+    column: $table.homeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get inventoryItemId => $composableBuilder(
+    column: $table.inventoryItemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemName => $composableBuilder(
+    column: $table.itemName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get averageDailyConsumption => $composableBuilder(
+    column: $table.averageDailyConsumption,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get weightedDailyConsumption => $composableBuilder(
+    column: $table.weightedDailyConsumption,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get typicalIntervalDays => $composableBuilder(
+    column: $table.typicalIntervalDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get estimatedDaysRemaining => $composableBuilder(
+    column: $table.estimatedDaysRemaining,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalConsumptionProfilesTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalConsumptionProfilesTable> {
+  $$LocalConsumptionProfilesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get homeId => $composableBuilder(
+    column: $table.homeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get inventoryItemId => $composableBuilder(
+    column: $table.inventoryItemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemName => $composableBuilder(
+    column: $table.itemName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get averageDailyConsumption => $composableBuilder(
+    column: $table.averageDailyConsumption,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get weightedDailyConsumption => $composableBuilder(
+    column: $table.weightedDailyConsumption,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get typicalIntervalDays => $composableBuilder(
+    column: $table.typicalIntervalDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get estimatedDaysRemaining => $composableBuilder(
+    column: $table.estimatedDaysRemaining,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalConsumptionProfilesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalConsumptionProfilesTable> {
+  $$LocalConsumptionProfilesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get homeId =>
+      $composableBuilder(column: $table.homeId, builder: (column) => column);
+
+  GeneratedColumn<String> get inventoryItemId => $composableBuilder(
+    column: $table.inventoryItemId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get itemName =>
+      $composableBuilder(column: $table.itemName, builder: (column) => column);
+
+  GeneratedColumn<double> get averageDailyConsumption => $composableBuilder(
+    column: $table.averageDailyConsumption,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get weightedDailyConsumption => $composableBuilder(
+    column: $table.weightedDailyConsumption,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get typicalIntervalDays => $composableBuilder(
+    column: $table.typicalIntervalDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get confidence => $composableBuilder(
+    column: $table.confidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get estimatedDaysRemaining => $composableBuilder(
+    column: $table.estimatedDaysRemaining,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalConsumptionProfilesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalConsumptionProfilesTable,
+          LocalConsumptionProfile,
+          $$LocalConsumptionProfilesTableFilterComposer,
+          $$LocalConsumptionProfilesTableOrderingComposer,
+          $$LocalConsumptionProfilesTableAnnotationComposer,
+          $$LocalConsumptionProfilesTableCreateCompanionBuilder,
+          $$LocalConsumptionProfilesTableUpdateCompanionBuilder,
+          (
+            LocalConsumptionProfile,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalConsumptionProfilesTable,
+              LocalConsumptionProfile
+            >,
+          ),
+          LocalConsumptionProfile,
+          PrefetchHooks Function()
+        > {
+  $$LocalConsumptionProfilesTableTableManager(
+    _$AppDatabase db,
+    $LocalConsumptionProfilesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalConsumptionProfilesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$LocalConsumptionProfilesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$LocalConsumptionProfilesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> homeId = const Value.absent(),
+                Value<String> inventoryItemId = const Value.absent(),
+                Value<String> itemName = const Value.absent(),
+                Value<double> averageDailyConsumption = const Value.absent(),
+                Value<double> weightedDailyConsumption = const Value.absent(),
+                Value<double> typicalIntervalDays = const Value.absent(),
+                Value<String> confidence = const Value.absent(),
+                Value<int?> estimatedDaysRemaining = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalConsumptionProfilesCompanion(
+                id: id,
+                homeId: homeId,
+                inventoryItemId: inventoryItemId,
+                itemName: itemName,
+                averageDailyConsumption: averageDailyConsumption,
+                weightedDailyConsumption: weightedDailyConsumption,
+                typicalIntervalDays: typicalIntervalDays,
+                confidence: confidence,
+                estimatedDaysRemaining: estimatedDaysRemaining,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String homeId,
+                required String inventoryItemId,
+                required String itemName,
+                Value<double> averageDailyConsumption = const Value.absent(),
+                Value<double> weightedDailyConsumption = const Value.absent(),
+                Value<double> typicalIntervalDays = const Value.absent(),
+                Value<String> confidence = const Value.absent(),
+                Value<int?> estimatedDaysRemaining = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalConsumptionProfilesCompanion.insert(
+                id: id,
+                homeId: homeId,
+                inventoryItemId: inventoryItemId,
+                itemName: itemName,
+                averageDailyConsumption: averageDailyConsumption,
+                weightedDailyConsumption: weightedDailyConsumption,
+                typicalIntervalDays: typicalIntervalDays,
+                confidence: confidence,
+                estimatedDaysRemaining: estimatedDaysRemaining,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalConsumptionProfilesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalConsumptionProfilesTable,
+      LocalConsumptionProfile,
+      $$LocalConsumptionProfilesTableFilterComposer,
+      $$LocalConsumptionProfilesTableOrderingComposer,
+      $$LocalConsumptionProfilesTableAnnotationComposer,
+      $$LocalConsumptionProfilesTableCreateCompanionBuilder,
+      $$LocalConsumptionProfilesTableUpdateCompanionBuilder,
+      (
+        LocalConsumptionProfile,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalConsumptionProfilesTable,
+          LocalConsumptionProfile
+        >,
+      ),
+      LocalConsumptionProfile,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -15985,4 +17526,9 @@ class $AppDatabaseManager {
       $$LocalProductOffersTableTableManager(_db, _db.localProductOffers);
   $$LocalProductsTableTableManager get localProducts =>
       $$LocalProductsTableTableManager(_db, _db.localProducts);
+  $$LocalConsumptionProfilesTableTableManager get localConsumptionProfiles =>
+      $$LocalConsumptionProfilesTableTableManager(
+        _db,
+        _db.localConsumptionProfiles,
+      );
 }

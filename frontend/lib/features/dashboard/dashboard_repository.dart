@@ -5,6 +5,7 @@ import '../../core/database/daos/inventory_dao.dart';
 import '../../core/database/daos/shopping_dao.dart';
 import '../../core/network/api_client.dart';
 import '../../core/sync/connectivity_monitor.dart';
+import '../inventory/consumption_model.dart';
 import 'dashboard_model.dart';
 
 /// Offline-first dashboard repository.
@@ -238,5 +239,31 @@ class DashboardRepository {
       soon: soon,
       optional: optional,
     );
+  }
+
+  Future<HomeInsightModel?> getHomeInsights(String homeId) async {
+    if (!_connectivity.isOnline) return null;
+    try {
+      final response = await _apiClient.dio.get('/api/v1/homes/$homeId/insights');
+      if (response.data['data'] != null) {
+        return HomeInsightModel.fromJson(response.data['data']);
+      }
+    } catch (e) {
+      if (kDebugMode) print('[DashboardRepo] Failed to fetch home insights: $e');
+    }
+    return null;
+  }
+
+  Future<ReturnSummaryModel?> getReturnSummary(String homeId, {int daysAway = 7}) async {
+    if (!_connectivity.isOnline) return null;
+    try {
+      final response = await _apiClient.dio.get('/api/v1/homes/$homeId/return-summary', queryParameters: {'daysAway': daysAway});
+      if (response.data['data'] != null) {
+        return ReturnSummaryModel.fromJson(response.data['data']);
+      }
+    } catch (e) {
+      if (kDebugMode) print('[DashboardRepo] Failed to fetch return summary: $e');
+    }
+    return null;
   }
 }

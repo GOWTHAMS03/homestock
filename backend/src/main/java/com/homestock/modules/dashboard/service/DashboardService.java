@@ -30,6 +30,7 @@ public class DashboardService {
     private final InventoryItemRepository inventoryItemRepository;
     private final ShoppingListRepository shoppingListRepository;
     private final ShoppingListItemRepository shoppingListItemRepository;
+    private final com.homestock.modules.consumption.service.SmartRecommendationService smartRecommendationService;
 
     @Transactional(readOnly = true)
     public DashboardSummaryDto getDashboardSummary(UUID homeId) {
@@ -125,79 +126,40 @@ public class DashboardService {
         homeRepository.findById(homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
 
-        List<InventoryItem> lowStockItems = inventoryItemRepository.findLowStockItems(homeId);
-        LocalDate today = LocalDate.now();
-        List<InventoryItem> expiringSoon = inventoryItemRepository.findExpiringSoonItems(homeId, today, today.plusDays(5));
+        var smartRecs = smartRecommendationService.getWhatDoINeed(homeId);
 
-        List<RecommendationItemDto> urgent = new ArrayList<>();
-        List<RecommendationItemDto> soon = new ArrayList<>();
-        List<RecommendationItemDto> optional = new ArrayList<>();
-        Set<UUID> processedIds = new HashSet<>();
+        List<RecommendationItemDto> urgent = smartRecs.getOrDefault(com.homestock.modules.consumption.entity.RecommendationUrgency.URGENT, Collections.emptyList())
+                .stream().map(r -> RecommendationItemDto.builder()
+                        .itemId(r.getItemId())
+                        .name(r.getName())
+                        .categoryName(r.getCategoryName())
+                        .currentQuantity(r.getCurrentQuantity())
+                        .recommendedQuantity(r.getRecommendedQuantity())
+                        .unit(r.getUnit())
+                        .rationale(r.getRationale())
+                        .build()).toList();
 
-        // URGENT: Out of stock or critically below minimum (< 50% of min)
-        for (InventoryItem item : lowStockItems) {
-            BigDecimal halfMin = item.getMinimumQuantity().multiply(BigDecimal.valueOf(0.5));
-            if (item.getQuantity().compareTo(BigDecimal.ZERO) == 0) {
-                BigDecimal restock = item.getMaximumQuantity() != null ?
-                        item.getMaximumQuantity() : item.getMinimumQuantity().multiply(BigDecimal.valueOf(2));
-                urgent.add(RecommendationItemDto.builder()
-                        .itemId(item.getId())
-                        .name(item.getName())
-                        .categoryName(item.getCategory() != null ? item.getCategory().getName() : "General")
-                        .currentQuantity(item.getQuantity())
-                        .recommendedQuantity(restock.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ONE : restock)
-                        .unit(item.getUnit())
-                        .rationale("Out of stock")
-                        .build());
-                processedIds.add(item.getId());
-            } else if (item.getQuantity().compareTo(halfMin) <= 0) {
-                BigDecimal restock = item.getMaximumQuantity() != null ?
-                        item.getMaximumQuantity().subtract(item.getQuantity()) : item.getMinimumQuantity();
-                urgent.add(RecommendationItemDto.builder()
-                        .itemId(item.getId())
-                        .name(item.getName())
-                        .categoryName(item.getCategory() != null ? item.getCategory().getName() : "General")
-                        .currentQuantity(item.getQuantity())
-                        .recommendedQuantity(restock.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ONE : restock)
-                        .unit(item.getUnit())
-                        .rationale("Critically low (less than half of minimum)")
-                        .build());
-                processedIds.add(item.getId());
-            }
-        }
+        List<RecommendationItemDto> soon = smartRecs.getOrDefault(com.homestock.modules.consumption.entity.RecommendationUrgency.SOON, Collections.emptyList())
+                .stream().map(r -> RecommendationItemDto.builder()
+                        .itemId(r.getItemId())
+                        .name(r.getName())
+                        .categoryName(r.getCategoryName())
+                        .currentQuantity(r.getCurrentQuantity())
+                        .recommendedQuantity(r.getRecommendedQuantity())
+                        .unit(r.getUnit())
+                        .rationale(r.getRationale())
+                        .build()).toList();
 
-        // SOON: Normal low stock or expiring soon
-        for (InventoryItem item : lowStockItems) {
-            if (!processedIds.contains(item.getId())) {
-                BigDecimal restock = item.getMaximumQuantity() != null ?
-                        item.getMaximumQuantity().subtract(item.getQuantity()) : item.getMinimumQuantity();
-                soon.add(RecommendationItemDto.builder()
-                        .itemId(item.getId())
-                        .name(item.getName())
-                        .categoryName(item.getCategory() != null ? item.getCategory().getName() : "General")
-                        .currentQuantity(item.getQuantity())
-                        .recommendedQuantity(restock.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ONE : restock)
-                        .unit(item.getUnit())
-                        .rationale("Below minimum threshold")
-                        .build());
-                processedIds.add(item.getId());
-            }
-        }
-
-        for (InventoryItem item : expiringSoon) {
-            if (!processedIds.contains(item.getId())) {
-                soon.add(RecommendationItemDto.builder()
-                        .itemId(item.getId())
-                        .name(item.getName())
-                        .categoryName(item.getCategory() != null ? item.getCategory().getName() : "General")
-                        .currentQuantity(item.getQuantity())
-                        .recommendedQuantity(item.getMinimumQuantity())
-                        .unit(item.getUnit())
-                        .rationale("Expiring in " + item.getDaysUntilExpiry() + " days - replace soon")
-                        .build());
-                processedIds.add(item.getId());
-            }
-        }
+        List<RecommendationItemDto> optional = smartRecs.getOrDefault(com.homestock.modules.consumption.entity.RecommendationUrgency.OPTIONAL, Collections.emptyList())
+                .stream().map(r -> RecommendationItemDto.builder()
+                        .itemId(r.getItemId())
+                        .name(r.getName())
+                        .categoryName(r.getCategoryName())
+                        .currentQuantity(r.getCurrentQuantity())
+                        .recommendedQuantity(r.getRecommendedQuantity())
+                        .unit(r.getUnit())
+                        .rationale(r.getRationale())
+                        .build()).toList();
 
         return WhatDoINeedResponse.builder()
                 .urgent(urgent)

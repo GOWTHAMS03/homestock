@@ -17,6 +17,7 @@ import '../voice/widgets/voice_input_button.dart';
 import 'add_shopping_item_dialog.dart';
 import 'shopping_controller.dart';
 import 'shopping_model.dart';
+import 'shopping_mode_screen.dart';
 
 enum _ShoppingFilter { all, toBuy, completed }
 
@@ -31,6 +32,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   _ShoppingFilter _filter = _ShoppingFilter.all;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  final Set<String> _selectedItemIds = {};
+  bool _isSelectionMode = false;
 
   @override
   void dispose() {
@@ -145,21 +148,37 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                                         ],
                                       ),
                                     ),
-                                    if (pendingCount > 0)
+                                    if (pendingCount > 0) ...[
                                       ElevatedButton.icon(
+                                        onPressed: () => Navigator.of(context).push(
+                                          MaterialPageRoute(builder: (_) => const ShoppingModeScreen()),
+                                        ),
+                                        icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 14),
+                                        label: const Text('Shop Mode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.hsGreen,
+                                          foregroundColor: Colors.white,
+                                          minimumSize: Size.zero,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      OutlinedButton.icon(
                                         onPressed: () => Navigator.of(context).push(
                                           MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
                                         ),
                                         icon: const Icon(Icons.receipt_long_rounded, size: 14),
                                         label: const Text('Record', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          foregroundColor: Colors.white,
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.primary,
+                                          side: const BorderSide(color: AppColors.primary),
                                           minimumSize: Size.zero,
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
                                         ),
                                       ),
+                                    ],
                                   ],
                                 ),
                                 const SizedBox(height: 10),
@@ -262,9 +281,72 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                                 _buildFilterChip('To Buy ($pendingCount)', _ShoppingFilter.toBuy),
                                 const SizedBox(width: 8),
                                 _buildFilterChip('Done ($completedCount)', _ShoppingFilter.completed),
+                                const SizedBox(width: 12),
+                                ActionChip(
+                                  avatar: Icon(
+                                    _isSelectionMode ? Icons.close_rounded : Icons.bolt_rounded,
+                                    size: 14,
+                                    color: _isSelectionMode ? AppColors.primary : const Color(0xFFD97706),
+                                  ),
+                                  label: Text(
+                                    _isSelectionMode ? 'Cancel' : 'Compare Basket ⚡',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: _isSelectionMode ? AppColors.primary : const Color(0xFFD97706),
+                                    ),
+                                  ),
+                                  backgroundColor: _isSelectionMode ? AppColors.primaryContainer : const Color(0xFFFEF3C7),
+                                  side: BorderSide(
+                                    color: _isSelectionMode ? AppColors.primary : const Color(0xFFFDE68A),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isSelectionMode = !_isSelectionMode;
+                                      if (!_isSelectionMode) {
+                                        _selectedItemIds.clear();
+                                      } else {
+                                        _selectedItemIds.addAll(
+                                          filteredItems.where((i) => !i.isCompleted).map((i) => i.id),
+                                        );
+                                      }
+                                    });
+                                  },
+                                ),
                               ],
                             ),
                           ),
+                          if (_isSelectionMode) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedItemIds.addAll(filteredItems.where((i) => !i.isCompleted).map((i) => i.id));
+                                    });
+                                  },
+                                  child: const Text('Select All Pending', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w700)),
+                                ),
+                                const SizedBox(width: 12),
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedItemIds.addAll(
+                                        filteredItems.where((i) => i.isAutoGenerated && !i.isCompleted).map((i) => i.id),
+                                      );
+                                    });
+                                  },
+                                  child: const Text('Select Low-Stock', style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w700)),
+                                ),
+                                const SizedBox(width: 12),
+                                InkWell(
+                                  onTap: () => setState(() => _selectedItemIds.clear()),
+                                  child: const Text('Clear', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                                ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: AppSpacing.md),
                         ],
 
@@ -310,6 +392,59 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               elevation: 3,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
             ),
+      bottomNavigationBar: _selectedItemIds.isNotEmpty
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    offset: const Offset(0, -2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${_selectedItemIds.length} item(s) selected',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary),
+                        ),
+                        const Text('Multi-provider price optimizer', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SmartShoppingScreen(
+                              itemIds: _selectedItemIds.toList(),
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.bolt_rounded, size: 18),
+                      label: const Text('Find Best Price ⚡', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -590,9 +725,37 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       child: HomeStockCard(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        onTap: () => ref.read(shoppingControllerProvider.notifier).toggleItem(item.id),
+        onTap: _isSelectionMode
+            ? () {
+                setState(() {
+                  if (_selectedItemIds.contains(item.id)) {
+                    _selectedItemIds.remove(item.id);
+                  } else {
+                    _selectedItemIds.add(item.id);
+                  }
+                });
+              }
+            : () => ref.read(shoppingControllerProvider.notifier).toggleItem(item.id),
         child: Row(
           children: [
+            if (_isSelectionMode && !item.isCompleted) ...[
+              Checkbox(
+                value: _selectedItemIds.contains(item.id),
+                activeColor: AppColors.primary,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                onChanged: (val) {
+                  setState(() {
+                    if (val == true) {
+                      _selectedItemIds.add(item.id);
+                    } else {
+                      _selectedItemIds.remove(item.id);
+                    }
+                  });
+                },
+              ),
+              const SizedBox(width: 4),
+            ],
             // Circular Check Indicator
             InkWell(
               onTap: () => ref.read(shoppingControllerProvider.notifier).toggleItem(item.id),

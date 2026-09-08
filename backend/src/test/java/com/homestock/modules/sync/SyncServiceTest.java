@@ -65,6 +65,8 @@ class SyncServiceTest {
     private ShoppingService shoppingService;
     @Mock
     private ObjectMapper objectMapper;
+    @Mock
+    private com.homestock.modules.consumption.service.ConsumptionService consumptionService;
 
     @InjectMocks
     private SyncService syncService;

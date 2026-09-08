@@ -26,6 +26,21 @@ public interface PriceHistoryRepository extends JpaRepository<PriceHistory, UUID
     BigDecimal getAveragePrice(String provider, String productId, Instant since);
 
     /**
+     * Get recent price records by canonical product.
+     */
+    List<PriceHistory> findByProductIdOrderByRecordedAtDesc(UUID productId);
+
+    /**
+     * Get recent price records by provider.
+     */
+    List<PriceHistory> findByProviderOrderByRecordedAtDesc(String provider);
+
+    /**
+     * Get recent price records.
+     */
+    List<PriceHistory> findTop30ByOrderByRecordedAtDesc();
+
+    /**
      * Cleanup old price history records.
      */
     void deleteByRecordedAtBefore(Instant cutoff);
