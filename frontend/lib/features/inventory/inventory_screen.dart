@@ -712,7 +712,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       final neededQty = item.minimumQuantity > item.quantity
                           ? (item.minimumQuantity - item.quantity)
                           : 1.0;
-                      await ref.read(shoppingControllerProvider.notifier).addItem(
+                      final success = await ref.read(shoppingControllerProvider.notifier).addItem(
                             inventoryItemId: item.id,
                             itemName: item.name,
                             quantity: neededQty,
@@ -723,14 +723,27 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             categoryColor: item.categoryColor,
                           );
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Added $formattedName to shopping list'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: AppColors.primary,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Added $formattedName to shopping list'),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: AppColors.primary,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          final error = ref.read(shoppingControllerProvider).errorMessage ??
+                              'Could not add $formattedName to shopping list';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error),
+                              backgroundColor: Colors.red.shade700,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
                       }
                     },
                     borderRadius: BorderRadius.circular(6),

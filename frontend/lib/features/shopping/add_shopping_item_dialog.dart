@@ -94,7 +94,19 @@ class _AddShoppingItemDialogState extends ConsumerState<AddShoppingItemDialog> {
 
     if (mounted) {
       setState(() => _isLoading = false);
-      if (success) Navigator.of(context).pop();
+      if (success) {
+        Navigator.of(context).pop();
+      } else {
+        final error = ref.read(shoppingControllerProvider).errorMessage ??
+            'Could not add item to shopping list. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 

@@ -143,8 +143,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
     if (mounted) {
       setState(() => _isAddingQuickItem = false);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       if (success) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -164,6 +164,16 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
+      } else {
+        final error = ref.read(shoppingControllerProvider).errorMessage ??
+            'Could not add "${parsed.name}" to shopping list';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -174,27 +184,39 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       quantity: staple.qty,
       unit: staple.unit,
     );
-    if (mounted && success) {
+    if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Text(staple.emoji, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Added ${staple.name} (${staple.qty == staple.qty.roundToDouble() ? staple.qty.toInt() : staple.qty} ${staple.unit}) to list',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Text(staple.emoji, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Added ${staple.name} (${staple.qty == staple.qty.roundToDouble() ? staple.qty.toInt() : staple.qty} ${staple.unit}) to list',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            backgroundColor: AppColors.textPrimary,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
           ),
-          backgroundColor: AppColors.textPrimary,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        );
+      } else {
+        final error = ref.read(shoppingControllerProvider).errorMessage ??
+            'Could not add "${staple.name}" to shopping list';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -216,25 +238,37 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     }
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Restocked all $count low-stock items to your shopping list! ⚡',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+      if (count > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Restocked all $count low-stock items to your shopping list! ⚡',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            backgroundColor: const Color(0xFFD97706),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
           ),
-          backgroundColor: const Color(0xFFD97706),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        );
+      } else {
+        final error = ref.read(shoppingControllerProvider).errorMessage ??
+            'Failed to restock low-stock items';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 

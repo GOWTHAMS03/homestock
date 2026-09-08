@@ -44,46 +44,85 @@ class ShoppingState {
 final shoppingControllerProvider = StateNotifierProvider<ShoppingController, ShoppingState>((ref) {
   final repo = ref.watch(shoppingRepositoryProvider);
   final homeState = ref.watch(homeControllerProvider);
-  return ShoppingController(repo, homeState.activeHome?.id);
+  final effectiveHomeId = homeState.activeHome?.id ?? homeState.homes.firstOrNull?.id;
+  return ShoppingController(repo, effectiveHomeId);
 });
 
 class ShoppingController extends StateNotifier<ShoppingState> {
   final ShoppingRepository _repo;
-  final String? _homeId;
+  String? _homeId;
   StreamSubscription? _listSub;
 
   ShoppingController(this._repo, this._homeId) : super(const ShoppingState()) {
-    if (_homeId != null) {
+    if (_homeId != null && _homeId!.isNotEmpty) {
+      _subscribeToLocalData();
+      _fetchServerDataInBackground();
+    } else {
+      _tryResolveHomeAndInitialize();
+    }
+  }
+
+  Future<void> _tryResolveHomeAndInitialize() async {
+    final resolved = await _repo.resolveFallbackHomeId();
+    if (resolved != null && resolved.isNotEmpty && mounted) {
+      _homeId = resolved;
       _subscribeToLocalData();
       _fetchServerDataInBackground();
     }
   }
 
+  Future<String?> _getOrResolveHomeId() async {
+    if (_homeId != null && _homeId!.isNotEmpty) {
+      return _homeId;
+    }
+    final resolved = await _repo.resolveFallbackHomeId();
+    if (resolved != null && resolved.isNotEmpty) {
+      _homeId = resolved;
+      _subscribeToLocalData();
+      return _homeId;
+    }
+    return null;
+  }
+
   /// Subscribe to local DB stream for instant UI updates.
   void _subscribeToLocalData() {
-    if (_homeId == null) return;
+    final homeId = _homeId;
+    if (homeId == null || homeId.isEmpty) return;
 
-    _listSub = _repo.watchDefaultList(_homeId).listen((list) {
-      if (mounted) {
-        state = state.copyWith(list: list, isLoading: false);
-      }
-    });
+    _listSub?.cancel();
+    _listSub = _repo.watchDefaultList(homeId).listen(
+      (list) {
+        if (mounted) {
+          state = state.copyWith(list: list, isLoading: false);
+        }
+      },
+      onError: (err) {
+        if (mounted) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: 'Error loading shopping list: $err',
+          );
+        }
+      },
+    );
   }
 
   /// Fetch from server in background (non-blocking).
   Future<void> _fetchServerDataInBackground() async {
-    if (_homeId == null) return;
+    final homeId = await _getOrResolveHomeId();
+    if (homeId == null) return;
     if (!_repo.isOnline) return;
 
     try {
-      await _repo.fetchAndCacheFromServer(_homeId);
+      await _repo.fetchAndCacheFromServer(homeId);
     } catch (_) {
       // Server failures are non-fatal
     }
   }
 
   Future<void> loadShoppingList() async {
-    if (_homeId == null) return;
+    final homeId = await _getOrResolveHomeId();
+    if (homeId == null) return;
     await _fetchServerDataInBackground();
   }
 
@@ -99,12 +138,17 @@ class ShoppingController extends StateNotifier<ShoppingState> {
     String unit = 'pcs',
     String? notes,
   }) async {
-    if (_homeId == null) return false;
+    final activeHomeId = await _getOrResolveHomeId();
+    if (activeHomeId == null || activeHomeId.isEmpty) {
+      state = state.copyWith(errorMessage: 'No active home selected.');
+      return false;
+    }
 
     try {
-      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
+      final defaultList = await _repo.ensureDefaultList(activeHomeId);
+      final listId = state.list?.id ?? defaultList.id;
       await _repo.addItem(
-        _homeId,
+        activeHomeId,
         listId,
         inventoryItemId: inventoryItemId,
         itemName: itemName,
@@ -116,7 +160,9 @@ class ShoppingController extends StateNotifier<ShoppingState> {
         unit: unit,
         notes: notes,
       );
-      // UI updates automatically via Drift stream
+      if (state.errorMessage != null) {
+        state = state.copyWith(errorMessage: null);
+      }
       return true;
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
@@ -126,12 +172,13 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   /// Toggle item: local-first, no rollback needed.
   Future<void> toggleItem(String itemId) async {
-    if (_homeId == null) return;
+    final activeHomeId = await _getOrResolveHomeId();
+    if (activeHomeId == null) return;
 
     try {
-      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
-      await _repo.toggleItem(_homeId, listId, itemId);
-      // UI updates automatically via Drift stream
+      final defaultList = await _repo.ensureDefaultList(activeHomeId);
+      final listId = state.list?.id ?? defaultList.id;
+      await _repo.toggleItem(activeHomeId, listId, itemId);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
     }
@@ -139,15 +186,16 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   /// Update item quantity: local-first.
   Future<void> updateQuantity(String itemId, double newQuantity) async {
-    if (_homeId == null) return;
+    final activeHomeId = await _getOrResolveHomeId();
+    if (activeHomeId == null) return;
     if (newQuantity <= 0) {
       await deleteItem(itemId);
       return;
     }
     try {
-      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
-      await _repo.updateQuantity(_homeId, listId, itemId, newQuantity);
-      // UI updates automatically via Drift stream
+      final defaultList = await _repo.ensureDefaultList(activeHomeId);
+      final listId = state.list?.id ?? defaultList.id;
+      await _repo.updateQuantity(activeHomeId, listId, itemId, newQuantity);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
     }
@@ -155,11 +203,12 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   /// Delete item: local-first.
   Future<void> deleteItem(String itemId) async {
-    if (_homeId == null) return;
+    final activeHomeId = await _getOrResolveHomeId();
+    if (activeHomeId == null) return;
     try {
-      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
-      await _repo.deleteItem(_homeId, listId, itemId);
-      // UI updates automatically via Drift stream
+      final defaultList = await _repo.ensureDefaultList(activeHomeId);
+      final listId = state.list?.id ?? defaultList.id;
+      await _repo.deleteItem(activeHomeId, listId, itemId);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
     }
@@ -167,11 +216,12 @@ class ShoppingController extends StateNotifier<ShoppingState> {
 
   /// Clear completed: local-first.
   Future<void> clearCompleted() async {
-    if (_homeId == null) return;
+    final activeHomeId = await _getOrResolveHomeId();
+    if (activeHomeId == null) return;
     try {
-      final listId = state.list?.id ?? (await _repo.ensureDefaultList(_homeId)).id;
-      await _repo.clearCompleted(_homeId, listId);
-      // UI updates automatically via Drift stream
+      final defaultList = await _repo.ensureDefaultList(activeHomeId);
+      final listId = state.list?.id ?? defaultList.id;
+      await _repo.clearCompleted(activeHomeId, listId);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
     }

@@ -88,7 +88,7 @@ class ShoppingRepository {
     var list = await _shoppingDao.getDefaultList(homeId);
     list ??= await _shoppingDao.ensureDefaultList(homeId);
 
-    final items = await _shoppingDao.getShoppingItems(list.id);
+    final items = await _shoppingDao.getShoppingItemsForHome(homeId);
     final modelItems = items
         .map((item) => ShoppingItemModel(
               id: item.id,
@@ -125,6 +125,11 @@ class ShoppingRepository {
     return _shoppingDao.ensureDefaultList(homeId);
   }
 
+  /// Resolve an existing fallback home ID if none is active in controller state.
+  Future<String?> resolveFallbackHomeId() {
+    return _shoppingDao.resolveFallbackHomeId();
+  }
+
   // ──── WRITE (local-first) ────
 
   /// Add an item to the shopping list locally and queue for sync.
@@ -141,9 +146,10 @@ class ShoppingRepository {
     String unit = 'pcs',
     String? notes,
   }) async {
+    final defaultList = await _shoppingDao.ensureDefaultList(homeId);
     final effectiveListId = (listId != null && listId.isNotEmpty)
         ? listId
-        : (await _shoppingDao.ensureDefaultList(homeId)).id;
+        : defaultList.id;
     final itemId = _uuid.v4();
     final operationId = _uuid.v4();
     final now = DateTime.now();
@@ -296,8 +302,8 @@ class ShoppingRepository {
     final operationId = _uuid.v4();
     final now = DateTime.now();
 
-    // 1. Delete completed items locally
-    await _shoppingDao.clearCompletedItems(listId);
+    // 1. Delete completed items locally across all home lists
+    await _shoppingDao.clearCompletedItemsForHome(homeId);
 
     // 2. Enqueue sync
     await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
@@ -324,21 +330,29 @@ class ShoppingRepository {
       final data = response.data['data'];
       if (data == null) return;
 
-      // Upsert the list
+      final serverListId = data['id'] as String;
+
+      // Upsert the server list
       await _shoppingDao.upsertShoppingList(LocalShoppingListsCompanion(
-        id: Value(data['id'] as String),
+        id: Value(serverListId),
         homeId: Value(homeId),
         name: Value(data['name'] as String? ?? 'Home Shopping List'),
         isDefault: Value(data['isDefault'] as bool? ?? true),
         updatedAt: Value(DateTime.now()),
       ));
 
+      // If a placeholder local list existed with id == homeId, migrate items to serverListId
+      if (serverListId != homeId) {
+        await _shoppingDao.migrateItemShoppingListId(homeId, serverListId);
+        await _shoppingDao.deleteShoppingListById(homeId);
+      }
+
       // Upsert items
       final rawItems = data['items'] as List? ?? [];
       final companions = rawItems.map((json) {
         return LocalShoppingListItemsCompanion(
           id: Value(json['id'] as String),
-          shoppingListId: Value(json['shoppingListId'] as String? ?? data['id'] as String),
+          shoppingListId: Value(json['shoppingListId'] as String? ?? serverListId),
           inventoryItemId: Value(json['inventoryItemId'] as String?),
           itemName: Value(json['itemName'] as String? ?? ''),
           categoryName: Value(json['categoryName'] as String?),

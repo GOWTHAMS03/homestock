@@ -257,19 +257,32 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      await ref.read(shoppingControllerProvider.notifier).addItem(
+                      final success = await ref.read(shoppingControllerProvider.notifier).addItem(
                             inventoryItemId: item.id,
                             itemName: item.name,
                             quantity: item.minimumQuantity > 0 ? item.minimumQuantity : 1.0,
                             unit: item.unit,
                           );
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${item.name} added to shopping list!'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${item.name} added to shopping list!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        } else {
+                          final error = ref.read(shoppingControllerProvider).errorMessage ??
+                              'Could not add ${item.name} to shopping list';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error),
+                              backgroundColor: Colors.red.shade700,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
                       }
                     },
                     icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),

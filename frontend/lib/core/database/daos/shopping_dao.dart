@@ -10,11 +10,17 @@ class ShoppingDao {
   // ──── SHOPPING LISTS ────
 
   /// Get the default shopping list for a home.
-  Future<LocalShoppingList?> getDefaultList(String homeId) {
-    return (_db.select(_db.localShoppingLists)
-          ..where(
-              (t) => t.homeId.equals(homeId) & t.isDefault.equals(true)))
-        .getSingleOrNull();
+  /// Uses limit(1) and ordering to avoid StateError if multiple default lists exist.
+  Future<LocalShoppingList?> getDefaultList(String homeId) async {
+    final lists = await (_db.select(_db.localShoppingLists)
+          ..where((t) => t.homeId.equals(homeId))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.isDefault),
+            (t) => OrderingTerm.desc(t.updatedAt),
+          ])
+          ..limit(1))
+        .get();
+    return lists.firstOrNull;
   }
 
   /// Ensure a default shopping list exists locally for the home.
@@ -50,6 +56,27 @@ class ShoppingDao {
         .insertOnConflictUpdate(list);
   }
 
+  /// Delete a shopping list by ID.
+  Future<void> deleteShoppingListById(String listId) {
+    return (_db.delete(_db.localShoppingLists)
+          ..where((t) => t.id.equals(listId)))
+        .go();
+  }
+
+  /// Resolve a fallback home ID from local database tables.
+  Future<String?> resolveFallbackHomeId() async {
+    final home = await (_db.select(_db.localHomes)..limit(1)).getSingleOrNull();
+    if (home != null && home.id.isNotEmpty) return home.id;
+
+    final list = await (_db.select(_db.localShoppingLists)..limit(1)).getSingleOrNull();
+    if (list != null && list.homeId.isNotEmpty) return list.homeId;
+
+    final item = await (_db.select(_db.localInventoryItems)..limit(1)).getSingleOrNull();
+    if (item != null && item.homeId.isNotEmpty) return item.homeId;
+
+    return 'default_home';
+  }
+
   // ──── SHOPPING LIST ITEMS ────
 
   /// Watch all non-deleted items for a shopping list.
@@ -64,17 +91,48 @@ class ShoppingDao {
         .watch();
   }
 
-  /// Watch all items for a home's default list.
+  /// Watch all items for a home across any of its shopping lists.
+  /// Extremely resilient: queries all list IDs associated with the home and the homeId itself.
   Stream<List<LocalShoppingListItem>> watchShoppingItemsForHome(
       String homeId) {
-    // First get the default list, then watch its items
     final listQuery = _db.select(_db.localShoppingLists)
-      ..where((t) => t.homeId.equals(homeId) & t.isDefault.equals(true));
+      ..where((t) => t.homeId.equals(homeId));
 
-    return listQuery.watchSingleOrNull().asyncExpand((list) {
-      if (list == null) return Stream.value(<LocalShoppingListItem>[]);
-      return watchShoppingItems(list.id);
+    return listQuery.watch().asyncExpand((lists) {
+      final listIds = {
+        homeId,
+        ...lists.map((l) => l.id),
+      }.toList();
+
+      return (_db.select(_db.localShoppingListItems)
+            ..where((t) =>
+                t.shoppingListId.isIn(listIds) & t.isDeleted.equals(false))
+            ..orderBy([
+              (t) => OrderingTerm.asc(t.isCompleted),
+              (t) => OrderingTerm.desc(t.updatedAt),
+            ]))
+          .watch();
     });
+  }
+
+  /// Get all items for all shopping lists belonging to a home (non-reactive).
+  Future<List<LocalShoppingListItem>> getShoppingItemsForHome(String homeId) async {
+    final lists = await (_db.select(_db.localShoppingLists)
+          ..where((t) => t.homeId.equals(homeId)))
+        .get();
+    final listIds = {
+      homeId,
+      ...lists.map((l) => l.id),
+    }.toList();
+
+    return (_db.select(_db.localShoppingListItems)
+          ..where((t) =>
+              t.shoppingListId.isIn(listIds) & t.isDeleted.equals(false))
+          ..orderBy([
+            (t) => OrderingTerm.asc(t.isCompleted),
+            (t) => OrderingTerm.desc(t.updatedAt),
+          ]))
+        .get();
   }
 
   /// Get all items for a shopping list (non-reactive).
@@ -86,10 +144,12 @@ class ShoppingDao {
   }
 
   /// Get a single shopping item by ID.
-  Future<LocalShoppingListItem?> getShoppingItemById(String itemId) {
-    return (_db.select(_db.localShoppingListItems)
-          ..where((t) => t.id.equals(itemId)))
-        .getSingleOrNull();
+  Future<LocalShoppingListItem?> getShoppingItemById(String itemId) async {
+    final items = await (_db.select(_db.localShoppingListItems)
+          ..where((t) => t.id.equals(itemId))
+          ..limit(1))
+        .get();
+    return items.firstOrNull;
   }
 
   /// Insert or update a shopping item.
@@ -108,6 +168,16 @@ class ShoppingDao {
             onConflict: DoUpdate((_) => item));
       }
     });
+  }
+
+  /// Migrate items from old list ID to new list ID (e.g. after remote list UUID sync).
+  Future<void> migrateItemShoppingListId(String oldListId, String newListId) {
+    return (_db.update(_db.localShoppingListItems)
+          ..where((t) => t.shoppingListId.equals(oldListId)))
+        .write(LocalShoppingListItemsCompanion(
+      shoppingListId: Value(newListId),
+      updatedAt: Value(DateTime.now()),
+    ));
   }
 
   /// Toggle the completion status of a shopping item.
@@ -154,6 +224,18 @@ class ShoppingDao {
     return (_db.delete(_db.localShoppingListItems)
           ..where((t) =>
               t.shoppingListId.equals(listId) & t.isCompleted.equals(true)))
+        .go();
+  }
+
+  /// Delete all completed items for all lists of a home.
+  Future<void> clearCompletedItemsForHome(String homeId) async {
+    final lists = await (_db.select(_db.localShoppingLists)
+          ..where((t) => t.homeId.equals(homeId)))
+        .get();
+    final listIds = {homeId, ...lists.map((l) => l.id)}.toList();
+    await (_db.delete(_db.localShoppingListItems)
+          ..where((t) =>
+              t.shoppingListId.isIn(listIds) & t.isCompleted.equals(true)))
         .go();
   }
 
