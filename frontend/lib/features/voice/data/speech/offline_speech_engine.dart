@@ -45,8 +45,11 @@ class OfflineSpeechEngine implements SpeechEngine {
     // 2. Ensure model is loaded
     final engine = _modelManager.engine ?? await _modelManager.loadModel();
     if (engine == null) {
+      final modelErr = _modelManager.currentModel.errorMessage;
       throw Exception(
-        'Voice model is not installed. Please download the offline voice model in Settings.',
+        modelErr != null && modelErr.isNotEmpty
+            ? modelErr
+            : 'Voice model is not installed. Please download the offline voice model in Settings.',
       );
     }
 

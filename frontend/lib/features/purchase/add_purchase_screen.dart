@@ -6,6 +6,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
 import '../inventory/inventory_controller.dart';
+import '../shopping/processed_products_screen.dart';
 import '../shopping/shopping_controller.dart';
 import 'purchase_controller.dart';
 
@@ -119,18 +120,27 @@ class _AddPurchaseScreenState extends ConsumerState<AddPurchaseScreen> {
       }).toList(),
     };
 
-    final success = await ref.read(purchaseControllerProvider.notifier).recordPurchase(payload);
+    final purchase = await ref.read(purchaseControllerProvider.notifier).recordPurchase(payload);
 
     if (mounted) {
       setState(() => _isLoading = false);
-      if (success) {
+      if (purchase != null) {
         ref.read(inventoryControllerProvider.notifier).loadData();
         ref.read(shoppingControllerProvider.notifier).loadShoppingList();
-        Navigator.of(context).pop();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ProcessedProductsScreen(
+              purchase: purchase,
+              isJustCompleted: true,
+              source: 'Receipt Entry',
+            ),
+          ),
+        );
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Purchase recorded! Inventory restocked 🎉'),
-            behavior: SnackBarBehavior.floating,
+            content: Text('Failed to record purchase. Please try again.'),
+            backgroundColor: AppColors.outOfStockText,
           ),
         );
       }

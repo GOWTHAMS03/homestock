@@ -6,6 +6,7 @@ import '../../core/widgets/homestock/homestock_card.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../inventory/inventory_controller.dart';
 import '../purchase/purchase_controller.dart';
+import 'processed_products_screen.dart';
 import 'shopping_controller.dart';
 import 'shopping_model.dart';
 
@@ -75,7 +76,8 @@ class _ShoppingModeScreenState extends ConsumerState<ShoppingModeScreen> {
         };
       }).toList();
 
-      await purchaseNotifier.recordPurchase({
+      final purchase = await purchaseNotifier.recordPurchase({
+        'storeName': 'In-store Shopping Run',
         'totalAmount': total,
         'purchaseDate': DateTime.now().toIso8601String().substring(0, 10),
         'currency': 'INR',
@@ -89,7 +91,19 @@ class _ShoppingModeScreenState extends ConsumerState<ShoppingModeScreen> {
 
       if (mounted) {
         setState(() => _isCompleting = false);
-        _showCelebrationDialog(boughtItems.length, total);
+        if (purchase != null) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => ProcessedProductsScreen(
+                purchase: purchase,
+                isJustCompleted: true,
+                source: 'In-store Shopping',
+              ),
+            ),
+          );
+        } else {
+          _showCelebrationDialog(boughtItems.length, total);
+        }
       }
     } catch (e) {
       if (mounted) {

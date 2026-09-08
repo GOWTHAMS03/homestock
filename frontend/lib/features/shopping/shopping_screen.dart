@@ -11,6 +11,7 @@ import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_model.dart';
 import '../purchase/add_purchase_screen.dart';
+import '../purchase/purchases_screen.dart';
 import '../smart_shopping/smart_shopping_screen.dart';
 import '../voice/widgets/voice_bottom_sheet.dart';
 import '../voice/widgets/voice_input_button.dart';
@@ -85,6 +86,24 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         subtitle: '$pendingCount item(s) to buy',
         showBackButton: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bolt_rounded, color: Color(0xFFD97706)),
+            tooltip: 'Price Checking & Deals ⚡',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined, color: AppColors.textSecondary),
+            tooltip: 'Restocked Products & Receipts',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PurchasesScreen()),
+              );
+            },
+          ),
           const VoiceInputButton(
             tooltip: 'Voice shopping command',
           ),
@@ -148,54 +167,160 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                                         ],
                                       ),
                                     ),
-                                    if (pendingCount > 0) ...[
-                                      ElevatedButton.icon(
-                                        onPressed: () => Navigator.of(context).push(
-                                          MaterialPageRoute(builder: (_) => const ShoppingModeScreen()),
-                                        ),
-                                        icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 14),
-                                        label: const Text('Shop Mode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.hsGreen,
-                                          foregroundColor: Colors.white,
-                                          minimumSize: Size.zero,
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      OutlinedButton.icon(
-                                        onPressed: () => Navigator.of(context).push(
-                                          MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
-                                        ),
-                                        icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                                        label: const Text('Record', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.primary,
-                                          side: const BorderSide(color: AppColors.primary),
-                                          minimumSize: Size.zero,
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: LinearProgressIndicator(
-                                    value: completionRatio,
-                                    backgroundColor: const Color(0xFFE2E8F0),
-                                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.hsGreen),
-                                    minHeight: 6,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
+                                     Wrap(
+                                       spacing: 6,
+                                       children: [
+                                         if (pendingCount > 0)
+                                           ElevatedButton.icon(
+                                             onPressed: () => Navigator.of(context).push(
+                                               MaterialPageRoute(builder: (_) => const ShoppingModeScreen()),
+                                             ),
+                                             icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 14),
+                                             label: const Text('Shop Mode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                                             style: ElevatedButton.styleFrom(
+                                               backgroundColor: AppColors.hsGreen,
+                                               foregroundColor: Colors.white,
+                                               minimumSize: Size.zero,
+                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                                             ),
+                                           ),
+                                         OutlinedButton.icon(
+                                           onPressed: () => Navigator.of(context).push(
+                                             MaterialPageRoute(builder: (_) => const PurchasesScreen()),
+                                           ),
+                                           icon: const Icon(Icons.history_rounded, size: 14),
+                                           label: const Text('Restocked', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                                           style: OutlinedButton.styleFrom(
+                                             foregroundColor: AppColors.textPrimary,
+                                             side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                             minimumSize: Size.zero,
+                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                                           ),
+                                         ),
+                                         OutlinedButton.icon(
+                                           onPressed: () => Navigator.of(context).push(
+                                             MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
+                                           ),
+                                           icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                                           label: const Text('Record', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                                           style: OutlinedButton.styleFrom(
+                                             foregroundColor: AppColors.primary,
+                                             side: const BorderSide(color: AppColors.primary),
+                                             minimumSize: Size.zero,
+                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                                           ),
+                                         ),
+                                       ],
+                                     ),
+                                   ],
+                                 ),
+                                 const SizedBox(height: 10),
+                                 ClipRRect(
+                                   borderRadius: BorderRadius.circular(6),
+                                   child: LinearProgressIndicator(
+                                     value: completionRatio,
+                                     backgroundColor: const Color(0xFFE2E8F0),
+                                     valueColor: const AlwaysStoppedAnimation<Color>(AppColors.hsGreen),
+                                     minHeight: 6,
+                                   ),
+                                 ),
+                               ],
+                             ),
+                           ),
+                           const SizedBox(height: AppSpacing.md),
+
+                           // Dedicated Smart Shopping & Multi-Store Price Comparison Banner
+                           Container(
+                             margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                             decoration: BoxDecoration(
+                               gradient: const LinearGradient(
+                                 colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                                 begin: Alignment.topLeft,
+                                 end: Alignment.bottomRight,
+                               ),
+                               borderRadius: BorderRadius.circular(16),
+                               border: Border.all(color: const Color(0xFFFDE68A)),
+                               boxShadow: [
+                                 BoxShadow(
+                                   color: Colors.black.withValues(alpha: 0.03),
+                                   blurRadius: 8,
+                                   offset: const Offset(0, 2),
+                                 ),
+                               ],
+                             ),
+                             child: Material(
+                               color: Colors.transparent,
+                               borderRadius: BorderRadius.circular(16),
+                               child: InkWell(
+                                 onTap: () {
+                                   Navigator.of(context).push(
+                                     MaterialPageRoute(
+                                       builder: (_) => const SmartShoppingScreen(),
+                                     ),
+                                   );
+                                 },
+                                 borderRadius: BorderRadius.circular(16),
+                                 child: Padding(
+                                   padding: const EdgeInsets.all(14),
+                                   child: Row(
+                                     children: [
+                                       Container(
+                                         padding: const EdgeInsets.all(8),
+                                         decoration: BoxDecoration(
+                                           color: const Color(0xFFD97706),
+                                           borderRadius: BorderRadius.circular(10),
+                                         ),
+                                         child: const Icon(
+                                           Icons.bolt_rounded,
+                                           color: Colors.white,
+                                           size: 22,
+                                         ),
+                                       ),
+                                       const SizedBox(width: 12),
+                                       const Expanded(
+                                         child: Column(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             Row(
+                                               children: [
+                                                 Text(
+                                                   'Price Checking & Smart Deals',
+                                                   style: TextStyle(
+                                                     fontSize: 14,
+                                                     fontWeight: FontWeight.w800,
+                                                     color: Color(0xFF92400E),
+                                                   ),
+                                                 ),
+                                                 SizedBox(width: 6),
+                                                 Text('⚡', style: TextStyle(fontSize: 12)),
+                                               ],
+                                             ),
+                                             SizedBox(height: 2),
+                                             Text(
+                                               'Compare prices on Blinkit, Zepto, BigBasket, Amazon & Instamart',
+                                               style: TextStyle(
+                                                 fontSize: 11,
+                                                 color: Color(0xFFB45309),
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       ),
+                                       const Icon(
+                                         Icons.arrow_forward_ios_rounded,
+                                         size: 14,
+                                         color: Color(0xFFD97706),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ),
+                             ),
+                           ),
+                         ],
 
                         // 2. Pantry Restock Suggestions (When items exist in list)
                         if (totalCount > 0 && lowStockSuggestions.isNotEmpty) ...[

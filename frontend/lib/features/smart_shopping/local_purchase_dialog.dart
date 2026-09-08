@@ -144,12 +144,12 @@ class _LocalPurchaseDialogState extends ConsumerState<LocalPurchaseDialog> {
       ],
     };
 
-    final success = await ref.read(purchaseControllerProvider.notifier).recordPurchase(payload);
+    final purchase = await ref.read(purchaseControllerProvider.notifier).recordPurchase(payload);
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (success) {
+    if (purchase != null) {
       // Complete shopping list item
       final shoppingList = ref.read(shoppingControllerProvider).list;
       if (shoppingList != null) {

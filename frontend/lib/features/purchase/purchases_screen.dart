@@ -9,6 +9,7 @@ import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/sync_status_bar.dart';
+import '../shopping/processed_products_screen.dart';
 import 'add_purchase_screen.dart';
 import 'purchase_controller.dart';
 import 'purchase_model.dart';
@@ -82,123 +83,142 @@ class PurchasesScreen extends ConsumerWidget {
         .format(DateTime.tryParse(purchase.purchaseDate) ?? DateTime.now());
 
     return HomeStockCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: Store Icon, Store Name, Date, Status Badge
-          Row(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProcessedProductsScreen(purchase: purchase),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.outline.withValues(alpha: 0.7)),
-                ),
-                child: const Icon(Icons.storefront_rounded, size: 22, color: AppColors.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      purchase.storeName ?? 'Grocery Store',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary),
+              // Header: Store Icon, Store Name, Date, Status Badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.outline.withValues(alpha: 0.7)),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$dateStr • ${purchase.recordedByName}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    child: const Icon(Icons.storefront_rounded, size: 22, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          purchase.storeName ?? 'Grocery Store',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$dateStr • ${purchase.recordedByName}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const HomeStockPillBadge(
+                    label: '✓ Restocked',
+                    variant: HomeStockPillVariant.green,
+                    fontSize: 10,
+                    padding: EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  ),
+                ],
               ),
-              const HomeStockPillBadge(
-                label: '✓ Restocked',
-                variant: HomeStockPillVariant.green,
-                fontSize: 10,
-                padding: EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 12),
-          const HomeStockDottedDivider(height: 14),
-          const SizedBox(height: 8),
+              const SizedBox(height: 12),
+              const HomeStockDottedDivider(height: 14),
+              const SizedBox(height: 8),
 
-          // Items summary list
-          Column(
-            children: purchase.items.take(4).map((item) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: const BoxDecoration(
-                        color: AppColors.textMuted,
-                        shape: BoxShape.circle,
-                      ),
+              // Items summary list
+              Column(
+                children: purchase.items.take(4).map((item) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: const BoxDecoration(
+                            color: AppColors.textMuted,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item.itemName,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                        if (item.totalPrice > 0) ...[
+                          const SizedBox(width: 12),
+                          Text(
+                            '₹${item.totalPrice.toStringAsFixed(0)}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item.itemName,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    if (item.totalPrice > 0) ...[
-                      const SizedBox(width: 12),
+                  );
+                }).toList(),
+              ),
+
+              if (purchase.items.length > 4)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '+ ${purchase.items.length - 4} more items',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
+                  ),
+                ),
+
+              const SizedBox(height: 8),
+              const HomeStockDottedDivider(height: 14),
+              const SizedBox(height: 8),
+
+              // Total Price & View link
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
                       Text(
-                        '₹${item.totalPrice.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                        'View Added Products',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
                       ),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.primary),
                     ],
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-
-          if (purchase.items.length > 4)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '+ ${purchase.items.length - 4} more items',
-                style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
-              ),
-            ),
-
-          const SizedBox(height: 8),
-          const HomeStockDottedDivider(height: 14),
-          const SizedBox(height: 8),
-
-          // Total Price & Actions
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total Amount Paid',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
-              ),
-              Text(
-                '₹${purchase.totalAmount.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.primary),
+                  ),
+                  Text(
+                    '₹${purchase.totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.primary),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

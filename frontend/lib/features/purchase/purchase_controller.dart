@@ -97,18 +97,18 @@ class PurchaseController extends StateNotifier<PurchaseState> {
   }
 
   /// Record purchase: local-first with atomic local transaction.
-  Future<bool> recordPurchase(Map<String, dynamic> data) async {
-    if (_homeId == null) return false;
+  Future<PurchaseModel?> recordPurchase(Map<String, dynamic> data) async {
+    if (_homeId == null) return null;
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      await _repo.recordPurchase(_homeId, data);
+      final purchase = await _repo.recordPurchase(_homeId, data);
       state = state.copyWith(isLoading: false);
       // UI updates automatically via Drift stream
-      return true;
+      return purchase;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
-      return false;
+      return null;
     }
   }
 

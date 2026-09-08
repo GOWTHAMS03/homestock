@@ -111,12 +111,12 @@ class _PurchaseConfirmationDialogState extends ConsumerState<PurchaseConfirmatio
       ],
     };
 
-    final success = await ref.read(purchaseControllerProvider.notifier).recordPurchase(payload);
+    final purchase = await ref.read(purchaseControllerProvider.notifier).recordPurchase(payload);
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (success) {
+    if (purchase != null) {
       // Toggle/complete shopping item if still pending
       final shoppingList = ref.read(shoppingControllerProvider).list;
       if (shoppingList != null) {

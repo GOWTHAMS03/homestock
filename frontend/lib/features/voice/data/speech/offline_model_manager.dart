@@ -12,6 +12,7 @@ class WhisperModelVariant {
   final String fileName;
   final Uri downloadUrl;
   final int approximateSizeMb;
+  final int minValidSizeBytes;
   final String description;
   final int minRamMb;
 
@@ -21,6 +22,7 @@ class WhisperModelVariant {
     required this.fileName,
     required this.downloadUrl,
     required this.approximateSizeMb,
+    required this.minValidSizeBytes,
     required this.description,
     this.minRamMb = 0,
   });
@@ -120,6 +122,7 @@ class OfflineModelManager {
         'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin',
       ),
       approximateSizeMb: 75,
+      minValidSizeBytes: 70 * 1024 * 1024, // ~74 MB exact
       description: 'Fast, lower accuracy. Best for low-end devices.',
       minRamMb: 1024,
     ),
@@ -131,6 +134,7 @@ class OfflineModelManager {
         'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
       ),
       approximateSizeMb: 142,
+      minValidSizeBytes: 140 * 1024 * 1024, // ~141 MB exact
       description: 'Balanced speed & accuracy. Recommended for most devices.',
       minRamMb: 2048,
     ),
@@ -142,6 +146,7 @@ class OfflineModelManager {
         'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin',
       ),
       approximateSizeMb: 466,
+      minValidSizeBytes: 450 * 1024 * 1024, // ~465 MB exact
       description: 'Best Tamil & English accuracy. Requires 4+ GB RAM.',
       minRamMb: 4096,
     ),
@@ -170,12 +175,23 @@ class OfflineModelManager {
   Future<bool> isModelInstalled() async {
     try {
       final modelDir = await _modelDirectory();
+
+      // Clean up any stale partial downloads (.part files)
+      try {
+        final dirEntities = await modelDir.list().toList();
+        for (final entity in dirEntities) {
+          if (entity is File && entity.path.endsWith('.part')) {
+            await entity.delete().catchError((_) => entity);
+          }
+        }
+      } catch (_) {}
+
       for (final variant in availableModels) {
         final file = File('${modelDir.path}/${variant.fileName}');
         if (await file.exists()) {
           final fileSize = await file.length();
-          if (fileSize > 1024 * 1024) {
-            // At least 1 MB — not a corrupt partial download
+          if (fileSize >= variant.minValidSizeBytes) {
+            // Fully intact valid model file
             _updateStatus(ModelInfo(
               name: variant.displayName,
               fileName: variant.fileName,
@@ -184,6 +200,15 @@ class OfflineModelManager {
               status: ModelStatus.installed,
             ));
             return true;
+          } else {
+            // Corrupt or truncated partial file from an earlier interrupted download!
+            // Automatically clean it up so it doesn't cause crashes or false 'installed' status.
+            if (kDebugMode) {
+              print('[OfflineModelManager] Found truncated ${variant.fileName} ($fileSize bytes < ${variant.minValidSizeBytes} bytes). Deleting corrupt file.');
+            }
+            try {
+              await file.delete();
+            } catch (_) {}
           }
         }
       }
@@ -216,6 +241,14 @@ class OfflineModelManager {
     WhisperModelVariant model,
     StreamController<double> progressController,
   ) async {
+    final modelDir = await _modelDirectory();
+    final targetPath = '${modelDir.path}/${model.fileName}';
+    final partPath = '$targetPath.part';
+    final partFile = File(partPath);
+
+    HttpClient? client;
+    IOSink? sink;
+
     try {
       _updateStatus(ModelInfo(
         name: model.displayName,
@@ -224,20 +257,20 @@ class OfflineModelManager {
         downloadProgress: 0.0,
       ));
 
-      final modelDir = await _modelDirectory();
-      final targetPath = '${modelDir.path}/${model.fileName}';
-      final targetFile = File(targetPath);
-
-      // Delete partial downloads
-      if (await targetFile.exists()) {
-        await targetFile.delete();
+      // Remove stale .part file if present
+      if (await partFile.exists()) {
+        await partFile.delete();
       }
 
-      // Download using HTTP with progress tracking
-      final client = HttpClient();
+      // Download using HTTP with redirect support and progress throttling
+      client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 30);
+      client.idleTimeout = const Duration(seconds: 60);
 
       final request = await client.getUrl(model.downloadUrl);
+      request.followRedirects = true;
+      request.maxRedirects = 5;
+
       final response = await request.close();
 
       if (response.statusCode != 200) {
@@ -247,35 +280,58 @@ class OfflineModelManager {
       final totalBytes = response.contentLength;
       int receivedBytes = 0;
 
-      final sink = targetFile.openWrite();
+      sink = partFile.openWrite();
+
+      DateTime lastProgressTime = DateTime.now();
+      double lastReportedProgress = 0.0;
 
       await for (final chunk in response) {
         sink.add(chunk);
         receivedBytes += chunk.length;
 
-        final progress = totalBytes > 0 ? receivedBytes / totalBytes : 0.0;
+        final progress = totalBytes > 0
+            ? (receivedBytes / totalBytes).clamp(0.0, 1.0)
+            : 0.0;
 
-        progressController.add(progress);
-
-        _updateStatus(_currentModel.copyWith(
-          downloadProgress: progress,
-        ));
+        // Throttle UI updates to at most once per 150ms or 2% delta
+        // to avoid flooding the Flutter UI thread and causing frame drops
+        final now = DateTime.now();
+        if (now.difference(lastProgressTime).inMilliseconds >= 150 ||
+            (progress - lastReportedProgress).abs() >= 0.02 ||
+            receivedBytes == totalBytes) {
+          lastProgressTime = now;
+          lastReportedProgress = progress;
+          progressController.add(progress);
+          _updateStatus(_currentModel.copyWith(downloadProgress: progress));
+        }
       }
 
+      await sink.flush();
       await sink.close();
+      sink = null;
       client.close();
+      client = null;
 
-      // Verify download
-      final fileSize = await targetFile.length();
-      if (fileSize < 1024 * 1024) {
-        await targetFile.delete();
-        throw Exception('Downloaded file is too small — likely corrupt');
+      // Verify downloaded file size integrity
+      final downloadedBytes = await partFile.length();
+      if (downloadedBytes < model.minValidSizeBytes) {
+        await partFile.delete();
+        throw Exception(
+          'Downloaded model file was incomplete (${(downloadedBytes / (1024 * 1024)).toStringAsFixed(1)} MB of ~${model.approximateSizeMb} MB). Please try downloading again.',
+        );
       }
+
+      // Atomically install the model file
+      final targetFile = File(targetPath);
+      if (await targetFile.exists()) {
+        await targetFile.delete();
+      }
+      await partFile.rename(targetPath);
 
       _updateStatus(ModelInfo(
         name: model.displayName,
         fileName: model.fileName,
-        sizeMb: (fileSize / (1024 * 1024)).round(),
+        sizeMb: (downloadedBytes / (1024 * 1024)).round(),
         path: targetPath,
         status: ModelStatus.installed,
         downloadProgress: 1.0,
@@ -285,9 +341,26 @@ class OfflineModelManager {
       await progressController.close();
 
       if (kDebugMode) {
-        print('[OfflineModelManager] Model downloaded: ${model.displayName} (${(fileSize / (1024 * 1024)).round()} MB)');
+        print(
+          '[OfflineModelManager] Model successfully verified and installed: ${model.displayName} (${(downloadedBytes / (1024 * 1024)).round()} MB)',
+        );
       }
     } catch (e) {
+      // Clean up sink and client safely
+      try {
+        await sink?.close();
+      } catch (_) {}
+      try {
+        client?.close();
+      } catch (_) {}
+
+      // Clean up temporary .part file on error
+      try {
+        if (await partFile.exists()) {
+          await partFile.delete();
+        }
+      } catch (_) {}
+
       _updateStatus(_currentModel.copyWith(
         status: ModelStatus.error,
         errorMessage: 'Download failed: $e',
@@ -304,29 +377,45 @@ class OfflineModelManager {
   Future<WhisperEngine?> loadModel() async {
     if (_engine != null) return _engine;
 
-    if (_currentModel.status == ModelStatus.notInstalled) {
-      final installed = await isModelInstalled();
-      if (!installed) return null;
+    // Verify model is installed on disk
+    final installed = await isModelInstalled();
+    if (!installed || _currentModel.path.isEmpty) {
+      if (kDebugMode) {
+        print('[OfflineModelManager] loadModel failed: Model is not installed on disk.');
+      }
+      return null;
     }
 
-    if (_currentModel.path.isEmpty) return null;
+    final file = File(_currentModel.path);
+    if (!await file.exists()) {
+      _updateStatus(const ModelInfo(
+        name: 'Not Installed',
+        fileName: '',
+        status: ModelStatus.notInstalled,
+      ));
+      return null;
+    }
 
     try {
       _updateStatus(_currentModel.copyWith(status: ModelStatus.loading));
+
+      if (kDebugMode) {
+        print('[OfflineModelManager] Loading Whisper engine from: ${_currentModel.path} (${_currentModel.name})');
+      }
 
       _engine = await WhisperEngine.load(_currentModel.path);
 
       _updateStatus(_currentModel.copyWith(status: ModelStatus.ready));
 
       if (kDebugMode) {
-        print('[OfflineModelManager] Whisper engine loaded: ${_currentModel.name}');
+        print('[OfflineModelManager] Whisper engine loaded and ready: ${_currentModel.name}');
       }
 
       return _engine;
     } catch (e) {
       _updateStatus(_currentModel.copyWith(
         status: ModelStatus.error,
-        errorMessage: 'Failed to load model: $e',
+        errorMessage: 'Failed to initialize ${_currentModel.name} model ($e). Try the Tiny (75 MB) or Base (142 MB) model if device RAM is limited.',
       ));
       if (kDebugMode) print('[OfflineModelManager] Load error: $e');
       return null;

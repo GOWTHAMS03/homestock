@@ -7,6 +7,7 @@ import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../home_switcher/home_controller.dart';
+import '../shopping/shopping_controller.dart';
 import 'basket_purchase_confirmation_dialog.dart';
 import 'local_purchase_dialog.dart';
 import 'product_match_review_sheet.dart';
@@ -35,7 +36,7 @@ class SmartShoppingScreen extends ConsumerStatefulWidget {
     this.unit,
   });
 
-  bool get isBasketMode => itemIds != null && itemIds!.isNotEmpty;
+  bool get isBasketMode => (itemIds != null && itemIds!.isNotEmpty) || (itemId == null);
 
   @override
   ConsumerState<SmartShoppingScreen> createState() => _SmartShoppingScreenState();
@@ -52,13 +53,26 @@ class _SmartShoppingScreenState extends ConsumerState<SmartShoppingScreen> {
     Future.microtask(() {
       final homeId = ref.read(homeControllerProvider).activeHome?.id;
       if (homeId != null) {
-        if (widget.isBasketMode) {
+        if (widget.itemIds != null && widget.itemIds!.isNotEmpty) {
           ref.read(smartShoppingControllerProvider.notifier).fetchBasketComparison(
                 homeId,
                 itemIds: _activeItemIds,
               );
         } else if (widget.itemId != null) {
           ref.read(smartShoppingControllerProvider.notifier).fetchOffers(homeId, widget.itemId!);
+        } else {
+          // Open for all pending shopping items automatically
+          final pending = ref.read(shoppingControllerProvider).list?.items
+              .where((i) => !i.isCompleted)
+              .map((i) => i.id)
+              .toList() ?? [];
+          if (pending.isNotEmpty) {
+            setState(() => _activeItemIds = pending);
+            ref.read(smartShoppingControllerProvider.notifier).fetchBasketComparison(
+                  homeId,
+                  itemIds: pending,
+                );
+          }
         }
       }
     });
