@@ -8,6 +8,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/skeleton_loader.dart';
+import '../../core/sync/sync_providers.dart';
 import '../auth/auth_controller.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../home_switcher/create_home_dialog.dart';
@@ -932,11 +933,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     },
                                   );
 
-                                  // 2. Sync to API backend
-                                  final api = ref.read(apiClientProvider);
-                                  await api.post('/items/${attentionItem.itemId}/confirm-status', data: {
-                                    'action': 'STILL_HAVE_ENOUGH',
-                                  });
+                                  // 2. Sync to API backend (non-blocking, online only)
+                                  final conn = ref.read(connectivityMonitorProvider);
+                                  if (conn.isOnline) {
+                                    final api = ref.read(apiClientProvider);
+                                    unawaited(() async {
+                                      try {
+                                        await api.post('/items/${attentionItem.itemId}/confirm-status', data: {
+                                          'action': 'STILL_HAVE_ENOUGH',
+                                        });
+                                      } catch (_) {}
+                                    }());
+                                  }
 
                                   // 3. Background refresh
                                   ref.read(inventoryControllerProvider.notifier).loadData();

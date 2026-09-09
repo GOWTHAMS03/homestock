@@ -10,6 +10,7 @@ import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_model.dart';
 import '../inventory/smart_confirmation_sheet.dart';
 import '../shopping/shopping_controller.dart';
+import '../shopping/shopping_model.dart';
 import 'dashboard_controller.dart';
 import 'dashboard_model.dart';
 
@@ -700,6 +701,15 @@ class _AttentionItemCard extends ConsumerWidget {
     final emoji = staple?.emoji ?? '📦';
     final tamilName = staple?.tamilName;
 
+    final shoppingList = ref.watch(shoppingControllerProvider).list;
+    final pendingShoppingItem = shoppingList?.items.cast<ShoppingItemModel?>().firstWhere(
+      (s) => !s!.isCompleted &&
+             ((s.inventoryItemId != null && s.inventoryItemId == item.id) ||
+              s.itemName.toLowerCase().trim() == item.name.toLowerCase().trim()),
+      orElse: () => null,
+    );
+    final isAlreadyOnShoppingList = pendingShoppingItem != null;
+
     final isOut = item.isOutOfStock;
     final isLow = item.isLowStock && !isOut;
     final isExpiring = item.isExpiringSoon && !item.isExpired;
@@ -829,8 +839,39 @@ class _AttentionItemCard extends ConsumerWidget {
                 ),
               ),
 
-              // Urgency Badge
-              _buildUrgencyPill(isOut, isLow, isExpiring, isExpired, item),
+              // Urgency Badge & Shopping Status
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _buildUrgencyPill(isOut, isLow, isExpiring, isExpired, item),
+                  if (isAlreadyOnShoppingList) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3E8FF),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFD8B4FE), width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('🛒', style: TextStyle(fontSize: 10)),
+                          const SizedBox(width: 3),
+                          Text(
+                            'On List (${pendingShoppingItem.quantity % 1 == 0 ? pendingShoppingItem.quantity.toInt() : pendingShoppingItem.quantity} ${pendingShoppingItem.unit})',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF7E22CE),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
 
@@ -845,7 +886,15 @@ class _AttentionItemCard extends ConsumerWidget {
           const SizedBox(height: 12),
 
           // ──── ROW 3: Contextual Action Buttons ────
-          _buildActionButtons(context, ref, isOut, isLow, isExpiring, isExpired),
+          _buildActionButtons(
+            context,
+            ref,
+            isOut,
+            isLow,
+            isExpiring,
+            isExpired,
+            isAlreadyOnShoppingList: isAlreadyOnShoppingList,
+          ),
         ],
       ),
     );
@@ -1071,55 +1120,75 @@ class _AttentionItemCard extends ConsumerWidget {
     bool isOut,
     bool isLow,
     bool isExpiring,
-    bool isExpired,
-  ) {
+    bool isExpired, {
+    bool isAlreadyOnShoppingList = false,
+  }) {
     return Row(
       children: [
-        // Primary Action: Add to Shopping List
+        // Primary Action: Add to Shopping List or Navigate to Shopping List
         if (isOut || isLow)
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final neededQty = item.minimumQuantity > 0 ? (item.minimumQuantity - item.quantity).clamp(1.0, 99.0) : 1.0;
-                final success = await ref.read(shoppingControllerProvider.notifier).addItem(
-                      inventoryItemId: item.id,
-                      itemName: item.name,
-                      quantity: neededQty,
-                      unit: item.unit,
-                    );
-                if (context.mounted && success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          const Text('🛒', style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text('Added "${item.name}" ($neededQty ${item.unit}) to Shopping List'),
-                          ),
-                        ],
+          if (isAlreadyOnShoppingList)
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/shopping'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF7E22CE),
+                  side: const BorderSide(color: Color(0xFFD8B4FE), width: 1.2),
+                  backgroundColor: const Color(0xFFFAF5FF),
+                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 14, color: Color(0xFF7E22CE)),
+                label: const Text(
+                  'In Shopping List →',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final neededQty = item.minimumQuantity > 0 ? (item.minimumQuantity - item.quantity).clamp(1.0, 99.0) : 1.0;
+                  final success = await ref.read(shoppingControllerProvider.notifier).addItem(
+                        inventoryItemId: item.id,
+                        itemName: item.name,
+                        quantity: neededQty,
+                        unit: item.unit,
+                      );
+                  if (context.mounted && success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Text('🛒', style: TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text('Added "${item.name}" ($neededQty ${item.unit}) to Shopping List'),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: AppColors.primary,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
                       ),
-                      backgroundColor: AppColors.primary,
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.add_shopping_cart_rounded, size: 14),
+                label: const Text(
+                  '+ Add to Buy',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                ),
               ),
-              icon: const Icon(Icons.add_shopping_cart_rounded, size: 14),
-              label: const Text(
-                '+ Add to Buy',
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-              ),
-            ),
-          )
+            )
         else if (isExpiring)
           Expanded(
             child: ElevatedButton.icon(

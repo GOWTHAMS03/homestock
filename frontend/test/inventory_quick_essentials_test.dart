@@ -129,9 +129,9 @@ void main() {
       expect(onions.tamilName, equals('வெங்காயம்'));
     });
 
-    test('master product catalog contains 587 items with full Tamil names, icons and emojis', () {
-      expect(kMasterProductCatalogStaples.length, equals(587));
-      expect(kHouseholdStaples.length, greaterThanOrEqualTo(650));
+    test('master product catalog contains 2000+ items with full Tamil names, icons and emojis', () {
+      expect(kMasterProductCatalogStaples.length, greaterThanOrEqualTo(2000));
+      expect(kHouseholdStaples.length, greaterThanOrEqualTo(2000));
 
       for (final s in kMasterProductCatalogStaples) {
         expect(s.name.trim().isNotEmpty, isTrue);

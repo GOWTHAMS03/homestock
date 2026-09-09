@@ -78,6 +78,7 @@ class ConnectivityMonitor {
   /// Actively probe real backend reachability with a fast timeout (default 1500ms).
   Future<bool> checkRealReachability({
     Duration timeout = const Duration(milliseconds: 1500),
+    bool allowDiscovery = true,
   }) async {
     if (_isCheckingReachability) return isOnline;
     _isCheckingReachability = true;
@@ -112,8 +113,8 @@ class ConnectivityMonitor {
         }
       }
 
-      // If currently configured baseUrl is unreachable, perform dynamic LAN discovery
-      if (!reachable) {
+      // If currently configured baseUrl is unreachable, perform dynamic LAN discovery only when allowed
+      if (!reachable && allowDiscovery) {
         final discovered = await LanDiscoveryService.discoverServer();
         if (discovered != null) {
           reachable = true;
@@ -195,7 +196,14 @@ class ConnectivityMonitor {
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       // Don't interrupt while actively syncing
       if (_currentStatus == NetworkStatus.syncing) return;
-      await checkRealReachability();
+      // Fast lightweight probe without heavy multi-phase LAN discovery when offline
+      final isCurrentlyOffline = _currentStatus == NetworkStatus.offline;
+      await checkRealReachability(
+        timeout: isCurrentlyOffline
+            ? const Duration(milliseconds: 500)
+            : const Duration(milliseconds: 1500),
+        allowDiscovery: !isCurrentlyOffline,
+      );
     });
   }
 

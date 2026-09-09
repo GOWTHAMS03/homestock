@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/household_staples.dart';
+import '../../core/sync/sync_providers.dart';
 import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../auth/auth_controller.dart';
 import '../dashboard/dashboard_controller.dart';
@@ -110,11 +112,18 @@ class _SmartConfirmationSheetState extends ConsumerState<SmartConfirmationSheet>
         },
       );
 
-      // 2. Sync to API backend
-      final apiClient = ref.read(apiClientProvider);
-      await apiClient.post('/items/${widget.item.id}/confirm-status', data: {
-        'action': 'STILL_HAVE_ENOUGH',
-      });
+      // 2. Sync to API backend (non-blocking, online only)
+      final conn = ref.read(connectivityMonitorProvider);
+      if (conn.isOnline) {
+        final apiClient = ref.read(apiClientProvider);
+        unawaited(() async {
+          try {
+            await apiClient.post('/items/${widget.item.id}/confirm-status', data: {
+              'action': 'STILL_HAVE_ENOUGH',
+            });
+          } catch (_) {}
+        }());
+      }
 
       // 3. Background reload
       ref.read(inventoryControllerProvider.notifier).loadData();
@@ -203,11 +212,18 @@ class _SmartConfirmationSheetState extends ConsumerState<SmartConfirmationSheet>
         },
       );
 
-      // 2. Sync to API backend
-      final apiClient = ref.read(apiClientProvider);
-      await apiClient.post('/items/${widget.item.id}/confirm-status', data: {
-        'status': option.code,
-      });
+      // 2. Sync to API backend (non-blocking, online only)
+      final conn = ref.read(connectivityMonitorProvider);
+      if (conn.isOnline) {
+        final apiClient = ref.read(apiClientProvider);
+        unawaited(() async {
+          try {
+            await apiClient.post('/items/${widget.item.id}/confirm-status', data: {
+              'status': option.code,
+            });
+          } catch (_) {}
+        }());
+      }
 
       // 3. Background reload
       ref.read(inventoryControllerProvider.notifier).loadData();

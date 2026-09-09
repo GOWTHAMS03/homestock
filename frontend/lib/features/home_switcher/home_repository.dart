@@ -14,11 +14,30 @@ class HomeRepository {
 
   Future<List<HomeModel>> getMyHomes() async {
     final cached = storage.getCachedHomesSync();
-    if (apiClient.connectivityMonitor != null && !apiClient.connectivityMonitor!.isOnline) {
+    final isOffline = apiClient.connectivityMonitor != null && !apiClient.connectivityMonitor!.isOnline;
+
+    if (isOffline) {
       if (cached != null && cached.isNotEmpty) {
         await _cacheHomesLocally(cached);
         return cached;
       }
+      if (database != null) {
+        final localRows = await database!.select(database!.localHomes).get();
+        if (localRows.isNotEmpty) {
+          final localHomes = localRows
+              .map((r) => HomeModel(
+                    id: r.id,
+                    name: r.name,
+                    inviteCode: r.inviteCode,
+                    currentUserRole: r.currentUserRole,
+                    memberCount: r.memberCount,
+                    createdAt: r.createdAt?.toIso8601String(),
+                  ))
+              .toList();
+          return localHomes;
+        }
+      }
+      return [];
     }
 
     try {
@@ -33,7 +52,22 @@ class HomeRepository {
         await _cacheHomesLocally(cached);
         return cached;
       }
-      rethrow;
+      if (database != null) {
+        final localRows = await database!.select(database!.localHomes).get();
+        if (localRows.isNotEmpty) {
+          return localRows
+              .map((r) => HomeModel(
+                    id: r.id,
+                    name: r.name,
+                    inviteCode: r.inviteCode,
+                    currentUserRole: r.currentUserRole,
+                    memberCount: r.memberCount,
+                    createdAt: r.createdAt?.toIso8601String(),
+                  ))
+              .toList();
+        }
+      }
+      return [];
     }
   }
 

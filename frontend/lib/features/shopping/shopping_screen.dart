@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/household_staples.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/homestock/homestock_pill_badge.dart';
@@ -1187,6 +1188,16 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   }
 
   Widget _buildShoppingItemTile(BuildContext context, ShoppingItemModel item) {
+    final staple = findStapleForName(item.itemName);
+    final emoji = staple?.emoji ?? '🛒';
+    final tamilName = staple?.tamilName;
+    final invItems = ref.watch(inventoryControllerProvider).items;
+    final pantryItem = invItems.cast<InventoryItemModel?>().firstWhere(
+      (p) => (item.inventoryItemId != null && p?.id == item.inventoryItemId) ||
+             (p?.name.toLowerCase() == item.itemName.toLowerCase()),
+      orElse: () => null,
+    );
+
     return Dismissible(
       key: Key('shopping_item_${item.id}'),
       direction: DismissDirection.endToStart,
@@ -1248,7 +1259,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Row 1: Checkbox / Circular Check + Expanded Title + Stepper + Delete
+            // Row 1: Checkbox / Circular Check + Emoji + Expanded Title + Stepper + Delete
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -1290,40 +1301,89 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                           : null,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                 ],
+
+                // Product Emoji Avatar
+                Container(
+                  width: 32,
+                  height: 32,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: item.isCompleted ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                ),
 
                 // Item Title (Expanded so it has full width and never wraps letter by letter)
                 Expanded(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          item.itemName,
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            decoration: item.isCompleted ? TextDecoration.lineThrough : null,
-                            color: item.isCompleted ? AppColors.textMuted : AppColors.textPrimary,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.itemName,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                                color: item.isCompleted ? AppColors.textMuted : AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          if (tamilName != null && tamilName.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '($tamilName)',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: item.isCompleted ? AppColors.textMuted : AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          if (item.isAutoGenerated) ...[
+                            const SizedBox(width: 6),
+                            const HomeStockPillBadge(
+                              label: 'Low-Stock',
+                              variant: HomeStockPillVariant.yellow,
+                              fontSize: 9,
+                              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            ),
+                          ],
+                        ],
                       ),
-                      if (item.isAutoGenerated) ...[
-                        const SizedBox(width: 6),
-                        const HomeStockPillBadge(
-                          label: 'Low-Stock',
-                          variant: HomeStockPillVariant.yellow,
-                          fontSize: 9,
-                          padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.isCompleted
+                            ? 'Bought • Restocked to Pantry 👍'
+                            : (pantryItem != null
+                                ? 'Pantry: ${pantryItem.quantity.toStringAsFixed(pantryItem.quantity == pantryItem.quantity.roundToDouble() ? 0 : 1)} ${pantryItem.unit} (Min: ${pantryItem.minimumQuantity.toStringAsFixed(0)})'
+                                : 'Added by ${item.addedByName} • ${item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)} ${item.unit}'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: item.isCompleted ? AppColors.hsGreen : AppColors.textSecondary,
+                          fontWeight: item.isCompleted ? FontWeight.w600 : FontWeight.w500,
                         ),
-                      ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
 
                 // In-card Quantity Stepper
                 if (!item.isCompleted) ...[
@@ -1382,28 +1442,13 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               ],
             ),
 
-            // Row 2: Subtitle on Left, Deals & Scan Actions on Right
-            Padding(
-              padding: EdgeInsets.only(left: (_isSelectionMode && !item.isCompleted) ? 30 : 36, top: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.isCompleted
-                          ? 'Bought by ${item.completedByName ?? 'Family'}'
-                          : 'Added by ${item.addedByName} • ${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: item.isCompleted ? AppColors.hsGreen : AppColors.textSecondary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-
-                  if (!item.isCompleted) ...[
-                    const SizedBox(width: 8),
-
+            // Row 2: Deals & Scan Actions
+            if (!item.isCompleted)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
                     // Compare Deals Button
                     InkWell(
                       onTap: () => Navigator.of(context).push(
@@ -1467,9 +1512,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
           ],
         ),
       ),

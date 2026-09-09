@@ -87,6 +87,10 @@ class SyncEngine {
   /// Full sync cycle for all homes the user belongs to.
   Future<void> syncAll() async {
     if (_isSyncing) return;
+    if (!_connectivity.isOnline) {
+      if (kDebugMode) print('[SyncEngine] Skipping syncAll - device is offline');
+      return;
+    }
     _isSyncing = true;
     _connectivity.setSyncing();
     _updateState(_currentState.copyWith(

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/household_staples.dart';
 import '../../core/database/app_database.dart';
 import '../../core/network/api_client.dart';
 import '../../core/sync/connectivity_monitor.dart';
@@ -135,6 +136,31 @@ class BarcodeRepository {
                 isCompleted: existingShoppingItem.isCompleted,
               )
             : null,
+        isFromLocalCache: true,
+      );
+    }
+
+    // 1b. MASTER CATALOG LOOKUP: Check offline 2,055 product master staples
+    final stapleMatch = findStapleForName(normalized);
+    if (stapleMatch != null) {
+      final productModel = ProductCatalogModel(
+        barcode: normalized,
+        barcodeType: detectedType.displayName,
+        name: stapleMatch.name,
+        normalizedName: stapleMatch.name.toLowerCase(),
+        brand: stapleMatch.customBrands?.firstOrNull,
+        categoryName: stapleMatch.category,
+        unit: stapleMatch.defaultUnit,
+        source: 'MASTER_CATALOG',
+      );
+
+      return BarcodeLookupResult(
+        found: true,
+        barcode: normalized,
+        barcodeType: detectedType.displayName,
+        product: productModel,
+        existingInventory: null,
+        existingShopping: null,
         isFromLocalCache: true,
       );
     }

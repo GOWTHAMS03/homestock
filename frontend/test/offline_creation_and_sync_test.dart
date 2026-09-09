@@ -212,5 +212,15 @@ void main() {
       final pendingOps = await syncDao.getPendingOperations();
       expect(pendingOps.any((o) => o.operationType == SyncOperationType.clearCompletedShopping), isTrue);
     });
+
+    test('SyncEngine.syncAll() returns immediately when offline without network call', () async {
+      connectivity.markOffline();
+      expect(connectivity.isOnline, isFalse);
+
+      // syncAll should exit immediately without throwing and without starting sync
+      await syncEngine.syncAll();
+      expect(syncEngine.currentState.isSyncInProgress, isFalse);
+      expect(syncEngine.currentState.status, NetworkStatus.offline);
+    });
   });
 }

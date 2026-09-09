@@ -15,6 +15,7 @@ import '../voice/widgets/voice_input_button.dart';
 import '../voice/widgets/voice_bottom_sheet.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../shopping/shopping_controller.dart';
+import '../shopping/shopping_model.dart';
 import 'add_edit_item_screen.dart';
 import 'category_model.dart';
 import 'inventory_controller.dart';
@@ -989,8 +990,17 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final isLow = item.isLowStock;
     final isOut = item.isOutOfStock;
     final formattedName = _formatName(item.name);
-
     final isSelected = _selectedItemIds.contains(item.id);
+
+    final staple = findStapleForName(item.name, item.categoryName);
+    final shoppingList = ref.watch(shoppingControllerProvider).list;
+    final pendingShoppingItem = shoppingList?.items.cast<ShoppingItemModel?>().firstWhere(
+      (s) => !s!.isCompleted &&
+             ((s.inventoryItemId != null && s.inventoryItemId == item.id) ||
+              s.itemName.toLowerCase().trim() == item.name.toLowerCase().trim()),
+      orElse: () => null,
+    );
+    final isOnShoppingList = pendingShoppingItem != null;
 
     return HomeStockCard(
       padding: const EdgeInsets.all(14),
@@ -1036,30 +1046,25 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               ],
 
               // Left Category / Staple Indicator with soft pastel color
-              Builder(
-                builder: (context) {
-                  final staple = findStapleForName(item.name, item.categoryName);
-                  return Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: item.categoryColorParsed.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: item.categoryColorParsed.withValues(alpha: 0.28),
-                        width: 1,
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: item.categoryColorParsed.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: item.categoryColorParsed.withValues(alpha: 0.28),
+                    width: 1,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: staple != null && staple.emoji.isNotEmpty
+                    ? Text(staple.emoji, style: const TextStyle(fontSize: 24))
+                    : Icon(
+                        item.categoryIconData,
+                        size: 24,
+                        color: item.categoryColorParsed,
                       ),
-                    ),
-                    alignment: Alignment.center,
-                    child: staple != null && staple.emoji.isNotEmpty
-                        ? Text(staple.emoji, style: const TextStyle(fontSize: 24))
-                        : Icon(
-                            item.categoryIconData,
-                            size: 24,
-                            color: item.categoryColorParsed,
-                          ),
-                  );
-                },
               ),
               const SizedBox(width: 12),
 
@@ -1069,16 +1074,40 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      formattedName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            formattedName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (staple?.tamilName != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE9FE),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              staple!.tamilName!,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF6D28D9),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -1122,6 +1151,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           fontSize: 10,
                         ),
 
+                        if (isOnShoppingList)
+                          const HomeStockPillBadge(
+                            label: '🛒 On Shopping List',
+                            variant: HomeStockPillVariant.purple,
+                            fontSize: 10,
+                          ),
+
                         if (item.expiryDate != null)
                           ExpiryUrgencyBadge(expiryDateStr: item.expiryDate, compact: true),
                       ],
@@ -1160,29 +1196,50 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                InkWell(
-                  onTap: () => _addItemToShoppingList(item),
-                  borderRadius: BorderRadius.circular(50),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                if (isOnShoppingList)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: const Color(0xFFF3E8FF),
                       borderRadius: BorderRadius.circular(50),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFFD8B4FE)),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add_shopping_cart_rounded, size: 12, color: AppColors.primary),
-                        SizedBox(width: 4),
+                        const Text('🛒', style: TextStyle(fontSize: 10.5)),
+                        const SizedBox(width: 4),
                         Text(
-                          '+ Shopping List',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          'On Shopping List (${pendingShoppingItem.quantity % 1 == 0 ? pendingShoppingItem.quantity.toInt() : pendingShoppingItem.quantity} ${pendingShoppingItem.unit})',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF7E22CE)),
                         ),
                       ],
                     ),
+                  )
+                else
+                  InkWell(
+                    onTap: () => _addItemToShoppingList(item),
+                    borderRadius: BorderRadius.circular(50),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(50),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_shopping_cart_rounded, size: 12, color: AppColors.primary),
+                          SizedBox(width: 4),
+                          Text(
+                            '+ Shopping List',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ],
@@ -1218,28 +1275,53 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       ),
                     ),
                   ),
-                  InkWell(
-                    onTap: () => _addItemToShoppingList(item),
-                    borderRadius: BorderRadius.circular(6),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  if (isOnShoppingList)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3E8FF),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFD8B4FE), width: 0.8),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.add_shopping_cart_rounded, size: 13, color: AppColors.primary),
-                          SizedBox(width: 4),
+                          const Text('🛒', style: TextStyle(fontSize: 10.5)),
+                          const SizedBox(width: 4),
                           Text(
-                            '+ Shopping List',
-                            style: TextStyle(
-                              fontSize: 11,
+                            'On List (${pendingShoppingItem.quantity % 1 == 0 ? pendingShoppingItem.quantity.toInt() : pendingShoppingItem.quantity} ${pendingShoppingItem.unit})',
+                            style: const TextStyle(
+                              fontSize: 10.5,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
+                              color: Color(0xFF7E22CE),
                             ),
                           ),
                         ],
                       ),
+                    )
+                  else
+                    InkWell(
+                      onTap: () => _addItemToShoppingList(item),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_shopping_cart_rounded, size: 13, color: AppColors.primary),
+                            SizedBox(width: 4),
+                            Text(
+                              '+ Shopping List',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
