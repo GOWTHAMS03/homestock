@@ -13,11 +13,21 @@ import 'category_model.dart';
 import 'inventory_controller.dart';
 import 'inventory_model.dart';
 
+import 'package:flutter/services.dart';
+import '../../core/constants/household_staples.dart';
+import '../../core/widgets/homestock/homestock_pill_badge.dart';
+
 class AddEditItemScreen extends ConsumerStatefulWidget {
   final InventoryItemModel? initialItem;
   final String? initialBarcode;
+  final HouseholdStaple? initialStaple;
 
-  const AddEditItemScreen({super.key, this.initialItem, this.initialBarcode});
+  const AddEditItemScreen({
+    super.key,
+    this.initialItem,
+    this.initialBarcode,
+    this.initialStaple,
+  });
 
   @override
   ConsumerState<AddEditItemScreen> createState() => _AddEditItemScreenState();
@@ -47,23 +57,72 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
   void initState() {
     super.initState();
     final item = widget.initialItem;
-    _nameController = TextEditingController(text: item?.name ?? '');
-    _quantityController = TextEditingController(text: item != null ? item.quantity.toString() : '1.0');
-    _minQtyController = TextEditingController(text: item != null ? item.minimumQuantity.toString() : '1.0');
-    _brandController = TextEditingController(text: item?.brand ?? '');
+    final staple = widget.initialStaple;
+
+    final name = item?.name ?? staple?.name ?? '';
+    final qty = item != null
+        ? item.quantity.toString()
+        : (staple != null ? (staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt().toString() : staple.defaultQty.toString()) : '1.0');
+    final minQty = item != null
+        ? item.minimumQuantity.toString()
+        : (staple != null ? (staple.minimumQuantity == staple.minimumQuantity.roundToDouble() ? staple.minimumQuantity.toInt().toString() : staple.minimumQuantity.toString()) : '1.0');
+    final brand = item?.brand ?? (staple != null && staple.suggestedBrands.isNotEmpty ? staple.suggestedBrands.first : '');
+    final location = item?.storageLocation ?? staple?.storageLocation ?? '';
+
+    _nameController = TextEditingController(text: name);
+    _quantityController = TextEditingController(text: qty);
+    _minQtyController = TextEditingController(text: minQty);
+    _brandController = TextEditingController(text: brand);
     _barcodeController = TextEditingController(text: item?.barcode ?? widget.initialBarcode ?? '');
-    _locationController = TextEditingController(text: item?.storageLocation ?? '');
+    _locationController = TextEditingController(text: location);
     _priceController = TextEditingController(text: item?.purchasePrice != null ? item!.purchasePrice.toString() : '');
     _notesController = TextEditingController(text: item?.notes ?? '');
-    _unit = item?.unit ?? 'pcs';
+    _unit = item?.unit ?? staple?.defaultUnit ?? 'pcs';
     _categoryId = item?.categoryId;
 
     if (item?.expiryDate != null) {
       _expiryDate = DateTime.tryParse(item!.expiryDate!);
     }
-    if (item != null && (item.brand != null || item.storageLocation != null || item.expiryDate != null)) {
+    if ((item != null && (item.brand != null || item.storageLocation != null || item.expiryDate != null)) ||
+        (staple != null && staple.suggestedBrands.isNotEmpty)) {
       _showMoreDetails = true;
     }
+  }
+
+  void _applySuggestedStaple(HouseholdStaple staple, List<CategoryModel> categories) {
+    HapticFeedback.lightImpact();
+    final matchingCat = categories.cast<CategoryModel?>().firstWhere(
+          (c) => c?.name.toLowerCase() == staple.category.toLowerCase(),
+          orElse: () => null,
+        );
+
+    setState(() {
+      _nameController.text = staple.name;
+      _quantityController.text = staple.defaultQty == staple.defaultQty.roundToDouble()
+          ? staple.defaultQty.toInt().toString()
+          : staple.defaultQty.toString();
+      _minQtyController.text = staple.minimumQuantity == staple.minimumQuantity.roundToDouble()
+          ? staple.minimumQuantity.toInt().toString()
+          : staple.minimumQuantity.toString();
+      _locationController.text = staple.storageLocation;
+      _unit = staple.defaultUnit;
+      if (matchingCat != null) {
+        _categoryId = matchingCat.id;
+      }
+      if (staple.suggestedBrands.isNotEmpty && _brandController.text.isEmpty) {
+        _brandController.text = staple.suggestedBrands.first;
+      }
+    });
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Auto-filled details for ${staple.name}!'),
+        backgroundColor: const Color(0xFF0F172A),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -162,6 +221,81 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
+            // Quick Pick Suggested Staples (when adding new item)
+            if (!isEditing) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFFD97706)),
+                        SizedBox(width: 6),
+                        Text(
+                          'Quick Pick Suggested Staples',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        ),
+                        SizedBox(width: 6),
+                        HomeStockPillBadge(
+                          label: '1-Tap Auto-fill',
+                          variant: HomeStockPillVariant.yellow,
+                          fontSize: 9.5,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 38,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: kHouseholdStaples.length,
+                        separatorBuilder: (context, index) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final s = kHouseholdStaples[index];
+                          return InkWell(
+                            onTap: () => _applySuggestedStaple(s, categories),
+                            borderRadius: BorderRadius.circular(50),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(50),
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.02),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(s.emoji, style: const TextStyle(fontSize: 14)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    s.name,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${s.defaultQty == s.defaultQty.roundToDouble() ? s.defaultQty.toInt() : s.defaultQty} ${s.defaultUnit})',
+                                    style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Card 1: Essential Item Info
             HomeStockCard(
               padding: const EdgeInsets.all(16),

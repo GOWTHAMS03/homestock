@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
+import '../../theme/app_theme.dart';
 
 /// Reusable HomeStock top AppBar featuring the signature quick-commerce aesthetic:
-/// - Soft pastel lavender gradient header
+/// - Soft pastel lavender (online) or warm blush (offline) gradient header
 /// - 38x38dp circular elevated back button
 /// - High-contrast title and subtitle/status headline
 /// - Actions aligned with clean spacing
@@ -33,20 +34,21 @@ class HomeStockAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
+    final hsColors = context.hsColors;
 
     return Container(
       decoration: BoxDecoration(
         color: useGradient ? null : Colors.white,
         gradient: useGradient
-            ? const LinearGradient(
-                colors: [AppColors.headerGradientStart, AppColors.headerGradientEnd],
+            ? LinearGradient(
+                colors: [hsColors.headerGradientStart, hsColors.headerGradientEnd],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               )
             : null,
         border: Border(
           bottom: BorderSide(
-            color: AppColors.outline.withValues(alpha: 0.6),
+            color: hsColors.outline.withValues(alpha: 0.6),
             width: 0.8,
           ),
         ),
@@ -70,7 +72,7 @@ class HomeStockAppBar extends StatelessWidget implements PreferredSizeWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+                        border: Border.all(color: hsColors.outline.withValues(alpha: 0.8)),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.04),

@@ -14,6 +14,7 @@ final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
     apiClient: ref.watch(apiClientProvider),
     syncEngine: ref.watch(syncEngineProvider),
     connectivity: ref.watch(connectivityMonitorProvider),
+    inventoryDao: ref.watch(inventoryDaoProvider),
   );
 });
 
@@ -209,6 +210,17 @@ class ShoppingController extends StateNotifier<ShoppingState> {
       final defaultList = await _repo.ensureDefaultList(activeHomeId);
       final listId = state.list?.id ?? defaultList.id;
       await _repo.deleteItem(activeHomeId, listId, itemId);
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    }
+  }
+
+  /// Mark batch of items completed: local-first.
+  Future<void> markItemsCompleted(List<String> itemIds) async {
+    final activeHomeId = await _getOrResolveHomeId();
+    if (activeHomeId == null) return;
+    try {
+      await _repo.markItemsCompleted(activeHomeId, itemIds);
     } catch (e) {
       state = state.copyWith(errorMessage: e.toString());
     }

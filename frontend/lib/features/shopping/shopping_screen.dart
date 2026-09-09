@@ -5,7 +5,6 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/homestock/homestock_pill_badge.dart';
-import '../../core/widgets/offline_wifi_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/sync_status_bar.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
@@ -21,38 +20,6 @@ import 'shopping_model.dart';
 import 'shopping_mode_screen.dart';
 
 enum _ShoppingFilter { all, toBuy, completed }
-
-/// Quick-add household staple definitions with standard sizes and emojis
-class _StapleItem {
-  final String name;
-  final double qty;
-  final String unit;
-  final String emoji;
-  final String category;
-
-  const _StapleItem({
-    required this.name,
-    required this.qty,
-    required this.unit,
-    required this.emoji,
-    required this.category,
-  });
-}
-
-const List<_StapleItem> _kQuickStaples = [
-  _StapleItem(name: 'Milk', qty: 1.0, unit: 'L', emoji: '🥛', category: 'Dairy'),
-  _StapleItem(name: 'Eggs', qty: 12.0, unit: 'pcs', emoji: '🥚', category: 'Dairy'),
-  _StapleItem(name: 'Basmati Rice', qty: 5.0, unit: 'kg', emoji: '🌾', category: 'Grains'),
-  _StapleItem(name: 'Sunflower Oil', qty: 1.0, unit: 'L', emoji: '🌻', category: 'Oils'),
-  _StapleItem(name: 'Onions', qty: 1.0, unit: 'kg', emoji: '🧅', category: 'Vegetables'),
-  _StapleItem(name: 'Tomatoes', qty: 1.0, unit: 'kg', emoji: '🍅', category: 'Vegetables'),
-  _StapleItem(name: 'Aashirvaad Atta', qty: 5.0, unit: 'kg', emoji: '🫓', category: 'Grains'),
-  _StapleItem(name: 'Bread', qty: 1.0, unit: 'pk', emoji: '🍞', category: 'Bakery'),
-  _StapleItem(name: 'Tea / Chai', qty: 250.0, unit: 'g', emoji: '☕', category: 'Beverages'),
-  _StapleItem(name: 'Potatoes', qty: 1.0, unit: 'kg', emoji: '🥔', category: 'Vegetables'),
-  _StapleItem(name: 'Bananas', qty: 6.0, unit: 'pcs', emoji: '🍌', category: 'Fruits'),
-  _StapleItem(name: 'Dishwash Gel', qty: 500.0, unit: 'ml', emoji: '🧼', category: 'Cleaning'),
-];
 
 class ShoppingScreen extends ConsumerStatefulWidget {
   const ShoppingScreen({super.key});
@@ -178,47 +145,43 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     }
   }
 
-  Future<void> _addStapleItem(_StapleItem staple) async {
-    final success = await ref.read(shoppingControllerProvider.notifier).addItem(
-      itemName: staple.name,
-      quantity: staple.qty,
-      unit: staple.unit,
-    );
+  void _handleToggleItem(ShoppingItemModel item) {
+    final willBeCompleted = !item.isCompleted;
+    ref.read(shoppingControllerProvider.notifier).toggleItem(item.id);
+
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Text(staple.emoji, style: const TextStyle(fontSize: 16)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Added ${staple.name} (${staple.qty == staple.qty.roundToDouble() ? staple.qty.toInt() : staple.qty} ${staple.unit}) to list',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
+      final qtyText = '${item.quantity.toStringAsFixed(item.quantity.truncateToDouble() == item.quantity ? 0 : 1)} ${item.unit}';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                willBeCompleted ? Icons.check_circle_rounded : Icons.undo_rounded,
+                color: willBeCompleted ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  willBeCompleted
+                      ? 'Restocked ${item.itemName} (+$qtyText) to pantry & updated low-stock!'
+                      : 'Unmarked ${item.itemName} & reverted stock',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
                 ),
-              ],
-            ),
-            backgroundColor: AppColors.textPrimary,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
+              ),
+            ],
           ),
-        );
-      } else {
-        final error = ref.read(shoppingControllerProvider).errorMessage ??
-            'Could not add "${staple.name}" to shopping list';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+          backgroundColor: const Color(0xFF0F172A),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 2400),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
     }
   }
+
+
 
   Future<void> _restockAllLowStock(List<InventoryItemModel> lowStockSuggestions) async {
     if (lowStockSuggestions.isEmpty) return;
@@ -310,7 +273,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     final completionRatio = totalCount > 0 ? (completedCount / totalCount) : 0.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: HomeStockAppBar(
         title: 'Shopping List',
         subtitle: totalCount == 0
@@ -326,7 +289,6 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w700),
               ),
             ),
-          const OfflineWifiBadge(),
           const SizedBox(width: 8),
         ],
       ),
@@ -362,10 +324,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                           const SizedBox(height: 14),
                         ],
 
-                        // 3. One-Tap Household Essentials Carousel
-                        _buildStaplesCarousel(context),
 
-                        const SizedBox(height: 16),
 
                         // 4. Active Items List OR Clean Non-Redundant Empty Guide
                         if (totalCount > 0) ...[
@@ -397,16 +356,16 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         tooltip: 'Add Shopping Item',
         child: const Icon(Icons.add_rounded, size: 26),
       ),
-      bottomNavigationBar: _selectedItemIds.isNotEmpty
+      bottomNavigationBar: (_isSelectionMode || _selectedItemIds.isNotEmpty)
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    offset: const Offset(0, -2),
-                    blurRadius: 8,
+                    color: Colors.black.withValues(alpha: 0.1),
+                    offset: const Offset(0, -3),
+                    blurRadius: 10,
                   ),
                 ],
               ),
@@ -414,36 +373,71 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 top: false,
                 child: Row(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${_selectedItemIds.length} item(s) selected',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary),
-                        ),
-                        const Text('Multi-provider price optimizer', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SmartShoppingScreen(
-                              itemIds: _selectedItemIds.toList(),
-                            ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _selectedItemIds.isEmpty
+                                ? 'Tap items to select'
+                                : '${_selectedItemIds.length} item(s) selected',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.textPrimary),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD97706),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          Text(
+                            _selectedItemIds.isEmpty
+                                ? 'Choose products to compare prices'
+                                : 'Compare Blinkit, Zepto, Instamart',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ],
                       ),
-                      icon: const Icon(Icons.bolt_rounded, size: 18),
-                      label: const Text('Find Best Price ⚡', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    ),
+                    if (_selectedItemIds.isEmpty)
+                      OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedItemIds.addAll(
+                              filteredItems.where((i) => !i.isCompleted).map((i) => i.id),
+                            );
+                          });
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Select All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      )
+                    else
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SmartShoppingScreen(
+                                itemIds: _selectedItemIds.toList(),
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.bolt_rounded, size: 18),
+                        label: const Text('Compare Deals ⚡', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                      tooltip: 'Exit Selection Mode',
+                      onPressed: () {
+                        setState(() {
+                          _isSelectionMode = false;
+                          _selectedItemIds.clear();
+                        });
+                      },
                     ),
                   ],
                 ),
@@ -727,72 +721,6 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     );
   }
 
-  /// 1-Tap Household Staples Carousel
-  Widget _buildStaplesCarousel(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: const [
-            Icon(Icons.flash_on_rounded, size: 15, color: AppColors.primary),
-            SizedBox(width: 4),
-            Text(
-              'Quick-Add Essentials (1-Tap)',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-            ),
-            SizedBox(width: 6),
-            HomeStockPillBadge(
-              label: '1-Tap',
-              variant: HomeStockPillVariant.green,
-              fontSize: 9.5,
-              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _kQuickStaples.length,
-            separatorBuilder: (_, index) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final staple = _kQuickStaples[index];
-              return Material(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(50),
-                child: InkWell(
-                  onTap: () => _addStapleItem(staple),
-                  borderRadius: BorderRadius.circular(50),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(50),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(staple.emoji, style: const TextStyle(fontSize: 13)),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${staple.name} (${staple.qty == staple.qty.roundToDouble() ? staple.qty.toInt() : staple.qty} ${staple.unit})',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.add_circle_outline_rounded, size: 14, color: AppColors.primary),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
   /// Active Shopping Items List with Filters and Progress
   Widget _buildActiveListSection(
     BuildContext context, {
@@ -866,87 +794,167 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                   minHeight: 6,
                 ),
               ),
+
+              // Prominent 1-Tap Basket Comparison Banner when items are pending
+              if (pendingCount > 0) ...[
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: () {
+                    final pendingIds = filteredItems.where((i) => !i.isCompleted).map((i) => i.id).toList();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SmartShoppingScreen(
+                          itemIds: pendingIds.isNotEmpty ? pendingIds : null,
+                        ),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFD97706),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Compare Live Basket Prices ($pendingCount items)',
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF92400E)),
+                              ),
+                              const Text(
+                                'Find cheapest store split across Blinkit, Zepto, Instamart & BigBasket',
+                                style: TextStyle(fontSize: 10, color: Color(0xFFB45309)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFD97706)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
 
         const SizedBox(height: 12),
 
-        // Filter Chips Row
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildFilterChip('All ($totalCount)', _ShoppingFilter.all),
-              const SizedBox(width: 8),
-              _buildFilterChip('To Buy ($pendingCount)', _ShoppingFilter.toBuy),
-              const SizedBox(width: 8),
-              _buildFilterChip('Done ($completedCount)', _ShoppingFilter.completed),
-              const SizedBox(width: 10),
-              ActionChip(
-                avatar: Icon(
-                  _isSelectionMode ? Icons.close_rounded : Icons.bolt_rounded,
-                  size: 14,
-                  color: _isSelectionMode ? AppColors.primary : const Color(0xFFD97706),
-                ),
-                label: Text(
-                  _isSelectionMode ? 'Cancel' : 'Compare Basket ⚡',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _isSelectionMode ? AppColors.primary : const Color(0xFFD97706),
+        // Filter Chips Row (No horizontal scroll cut-off)
+        Row(
+          children: [
+            _buildFilterChip('All ($totalCount)', _ShoppingFilter.all),
+            const SizedBox(width: 8),
+            _buildFilterChip('To Buy ($pendingCount)', _ShoppingFilter.toBuy),
+            const SizedBox(width: 8),
+            _buildFilterChip('Done ($completedCount)', _ShoppingFilter.completed),
+            const Spacer(),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _isSelectionMode = !_isSelectionMode;
+                  if (!_isSelectionMode) {
+                    _selectedItemIds.clear();
+                  } else {
+                    _selectedItemIds.addAll(
+                      filteredItems.where((i) => !i.isCompleted).map((i) => i.id),
+                    );
+                  }
+                });
+              },
+              borderRadius: BorderRadius.circular(50),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _isSelectionMode ? AppColors.primaryContainer : Colors.white,
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(
+                    color: _isSelectionMode ? AppColors.primary : const Color(0xFFE2E8F0),
                   ),
                 ),
-                backgroundColor: _isSelectionMode ? AppColors.primaryContainer : const Color(0xFFFEF3C7),
-                side: BorderSide(
-                  color: _isSelectionMode ? AppColors.primary : const Color(0xFFFDE68A),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isSelectionMode ? Icons.close_rounded : Icons.checklist_rounded,
+                      size: 14,
+                      color: _isSelectionMode ? AppColors.primary : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isSelectionMode ? 'Cancel' : 'Select',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _isSelectionMode ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                onPressed: () {
-                  setState(() {
-                    _isSelectionMode = !_isSelectionMode;
-                    if (!_isSelectionMode) {
-                      _selectedItemIds.clear();
-                    } else {
-                      _selectedItemIds.addAll(
-                        filteredItems.where((i) => !i.isCompleted).map((i) => i.id),
-                      );
-                    }
-                  });
-                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
 
         if (_isSelectionMode) ...[
           const SizedBox(height: 8),
-          Row(
-            children: [
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedItemIds.addAll(filteredItems.where((i) => !i.isCompleted).map((i) => i.id));
-                  });
-                },
-                child: const Text('Select All Pending', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w700)),
-              ),
-              const SizedBox(width: 12),
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedItemIds.addAll(
-                      filteredItems.where((i) => i.isAutoGenerated && !i.isCompleted).map((i) => i.id),
-                    );
-                  });
-                },
-                child: const Text('Select Low-Stock', style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w700)),
-              ),
-              const SizedBox(width: 12),
-              InkWell(
-                onTap: () => setState(() => _selectedItemIds.clear()),
-                child: const Text('Clear', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedItemIds.addAll(filteredItems.where((i) => !i.isCompleted).map((i) => i.id));
+                    });
+                  },
+                  child: const Text('Select All', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 12),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedItemIds.addAll(
+                        filteredItems.where((i) => i.isAutoGenerated && !i.isCompleted).map((i) => i.id),
+                      );
+                    });
+                  },
+                  child: const Text('Select Low-Stock', style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 12),
+                InkWell(
+                  onTap: () => setState(() => _selectedItemIds.clear()),
+                  child: const Text('Clear', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                ),
+                const Spacer(),
+                Text(
+                  '${_selectedItemIds.length} chosen',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.primary),
+                ),
+              ],
+            ),
           ),
         ],
 
@@ -1235,65 +1243,71 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                   }
                 });
               }
-            : () => ref.read(shoppingControllerProvider.notifier).toggleItem(item.id),
-        child: Row(
+            : () => _handleToggleItem(item),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (_isSelectionMode && !item.isCompleted) ...[
-              Checkbox(
-                value: _selectedItemIds.contains(item.id),
-                activeColor: AppColors.primary,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-                onChanged: (val) {
-                  setState(() {
-                    if (val == true) {
-                      _selectedItemIds.add(item.id);
-                    } else {
-                      _selectedItemIds.remove(item.id);
-                    }
-                  });
-                },
-              ),
-              const SizedBox(width: 4),
-            ],
-            // Circular Check Indicator
-            InkWell(
-              onTap: () => ref.read(shoppingControllerProvider.notifier).toggleItem(item.id),
-              borderRadius: BorderRadius.circular(999),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: item.isCompleted ? AppColors.hsGreen : Colors.white,
-                  border: Border.all(
-                    color: item.isCompleted ? AppColors.hsGreen : AppColors.outline.withValues(alpha: 0.9),
-                    width: 1.5,
+            // Row 1: Checkbox / Circular Check + Expanded Title + Stepper + Delete
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (_isSelectionMode && !item.isCompleted) ...[
+                  Checkbox(
+                    value: _selectedItemIds.contains(item.id),
+                    activeColor: AppColors.primary,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == true) {
+                          _selectedItemIds.add(item.id);
+                        } else {
+                          _selectedItemIds.remove(item.id);
+                        }
+                      });
+                    },
                   ),
-                ),
-                child: item.isCompleted
-                    ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
-                    : null,
-              ),
-            ),
-            const SizedBox(width: 12),
+                  const SizedBox(width: 4),
+                ] else ...[
+                  // Circular Check Indicator
+                  InkWell(
+                    onTap: () => _handleToggleItem(item),
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: item.isCompleted ? AppColors.hsGreen : Colors.white,
+                        border: Border.all(
+                          color: item.isCompleted ? AppColors.hsGreen : AppColors.outline.withValues(alpha: 0.9),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: item.isCompleted
+                          ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
 
-            // Item Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                // Item Title (Expanded so it has full width and never wraps letter by letter)
+                Expanded(
+                  child: Row(
                     children: [
                       Flexible(
                         child: Text(
                           item.itemName,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 14.5,
                             fontWeight: FontWeight.w700,
                             decoration: item.isCompleted ? TextDecoration.lineThrough : null,
                             color: item.isCompleted ? AppColors.textMuted : AppColors.textPrimary,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (item.isAutoGenerated) ...[
@@ -1307,105 +1321,154 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.isCompleted
-                        ? 'Bought by ${item.completedByName ?? 'Family'}'
-                        : 'Added by ${item.addedByName} • ${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: item.isCompleted ? AppColors.hsGreen : AppColors.textSecondary,
+                ),
+
+                const SizedBox(width: 8),
+
+                // In-card Quantity Stepper
+                if (!item.isCompleted) ...[
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            final next = (item.quantity - 1.0).clamp(0.0, 999.0);
+                            ref.read(shoppingControllerProvider.notifier).updateQuantity(item.id, next);
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.remove_rounded, size: 14, color: AppColors.textSecondary),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity}',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: AppColors.textPrimary),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            ref.read(shoppingControllerProvider.notifier).updateQuantity(item.id, item.quantity + 1.0);
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.add_rounded, size: 14, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(width: 6),
                 ],
-              ),
+
+                // Delete action
+                InkWell(
+                  onTap: () => ref.read(shoppingControllerProvider.notifier).deleteItem(item.id),
+                  borderRadius: BorderRadius.circular(50),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                  ),
+                ),
+              ],
             ),
 
-            // In-card Quantity Stepper
-            if (!item.isCompleted) ...[
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+            // Row 2: Subtitle on Left, Deals & Scan Actions on Right
+            Padding(
+              padding: EdgeInsets.only(left: (_isSelectionMode && !item.isCompleted) ? 30 : 36, top: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.isCompleted
+                          ? 'Bought by ${item.completedByName ?? 'Family'}'
+                          : 'Added by ${item.addedByName} • ${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity} ${item.unit}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: item.isCompleted ? AppColors.hsGreen : AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+
+                  if (!item.isCompleted) ...[
+                    const SizedBox(width: 8),
+
+                    // Compare Deals Button
                     InkWell(
-                      onTap: () {
-                        final next = (item.quantity - 1.0).clamp(0.0, 999.0);
-                        ref.read(shoppingControllerProvider.notifier).updateQuantity(item.id, next);
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.remove_rounded, size: 14, color: AppColors.textSecondary),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SmartShoppingScreen(
+                            itemId: item.id,
+                            inventoryItemId: item.inventoryItemId,
+                            itemName: item.itemName,
+                            quantity: item.quantity,
+                            unit: item.unit,
+                          ),
+                        ),
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt_rounded, size: 12, color: Color(0xFFD97706)),
+                            SizedBox(width: 3),
+                            Text(
+                              'Deals',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF92400E)),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        '${item.quantity == item.quantity.roundToDouble() ? item.quantity.toInt() : item.quantity}',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: AppColors.textPrimary),
-                      ),
-                    ),
+                    const SizedBox(width: 6),
+
+                    // Per-Item Scan Barcode Button
                     InkWell(
                       onTap: () {
-                        ref.read(shoppingControllerProvider.notifier).updateQuantity(item.id, item.quantity + 1.0);
+                        BarcodeScannerWidget.open(context, targetShoppingItem: item);
                       },
-                      borderRadius: BorderRadius.circular(8),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.add_rounded, size: 14, color: AppColors.primary),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryContainer.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.6)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.qr_code_scanner_rounded, size: 12, color: AppColors.primary),
+                            SizedBox(width: 3),
+                            Text(
+                              'Scan',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-
-              // Compare Deals Button
-              InkWell(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SmartShoppingScreen(
-                      itemId: item.id,
-                      inventoryItemId: item.inventoryItemId,
-                      itemName: item.itemName,
-                      quantity: item.quantity,
-                      unit: item.unit,
-                    ),
-                  ),
-                ),
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.bolt_rounded, size: 13, color: Color(0xFFD97706)),
-                      SizedBox(width: 2),
-                      Text(
-                        'Deals',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF92400E)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-
-            // Delete action
-            IconButton(
-              icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
-              onPressed: () => ref.read(shoppingControllerProvider.notifier).deleteItem(item.id),
-              tooltip: 'Remove',
             ),
           ],
         ),

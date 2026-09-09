@@ -108,10 +108,12 @@ D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\dto\C
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\dto\ProductDto.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\dto\ProductLookupResponse.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\entity\Product.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\entity\ProductIdentifier.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\provider\InternalProductProvider.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\provider\MockGroceryProductProvider.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\provider\OpenFoodFactsProductProvider.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\provider\ProductDataProvider.java
+D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\repository\ProductCatalogIdentifierRepository.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\repository\ProductRepository.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\service\BarcodeValidationService.java
 D:\New folder (3)\home\backend\src\main\java\com\homestock\modules\product\service\ProductCatalogService.java

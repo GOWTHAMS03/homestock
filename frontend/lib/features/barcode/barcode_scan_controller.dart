@@ -2,49 +2,62 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../home_switcher/home_controller.dart';
+import '../shopping/shopping_model.dart';
 import 'barcode_models.dart';
 import 'barcode_repository.dart';
 
 const int kBarcodeScanDebounceMs = 1500;
 
 class BarcodeScanState {
+  final ScanSessionState sessionState;
   final bool isScanning;
   final bool isLoading;
   final bool isFlashOn;
   final bool isQuickScanMode;
   final bool? hasCameraPermission;
   final BarcodeLookupResult? lastResult;
+  final ShoppingItemModel? targetShoppingItem;
+  final bool packageSizeMismatch;
   final List<QuickScanSessionItem> quickScanItems;
   final String? errorMessage;
 
   const BarcodeScanState({
+    this.sessionState = ScanSessionState.scanning,
     this.isScanning = true,
     this.isLoading = false,
     this.isFlashOn = false,
     this.isQuickScanMode = false,
     this.hasCameraPermission,
     this.lastResult,
+    this.targetShoppingItem,
+    this.packageSizeMismatch = false,
     this.quickScanItems = const [],
     this.errorMessage,
   });
 
   BarcodeScanState copyWith({
+    ScanSessionState? sessionState,
     bool? isScanning,
     bool? isLoading,
     bool? isFlashOn,
     bool? isQuickScanMode,
     bool? hasCameraPermission,
     BarcodeLookupResult? Function()? lastResult,
+    ShoppingItemModel? Function()? targetShoppingItem,
+    bool? packageSizeMismatch,
     List<QuickScanSessionItem>? quickScanItems,
     String? Function()? errorMessage,
   }) {
     return BarcodeScanState(
+      sessionState: sessionState ?? this.sessionState,
       isScanning: isScanning ?? this.isScanning,
       isLoading: isLoading ?? this.isLoading,
       isFlashOn: isFlashOn ?? this.isFlashOn,
       isQuickScanMode: isQuickScanMode ?? this.isQuickScanMode,
       hasCameraPermission: hasCameraPermission ?? this.hasCameraPermission,
       lastResult: lastResult != null ? lastResult() : this.lastResult,
+      targetShoppingItem: targetShoppingItem != null ? targetShoppingItem() : this.targetShoppingItem,
+      packageSizeMismatch: packageSizeMismatch ?? this.packageSizeMismatch,
       quickScanItems: quickScanItems ?? this.quickScanItems,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
     );
@@ -75,6 +88,13 @@ class BarcodeScanController extends StateNotifier<BarcodeScanState> {
 
   void setCameraPermission(bool granted) {
     state = state.copyWith(hasCameraPermission: granted);
+  }
+
+  void setTargetShoppingItem(ShoppingItemModel? item) {
+    state = state.copyWith(
+      targetShoppingItem: () => item,
+      packageSizeMismatch: false,
+    );
   }
 
   void toggleFlash() {
@@ -108,28 +128,50 @@ class BarcodeScanController extends StateNotifier<BarcodeScanState> {
     HapticFeedback.mediumImpact();
 
     final homeId = _ref.read(homeControllerProvider).activeHome?.id ?? '';
-    state = state.copyWith(isLoading: true, isScanning: false, errorMessage: () => null);
+    state = state.copyWith(
+      sessionState: ScanSessionState.lookingUp,
+      isLoading: true,
+      isScanning: false,
+      errorMessage: () => null,
+    );
 
     try {
       final result = await _repository.lookupBarcode(normalized, homeId: homeId);
+
+      bool sizeMismatch = false;
+      if (state.targetShoppingItem != null && result.product != null) {
+        sizeMismatch = !result.product!.matchesPackageSize(
+          state.targetShoppingItem!.quantity,
+          state.targetShoppingItem!.unit,
+        );
+      }
+
+      final nextSession = result.found
+          ? ScanSessionState.found
+          : ScanSessionState.notFound;
 
       if (state.isQuickScanMode) {
         // In Quick Scan mode: accumulate into session without blocking
         _addToQuickScanSession(result);
         state = state.copyWith(
+          sessionState: nextSession,
           isLoading: false,
           isScanning: true, // continue scanning immediately in quick scan mode
           lastResult: () => result,
+          packageSizeMismatch: sizeMismatch,
         );
       } else {
         // In Single Scan mode: show smart confirmation sheet
         state = state.copyWith(
+          sessionState: nextSession,
           isLoading: false,
           lastResult: () => result,
+          packageSizeMismatch: sizeMismatch,
         );
       }
     } catch (e) {
       state = state.copyWith(
+        sessionState: ScanSessionState.error,
         isLoading: false,
         isScanning: true,
         errorMessage: () => 'Failed to resolve barcode: $e',
@@ -192,8 +234,10 @@ class BarcodeScanController extends StateNotifier<BarcodeScanState> {
   void resumeScanning() {
     _lastScannedBarcode = null;
     state = state.copyWith(
+      sessionState: ScanSessionState.scanning,
       isScanning: true,
       isLoading: false,
+      packageSizeMismatch: false,
       lastResult: () => null,
       errorMessage: () => null,
     );

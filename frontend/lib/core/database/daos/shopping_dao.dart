@@ -203,6 +203,30 @@ class ShoppingDao {
     ));
   }
 
+  /// Link an inventory item to a shopping list item.
+  Future<void> linkInventoryItem(String itemId, String inventoryItemId) {
+    return (_db.update(_db.localShoppingListItems)
+          ..where((t) => t.id.equals(itemId)))
+        .write(LocalShoppingListItemsCompanion(
+      inventoryItemId: Value(inventoryItemId),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Mark multiple shopping items completed (e.g. after a purchase run).
+  Future<void> markItemsCompleted(List<String> itemIds, {String? completedByName}) {
+    if (itemIds.isEmpty) return Future.value();
+    return (_db.update(_db.localShoppingListItems)
+          ..where((t) => t.id.isIn(itemIds)))
+        .write(LocalShoppingListItemsCompanion(
+      isCompleted: const Value(true),
+      completedByName: Value(completedByName ?? 'You'),
+      completedAt: Value(DateTime.now().toIso8601String()),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+
   /// Soft delete a shopping item.
   Future<void> softDeleteShoppingItem(String itemId) {
     return (_db.update(_db.localShoppingListItems)

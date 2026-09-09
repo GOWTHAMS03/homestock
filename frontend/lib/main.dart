@@ -9,7 +9,7 @@ import 'core/storage/secure_storage_service.dart';
 import 'core/sync/connectivity_monitor.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/sync/sync_providers.dart';
-import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'features/home_switcher/home_controller.dart';
 
 void main() async {
@@ -86,11 +86,12 @@ class _HomeStockAppState extends ConsumerState<HomeStockApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final theme = ref.watch(appThemeProvider);
 
     return MaterialApp.router(
       title: 'HomeStock',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: theme,
       routerConfig: router,
     );
   }

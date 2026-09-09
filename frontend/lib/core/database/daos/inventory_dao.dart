@@ -89,6 +89,33 @@ class InventoryDao {
         .getSingleOrNull();
   }
 
+  /// Find an item by matching name (case-insensitive) for a home.
+  Future<LocalInventoryItem?> findItemByName(String homeId, String name) async {
+    final clean = name.trim().toLowerCase();
+    if (clean.isEmpty) return null;
+
+    // 1. Exact match (case-insensitive)
+    final exact = await (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.homeId.equals(homeId) &
+              t.isDeleted.equals(false) &
+              t.name.lower().equals(clean))
+          ..limit(1))
+        .get();
+    if (exact.isNotEmpty) return exact.first;
+
+    // 2. Substring match (e.g. "Milk" matches "Amul Milk")
+    final contains = await (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.homeId.equals(homeId) &
+              t.isDeleted.equals(false) &
+              t.name.lower().like('%$clean%'))
+          ..limit(1))
+        .get();
+    return contains.firstOrNull;
+  }
+
+
   /// Get all items for a home (non-reactive, for sync use).
   Future<List<LocalInventoryItem>> getAllItems(String homeId) {
     return (_db.select(_db.localInventoryItems)

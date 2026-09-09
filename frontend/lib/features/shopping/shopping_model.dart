@@ -14,6 +14,8 @@ class ShoppingItemModel {
   final String? completedByName;
   final String? completedAt;
   final String? notes;
+  final String? barcode;
+  final String? productId;
 
   ShoppingItemModel({
     required this.id,
@@ -31,6 +33,8 @@ class ShoppingItemModel {
     this.completedByName,
     this.completedAt,
     this.notes,
+    this.barcode,
+    this.productId,
   });
 
   factory ShoppingItemModel.fromJson(Map<String, dynamic> json) {
@@ -50,10 +54,17 @@ class ShoppingItemModel {
       completedByName: json['completedByName'],
       completedAt: json['completedAt'],
       notes: json['notes'],
+      barcode: json['barcode'],
+      productId: json['productId'],
     );
   }
 
-  ShoppingItemModel copyWith({bool? isCompleted, String? completedByName}) {
+  ShoppingItemModel copyWith({
+    bool? isCompleted,
+    String? completedByName,
+    String? barcode,
+    String? productId,
+  }) {
     return ShoppingItemModel(
       id: id,
       shoppingListId: shoppingListId,
@@ -70,6 +81,8 @@ class ShoppingItemModel {
       completedByName: completedByName ?? this.completedByName,
       completedAt: completedAt,
       notes: notes,
+      barcode: barcode ?? this.barcode,
+      productId: productId ?? this.productId,
     );
   }
 
@@ -89,6 +102,8 @@ class ShoppingItemModel {
     'completedByName': completedByName,
     'completedAt': completedAt,
     'notes': notes,
+    'barcode': barcode,
+    'productId': productId,
   };
 }
 

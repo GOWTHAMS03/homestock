@@ -71,6 +71,21 @@ public class OpenFoodFactsProductProvider implements ProductDataProvider {
                     String categories = pNode.path("categories").asText("General");
                     String firstCategory = categories.contains(",") ? categories.split(",")[0].trim() : categories;
 
+                    BigDecimal packageSize = BigDecimal.ONE;
+                    String unit = "pcs";
+                    if (pNode.has("product_quantity") && !pNode.path("product_quantity").isNull()) {
+                        try {
+                            packageSize = new BigDecimal(pNode.path("product_quantity").asText());
+                        } catch (Exception ignored) {}
+                    }
+                    if (pNode.has("product_quantity_unit") && !pNode.path("product_quantity_unit").isNull()) {
+                        String u = pNode.path("product_quantity_unit").asText().trim().toLowerCase();
+                        if (!u.isBlank()) {
+                            unit = u;
+                        }
+                    }
+                    String description = pNode.path("generic_name").asText(null);
+
                     return Optional.of(ProductDto.builder()
                             .barcode(barcode)
                             .barcodeType(barcode.length() == 13 ? "EAN_13" : "UPC_A")
@@ -78,8 +93,10 @@ public class OpenFoodFactsProductProvider implements ProductDataProvider {
                             .normalizedName(name.toLowerCase().replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim())
                             .brand(brand)
                             .categoryName(firstCategory)
-                            .packageSize(BigDecimal.ONE)
-                            .unit("pcs")
+                            .packageSize(packageSize)
+                            .unit(unit)
+                            .packageUnit(unit)
+                            .description(description)
                             .imageUrl(image)
                             .source("OPEN_FOOD_FACTS")
                             .build());

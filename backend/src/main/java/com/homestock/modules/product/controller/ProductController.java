@@ -37,6 +37,20 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/products/{id}")
+    @Operation(summary = "Get canonical product by ID")
+    public ResponseEntity<ApiResponse<ProductDto>> getProduct(@PathVariable UUID id) {
+        ProductDto product = productCatalogService.getProductById(id);
+        return ResponseEntity.ok(ApiResponse.success(product));
+    }
+
+    @GetMapping("/products/search")
+    @Operation(summary = "Search canonical products by name, brand, or barcode")
+    public ResponseEntity<ApiResponse<java.util.List<ProductDto>>> searchProducts(@RequestParam String query) {
+        java.util.List<ProductDto> results = productCatalogService.searchProducts(query);
+        return ResponseEntity.ok(ApiResponse.success(results));
+    }
+
     @PostMapping("/products")
     @Operation(summary = "Manually add a product to the canonical catalog")
     public ResponseEntity<ApiResponse<ProductDto>> createProduct(

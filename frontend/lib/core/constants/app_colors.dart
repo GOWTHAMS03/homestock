@@ -3,25 +3,39 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Primary brand colors (Warm Indigo / Deep Slate)
-  static const Color primary = Color(0xFF4F46E5);
-  static const Color primaryLight = Color(0xFF818CF8);
-  static const Color primaryDark = Color(0xFF3730A3);
-  static const Color primaryContainer = Color(0xFFEEF2FF);
+  // Online Primary brand colors (Royal Amethyst Purple)
+  static const Color primary = Color(0xFF7C3AED);
+  static const Color primaryLight = Color(0xFFA78BFA);
+  static const Color primaryDark = Color(0xFF5B21B6);
+  static const Color primaryContainer = Color(0xFFF3E8FF);
 
-  // Secondary brand colors (Teal / Sky Blue)
+  // Offline Primary brand colors (Warm Crimson Rose Red)
+  static const Color offlinePrimary = Color(0xFFE11D48);
+  static const Color offlinePrimaryLight = Color(0xFFFB7185);
+  static const Color offlinePrimaryDark = Color(0xFF9F1239);
+  static const Color offlinePrimaryContainer = Color(0xFFFFE4E6);
+
+  // Secondary brand colors (Teal / Sky Blue / Warm Amber)
   static const Color secondary = Color(0xFF0284C7);
   static const Color secondaryLight = Color(0xFF38BDF8);
   static const Color secondaryDark = Color(0xFF0369A1);
   static const Color secondaryContainer = Color(0xFFE0F2FE);
+  static const Color offlineSecondary = Color(0xFFD97706);
+  static const Color offlineSecondaryContainer = Color(0xFFFEF3C7);
 
-  // Background & Surfaces
-  static const Color background = Color(0xFFF8FAFC);
+  // Background & Surfaces (Online: Near-White with soft lavender undertone)
+  static const Color background = Color(0xFFFAF8FF);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceVariant = Color(0xFFF1F5F9);
-  static const Color outline = Color(0xFFE2E8F0);
-  static const Color outlineVariant = Color(0xFFCBD5E1);
+  static const Color surfaceVariant = Color(0xFFF5F3FF);
+  static const Color outline = Color(0xFFE9D5FF);
+  static const Color outlineVariant = Color(0xFFDDD6FE);
   static const Color borderLight = Color(0xFFE2E8F0);
+
+  // Background & Surfaces (Offline: Near-White with warm delicate rose blush undertone)
+  static const Color offlineBackground = Color(0xFFFFF9F9);
+  static const Color offlineSurfaceVariant = Color(0xFFFFF1F2);
+  static const Color offlineOutline = Color(0xFFFECDD3);
+  static const Color offlineOutlineVariant = Color(0xFFFDA4AF);
 
   // Text colors
   static const Color textPrimary = Color(0xFF0F172A);
@@ -69,7 +83,9 @@ class AppColors {
 
   // Modern HomeStock header & vibrant accent tokens
   static const Color headerGradientStart = Color(0xFFF3E8FF); // Soft pastel lavender
-  static const Color headerGradientEnd = Color(0xFFF8FAFC);
+  static const Color headerGradientEnd = Color(0xFFFAF8FF);
+  static const Color offlineHeaderGradientStart = Color(0xFFFFE4E6); // Soft warm blush
+  static const Color offlineHeaderGradientEnd = Color(0xFFFFF9F9);
   static const Color hsPurple = Color(0xFF8B5CF6);
   static const Color hsPurpleBg = Color(0xFFF5F3FF);
   static const Color hsPink = Color(0xFFEC4899);

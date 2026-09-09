@@ -17,10 +17,10 @@ class MainScaffold extends ConsumerWidget {
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
           border: Border(
-            top: BorderSide(color: AppColors.outline, width: 0.8),
+            top: BorderSide(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.6), width: 0.8),
           ),
         ),
         child: BottomNavigationBar(
@@ -33,7 +33,7 @@ class MainScaffold extends ConsumerWidget {
               initialLocation: index == navigationShell.currentIndex,
             );
           },
-          selectedItemColor: AppColors.primary,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
           unselectedItemColor: AppColors.textSecondary,
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
@@ -57,7 +57,7 @@ class MainScaffold extends ConsumerWidget {
                         '$pendingCount',
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10, color: Colors.white),
                       ),
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       child: const Icon(Icons.shopping_cart_outlined, size: 24),
                     )
                   : const Icon(Icons.shopping_cart_outlined, size: 24),
@@ -67,7 +67,7 @@ class MainScaffold extends ConsumerWidget {
                         '$pendingCount',
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10, color: Colors.white),
                       ),
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       child: const Icon(Icons.shopping_cart_rounded, size: 24),
                     )
                   : const Icon(Icons.shopping_cart_rounded, size: 24),

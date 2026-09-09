@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
-import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../inventory/inventory_controller.dart';
 import '../purchase/purchase_controller.dart';
 import 'processed_products_screen.dart';
+import 'shopping_continuous_scanner_screen.dart';
 import 'shopping_controller.dart';
 import 'shopping_model.dart';
 
@@ -84,6 +84,10 @@ class _ShoppingModeScreenState extends ConsumerState<ShoppingModeScreen> {
         'notes': 'In-store shopping mode run',
         'items': lineItems,
       });
+
+      // Mark the bought items as completed in the shopping list
+      final boughtIds = boughtItems.map((e) => e.id).toList();
+      await ref.read(shoppingControllerProvider.notifier).markItemsCompleted(boughtIds);
 
       // Refresh shopping list and inventory
       await ref.read(shoppingControllerProvider.notifier).loadShoppingList();
@@ -210,10 +214,20 @@ class _ShoppingModeScreenState extends ConsumerState<ShoppingModeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary),
-            tooltip: 'Scan Barcode',
+            tooltip: 'Continuous Shelf Scanner',
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const BarcodeScannerWidget()),
+              ShoppingContinuousScannerScreen.open(
+                context,
+                items: items,
+                inCart: _inCart,
+                onToggleInCart: _toggleInCart,
+                onAddUnlistedProduct: (product) {
+                  ref.read(shoppingControllerProvider.notifier).addItem(
+                    itemName: product.name,
+                    quantity: product.packageSize ?? 1.0,
+                    unit: product.unit,
+                  );
+                },
               );
             },
           ),
@@ -223,15 +237,86 @@ class _ShoppingModeScreenState extends ConsumerState<ShoppingModeScreen> {
           ? const Center(
               child: Text('No items in shopping list.\nAdd some items first!', textAlign: TextAlign.center),
             )
-          : ListView.separated(
+          : ListView(
               padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 100),
-              itemCount: items.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final inCart = _inCart[item.id] ?? false;
+              children: [
+                // Continuous Barcode Shelf Scanner Banner
+                Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF047857), Color(0xFF059669)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withValues(alpha: 0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 26),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Continuous Shelf Scanner ⚡',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            Text(
+                              'Scan barcodes non-stop off shelves to check off items automatically',
+                              style: TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          ShoppingContinuousScannerScreen.open(
+                            context,
+                            items: items,
+                            inCart: _inCart,
+                            onToggleInCart: _toggleInCart,
+                            onAddUnlistedProduct: (product) {
+                              ref.read(shoppingControllerProvider.notifier).addItem(
+                                itemName: product.name,
+                                quantity: product.packageSize ?? 1.0,
+                                unit: product.unit,
+                              );
+                            },
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF047857),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Scan Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
 
-                return HomeStockCard(
+                // Shopping Items
+                ...items.map((item) {
+                  final inCart = _inCart[item.id] ?? false;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: HomeStockCard(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   backgroundColor: inCart ? const Color(0xFFF0FDF4) : Colors.white,
                   child: Row(
@@ -303,9 +388,11 @@ class _ShoppingModeScreenState extends ConsumerState<ShoppingModeScreen> {
                       ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            }),
+          ],
+        ),
       bottomSheet: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(

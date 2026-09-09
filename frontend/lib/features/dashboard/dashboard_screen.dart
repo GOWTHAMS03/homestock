@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/empty_state_view.dart';
-import '../../core/widgets/offline_wifi_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../auth/auth_controller.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
@@ -87,7 +87,7 @@ class DashboardScreen extends ConsumerWidget {
 
     // 3. Main Modern Dashboard Content (Clean, Minimal, Non-disruptive)
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -163,11 +163,12 @@ class DashboardScreen extends ConsumerWidget {
         ? fullName.trim().split(' ').first
         : null;
     final greetingText = firstName != null ? '$greeting, $firstName 👋' : '$greeting 👋';
+    final hsColors = context.hsColors;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.headerGradientStart, AppColors.headerGradientEnd],
+          colors: [hsColors.headerGradientStart, hsColors.headerGradientEnd],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -176,7 +177,7 @@ class DashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row 1: Status Headline, Home Switcher Dropdown, Offline Wifi Badge, Bell & Avatar
+          // Row 1: Status Headline, Home Switcher Dropdown, Bell & Avatar
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -234,9 +235,6 @@ class DashboardScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-
-              // Simple non-disruptive Wi-Fi offline indicator
-              const OfflineWifiBadge(),
 
               // Notification bell
               Stack(

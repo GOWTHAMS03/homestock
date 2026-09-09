@@ -28,7 +28,7 @@ public class InternalProductProvider implements ProductDataProvider {
 
     @Override
     public Optional<ProductDto> findByBarcode(String barcode) {
-        return productRepository.findByBarcode(barcode).map(this::toDto);
+        return productRepository.findByBarcodeOrIdentifier(barcode).map(this::toDto);
     }
 
     @Override
@@ -50,6 +50,8 @@ public class InternalProductProvider implements ProductDataProvider {
                 .categoryName(p.getCategoryName())
                 .packageSize(p.getPackageSize())
                 .unit(p.getUnit())
+                .packageUnit(p.getPackageUnit())
+                .description(p.getDescription())
                 .imageUrl(p.getImageUrl())
                 .source(p.getSource())
                 .build();

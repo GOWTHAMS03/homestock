@@ -33,6 +33,16 @@ class DashboardRepository {
 
   bool get isOnline => _connectivity.isOnline;
 
+  /// Watch inventory items to re-trigger local dashboard summary computation on any stock change.
+  Stream<List<dynamic>> watchInventoryItems(String homeId) {
+    return _inventoryDao.watchItems(homeId);
+  }
+
+  /// Watch shopping items to re-trigger local dashboard summary computation on shopping status change.
+  Stream<List<dynamic>> watchShoppingItems(String homeId) {
+    return _shoppingDao.watchShoppingItemsForHome(homeId);
+  }
+
   /// Instant local summary computation from SQLite (0ms wait, zero network).
   Future<DashboardSummaryModel> getLocalSummary(String homeId, {String homeName = 'My Home'}) async {
     final local = await _computeLocalSummary(homeId, homeName);

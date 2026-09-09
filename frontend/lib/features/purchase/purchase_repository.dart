@@ -139,41 +139,86 @@ class PurchaseRepository {
       items: itemCompanions,
     );
 
-    // 2. Create STOCK_IN transactions for linked inventory items
+    // 2. Create STOCK_IN transactions for linked inventory items (or find by name)
     for (final rawItem in rawItems) {
-      final invItemId = rawItem['inventoryItemId'] as String?;
-      if (invItemId != null && invItemId.isNotEmpty) {
-        final qty = (rawItem['quantity'] as num?)?.toDouble() ?? 0.0;
-        if (qty > 0) {
-          // Update local stock
-          final current = await _inventoryDao.getItemById(invItemId);
-          if (current != null) {
-            final newQty = current.quantity + qty;
-            final stockStatus = newQty <= 0
-                ? 'OUT_OF_STOCK'
-                : newQty <= current.minimumQuantity
-                    ? 'LOW_STOCK'
-                    : 'IN_STOCK';
-            await _inventoryDao.updateLocalStock(
-                invItemId, newQty, stockStatus);
+      String? invItemId = rawItem['inventoryItemId'] as String?;
+      final rawName = rawItem['itemName'] as String? ?? '';
+      LocalInventoryItem? current;
 
-            // Record stock transaction
-            await _inventoryDao
-                .insertTransaction(LocalStockTransactionsCompanion(
-              id: Value(_uuid.v4()),
-              inventoryItemId: Value(invItemId),
-              itemName: Value(current.name),
-              userName: const Value('You'),
-              transactionType: const Value('STOCK_IN'),
-              quantityChange: Value(qty),
-              previousQuantity: Value(current.quantity),
-              newQuantity: Value(newQty),
-              unit: Value(current.unit),
-              reason: Value('Purchase restock'),
-              createdAt: Value(now.toIso8601String()),
-              isLocalOnly: const Value(true),
-            ));
-          }
+      if (invItemId != null && invItemId.isNotEmpty) {
+        current = await _inventoryDao.getItemById(invItemId);
+      }
+      if (current == null && rawName.isNotEmpty) {
+        current = await _inventoryDao.findItemByName(homeId, rawName);
+        if (current != null) {
+          invItemId = current.id;
+        }
+      }
+
+      final rawQty = (rawItem['quantity'] as num?)?.toDouble() ?? 0.0;
+      if (rawQty > 0) {
+        if (current != null) {
+          final effectiveQty = _convertQuantity(
+            fromQty: rawQty,
+            fromUnit: rawItem['unit'] as String? ?? current.unit,
+            toUnit: current.unit,
+          );
+          final newQty = current.quantity + effectiveQty;
+          final stockStatus = newQty <= 0
+              ? 'OUT_OF_STOCK'
+              : newQty <= current.minimumQuantity
+                  ? 'LOW_STOCK'
+                  : 'IN_STOCK';
+          await _inventoryDao.updateLocalStock(
+              current.id, newQty, stockStatus);
+
+          // Record stock transaction
+          await _inventoryDao
+              .insertTransaction(LocalStockTransactionsCompanion(
+            id: Value(_uuid.v4()),
+            inventoryItemId: Value(current.id),
+            itemName: Value(current.name),
+            userName: const Value('You'),
+            transactionType: const Value('STOCK_IN'),
+            quantityChange: Value(effectiveQty),
+            previousQuantity: Value(current.quantity),
+            newQuantity: Value(newQty),
+            unit: Value(current.unit),
+            reason: const Value('Purchase restock'),
+            createdAt: Value(now.toIso8601String()),
+            isLocalOnly: const Value(true),
+          ));
+        } else if (rawName.isNotEmpty) {
+          // Auto-create inventory staple if user bought it and it's not yet in pantry
+          final newInvId = _uuid.v4();
+          await _inventoryDao.upsertItem(LocalInventoryItemsCompanion(
+            id: Value(newInvId),
+            homeId: Value(homeId),
+            name: Value(rawName),
+            categoryName: Value(rawItem['categoryName'] as String? ?? 'Other'),
+            quantity: Value(rawQty),
+            unit: Value(rawItem['unit'] as String? ?? 'pcs'),
+            minimumQuantity: const Value(1.0),
+            stockStatus: const Value('IN_STOCK'),
+            isLocalOnly: const Value(true),
+            isDeleted: const Value(false),
+            updatedAt: Value(now),
+          ));
+
+          await _inventoryDao.insertTransaction(LocalStockTransactionsCompanion(
+            id: Value(_uuid.v4()),
+            inventoryItemId: Value(newInvId),
+            itemName: Value(rawName),
+            userName: const Value('You'),
+            transactionType: const Value('STOCK_IN'),
+            quantityChange: Value(rawQty),
+            previousQuantity: const Value(0.0),
+            newQuantity: Value(rawQty),
+            unit: Value(rawItem['unit'] as String? ?? 'pcs'),
+            reason: const Value('Purchase restock (new item)'),
+            createdAt: Value(now.toIso8601String()),
+            isLocalOnly: const Value(true),
+          ));
         }
       }
     }
@@ -196,6 +241,29 @@ class PurchaseRepository {
     final savedPurchase = await _purchaseDao.getPurchaseById(purchaseId);
     final savedItems = await _purchaseDao.getPurchaseItems(purchaseId);
     return _toPurchaseModel(savedPurchase!, savedItems);
+  }
+
+  /// Converts quantities when units differ (e.g. 500g -> 0.5kg, 500ml -> 0.5L).
+  double _convertQuantity({
+    required double fromQty,
+    required String fromUnit,
+    required String toUnit,
+  }) {
+    final from = fromUnit.trim().toLowerCase();
+    final to = toUnit.trim().toLowerCase();
+
+    if (from == to) return fromQty;
+
+    // Grams to Kilograms
+    if (from == 'g' && to == 'kg') return fromQty / 1000.0;
+    // Kilograms to Grams
+    if (from == 'kg' && to == 'g') return fromQty * 1000.0;
+    // Milliliters to Liters
+    if (from == 'ml' && (to == 'l' || to == 'litre' || to == 'liter')) return fromQty / 1000.0;
+    // Liters to Milliliters
+    if ((from == 'l' || from == 'litre' || from == 'liter') && to == 'ml') return fromQty * 1000.0;
+
+    return fromQty;
   }
 
   /// Create a store locally and queue for sync.

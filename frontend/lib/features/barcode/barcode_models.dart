@@ -1,5 +1,21 @@
 import 'package:flutter/foundation.dart';
 
+/// Explicit state machine lifecycle for a barcode scanning session
+enum ScanSessionState {
+  idle,
+  scanning,
+  detected,
+  lookingUp,
+  found,
+  notFound,
+  confirming,
+  completed,
+  error;
+
+  bool get isScanning => this == ScanSessionState.scanning;
+  bool get isLoading => this == ScanSessionState.detected || this == ScanSessionState.lookingUp;
+}
+
 enum BarcodeFormatType {
   ean13,
   ean8,
@@ -79,6 +95,8 @@ class ProductCatalogModel {
   final String categoryName;
   final double? packageSize;
   final String unit;
+  final String? packageUnit;
+  final String? description;
   final String? imageUrl;
   final String source;
 
@@ -87,15 +105,42 @@ class ProductCatalogModel {
     required this.barcode,
     this.barcodeType = 'EAN_13',
     required this.name,
-    required this.normalizedName,
+    this.normalizedName = '',
     this.brand,
     this.categoryId,
     this.categoryName = 'General',
     this.packageSize,
     this.unit = 'pcs',
+    this.packageUnit,
+    this.description,
     this.imageUrl,
     this.source = 'LOCAL',
   });
+
+  /// Check if the scanned product package size matches an expected size, with standard unit conversion
+  bool matchesPackageSize(double? expectedSize, String? expectedUnit) {
+    if (expectedSize == null || packageSize == null) return true;
+
+    double toBaseUnit(double val, String? u) {
+      if (u == null) return val;
+      final lower = u.toLowerCase().trim();
+      if (lower == 'kg' || lower == 'kilogram' || lower == 'kilograms') {
+        return val * 1000.0;
+      }
+      if (lower == 'l' || lower == 'liter' || lower == 'litre' || lower == 'liters' || lower == 'litres') {
+        return val * 1000.0;
+      }
+      return val;
+    }
+
+    final thisBase = toBaseUnit(packageSize!, unit);
+    final expectedBase = toBaseUnit(expectedSize, expectedUnit);
+
+    if ((thisBase - expectedBase).abs() < 0.01) {
+      return true;
+    }
+    return false;
+  }
 
   factory ProductCatalogModel.fromJson(Map<String, dynamic> json) {
     return ProductCatalogModel(
@@ -109,6 +154,8 @@ class ProductCatalogModel {
       categoryName: json['categoryName'] as String? ?? 'General',
       packageSize: (json['packageSize'] as num?)?.toDouble(),
       unit: json['unit'] as String? ?? 'pcs',
+      packageUnit: json['packageUnit'] as String?,
+      description: json['description'] as String?,
       imageUrl: json['imageUrl'] as String?,
       source: json['source'] as String? ?? 'ONLINE',
     );
@@ -125,6 +172,8 @@ class ProductCatalogModel {
         'categoryName': categoryName,
         'packageSize': packageSize,
         'unit': unit,
+        if (packageUnit != null) 'packageUnit': packageUnit,
+        if (description != null) 'description': description,
         'imageUrl': imageUrl,
         'source': source,
       };

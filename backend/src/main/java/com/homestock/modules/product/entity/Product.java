@@ -67,4 +67,8 @@ public class Product extends BaseEntity {
 
     @Column(name = "package_unit", length = 30)
     private String packageUnit;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<ProductIdentifier> identifiers = new java.util.ArrayList<>();
 }

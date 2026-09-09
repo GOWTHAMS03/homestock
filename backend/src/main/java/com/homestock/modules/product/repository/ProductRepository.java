@@ -21,4 +21,11 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query("SELECT p FROM Product p WHERE LOWER(p.normalizedName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<Product> searchProducts(@Param("query") String query);
+
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN p.identifiers i WHERE p.barcode = :val OR i.identifierValue = :val")
+    List<Product> findByBarcodeOrIdentifierList(@Param("val") String val);
+
+    default Optional<Product> findByBarcodeOrIdentifier(String val) {
+        return findByBarcodeOrIdentifierList(val).stream().findFirst();
+    }
 }

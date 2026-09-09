@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/sync/sync_providers.dart';
 import '../auth/auth_controller.dart';
@@ -65,11 +67,39 @@ class DashboardController extends StateNotifier<DashboardState> {
   final DashboardRepository _repo;
   final String? _homeId;
   final String? _homeName;
+  StreamSubscription? _inventorySub;
+  StreamSubscription? _shoppingSub;
 
   DashboardController(this._repo, this._homeId, this._homeName) : super(const DashboardState()) {
-    if (_homeId != null) {
+    final homeId = _homeId;
+    if (homeId != null) {
       loadDashboard();
+      _inventorySub = _repo.watchInventoryItems(homeId).listen((_) {
+        reloadLocalSummary();
+      });
+      _shoppingSub = _repo.watchShoppingItems(homeId).listen((_) {
+        reloadLocalSummary();
+      });
     }
+  }
+
+  @override
+  void dispose() {
+    _inventorySub?.cancel();
+    _shoppingSub?.cancel();
+    super.dispose();
+  }
+
+  /// Instant local recomputation of metrics when inventory changes
+  Future<void> reloadLocalSummary() async {
+    final homeId = _homeId;
+    if (homeId == null) return;
+    try {
+      final localSummary = await _repo.getLocalSummary(homeId, homeName: _homeName ?? 'My Home');
+      if (mounted) {
+        state = state.copyWith(summary: localSummary);
+      }
+    } catch (_) {}
   }
 
   Future<void> loadDashboard() async {

@@ -23,6 +23,8 @@ public class ProductDto {
     private String categoryName;
     private BigDecimal packageSize;
     private String unit;
+    private String packageUnit;
+    private String description;
     private String imageUrl;
     private String source;
 }

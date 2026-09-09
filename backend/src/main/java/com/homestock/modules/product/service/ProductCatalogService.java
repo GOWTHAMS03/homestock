@@ -84,6 +84,21 @@ public class ProductCatalogService {
         return internalProductProvider.toDto(saved);
     }
 
+    @Transactional(readOnly = true)
+    public ProductDto getProductById(UUID id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        return internalProductProvider.toDto(product);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<ProductDto> searchProducts(String query) {
+        if (query == null || query.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        return internalProductProvider.searchByName(query.trim());
+    }
+
     @Transactional
     public InventoryItemDto addOrUpdateInventoryFromBarcode(UUID homeId, BarcodeInventoryRequest request) {
         UUID currentUserId = SecurityUtils.getCurrentUserId();

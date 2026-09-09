@@ -4,17 +4,22 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:homestock/core/constants/app_colors.dart';
 import 'package:homestock/core/constants/app_spacing.dart';
+import 'package:homestock/features/shopping/shopping_model.dart';
 import '../barcode_scan_controller.dart';
 import 'barcode_result_bottom_sheet.dart';
 import 'manual_barcode_dialog.dart';
 import 'quick_scan_sheet.dart';
 
 class BarcodeScannerWidget extends ConsumerStatefulWidget {
-  const BarcodeScannerWidget({super.key});
+  final ShoppingItemModel? targetShoppingItem;
 
-  static Future<void> open(BuildContext context) {
+  const BarcodeScannerWidget({super.key, this.targetShoppingItem});
+
+  static Future<void> open(BuildContext context, {ShoppingItemModel? targetShoppingItem}) {
     return Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const BarcodeScannerWidget()),
+      MaterialPageRoute(
+        builder: (_) => BarcodeScannerWidget(targetShoppingItem: targetShoppingItem),
+      ),
     );
   }
 
@@ -32,6 +37,12 @@ class _BarcodeScannerWidgetState extends ConsumerState<BarcodeScannerWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    if (widget.targetShoppingItem != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(barcodeScanControllerProvider.notifier).setTargetShoppingItem(widget.targetShoppingItem);
+      });
+    }
 
     _cameraController = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
@@ -132,6 +143,20 @@ class _BarcodeScannerWidgetState extends ConsumerState<BarcodeScannerWidget>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          ManualBarcodeDialog.show(
+                            context,
+                            (barcode) => ref.read(barcodeScanControllerProvider.notifier).onBarcodeDetected(barcode),
+                          );
+                        },
+                        icon: const Icon(Icons.keyboard_rounded, color: Colors.white, size: 18),
+                        label: const Text('Enter Barcode Manually', style: TextStyle(color: Colors.white)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.white54),
                         ),
                       ),
                     ],
@@ -248,45 +273,76 @@ class _BarcodeScannerWidgetState extends ConsumerState<BarcodeScannerWidget>
             },
           ),
 
-          // 3. Top Controls (Back, Title, Flashlight, Quick Scan Mode)
+          // 3. Top Controls (Back, Title, Flashlight, Quick Scan Mode, Target Item)
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 26),
-                    onPressed: () => Navigator.of(context).pop(),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 26),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Scan Product',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      // Flash Toggle
+                      IconButton(
+                        icon: Icon(
+                          scanState.isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                          color: scanState.isFlashOn ? Colors.amber : Colors.white70,
+                          size: 24,
+                        ),
+                        tooltip: 'Flashlight',
+                        onPressed: () {
+                          _cameraController.toggleTorch();
+                          ref.read(barcodeScanControllerProvider.notifier).toggleFlash();
+                        },
+                      ),
+                      // Quick Scan Mode Toggle
+                      IconButton(
+                        icon: Icon(
+                          scanState.isQuickScanMode ? Icons.playlist_add_check_circle_rounded : Icons.playlist_add_rounded,
+                          color: scanState.isQuickScanMode ? AppColors.primaryLight : Colors.white70,
+                          size: 26,
+                        ),
+                        tooltip: scanState.isQuickScanMode ? 'Quick Scan Mode ON' : 'Single Scan Mode',
+                        onPressed: () => ref.read(barcodeScanControllerProvider.notifier).toggleQuickScanMode(),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  const Text(
-                    'Scan Product',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  // Flash Toggle
-                  IconButton(
-                    icon: Icon(
-                      scanState.isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                      color: scanState.isFlashOn ? Colors.amber : Colors.white70,
-                      size: 24,
+                  if (scanState.targetShoppingItem != null)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade900.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.8)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Target Item: ${scanState.targetShoppingItem!.itemName} (${scanState.targetShoppingItem!.quantity.toInt()} ${scanState.targetShoppingItem!.unit})',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () => ref.read(barcodeScanControllerProvider.notifier).setTargetShoppingItem(null),
+                            child: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                          ),
+                        ],
+                      ),
                     ),
-                    tooltip: 'Flashlight',
-                    onPressed: () {
-                      _cameraController.toggleTorch();
-                      ref.read(barcodeScanControllerProvider.notifier).toggleFlash();
-                    },
-                  ),
-                  // Quick Scan Mode Toggle
-                  IconButton(
-                    icon: Icon(
-                      scanState.isQuickScanMode ? Icons.playlist_add_check_circle_rounded : Icons.playlist_add_rounded,
-                      color: scanState.isQuickScanMode ? AppColors.primaryLight : Colors.white70,
-                      size: 26,
-                    ),
-                    tooltip: scanState.isQuickScanMode ? 'Quick Scan Mode ON' : 'Single Scan Mode',
-                    onPressed: () => ref.read(barcodeScanControllerProvider.notifier).toggleQuickScanMode(),
-                  ),
                 ],
               ),
             ),

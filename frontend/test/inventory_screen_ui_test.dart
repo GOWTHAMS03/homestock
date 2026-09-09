@@ -88,7 +88,10 @@ void main() {
     expect(find.text('Rice'), findsOneWidget);
 
     // 2. Verify "Kitchen" category chip appears EXACTLY once in the category strip (deduplicated)
-    final horizontalCategoryStrip = find.byType(ListView).at(1);
+    final horizontalCategoryStrip = find.ancestor(
+      of: find.text('All Categories'),
+      matching: find.byType(ListView),
+    );
     expect(find.descendant(of: horizontalCategoryStrip, matching: find.text('Kitchen')), findsOneWidget);
     expect(find.descendant(of: horizontalCategoryStrip, matching: find.text('Cleaning')), findsOneWidget);
     expect(find.text('All Categories'), findsOneWidget);
@@ -100,5 +103,15 @@ void main() {
     // 4. Verify search box is present with barcode and voice action (only 1 on the screen, not repeated)
     expect(find.byIcon(Icons.qr_code_scanner_rounded), findsOneWidget);
     expect(find.byType(VoiceInputButton), findsOneWidget);
+
+    // 5. Verify the sleek Segmented Status Control (All Items (1), Low Stock, Expiring)
+    expect(find.text('All Items (1)'), findsOneWidget);
+    expect(find.text('Low Stock'), findsOneWidget);
+    expect(find.text('Expiring'), findsOneWidget);
+
+    // 6. Verify Quick Add Staples suggestion card (non-intrusive, collapsible, 70+ items)
+    expect(find.text('Quick Add Staples'), findsOneWidget);
+    expect(find.text('70+ Items'), findsOneWidget);
+    expect(find.text('Explore All'), findsOneWidget);
   });
 }

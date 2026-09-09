@@ -100,12 +100,10 @@ void main() {
       expect(find.text('Price Deals ⚡'), findsOneWidget);
       expect(find.text('Shop Mode'), findsOneWidget);
       expect(find.text('Restocked'), findsOneWidget);
-
-      // 4. Check 1-Tap Household Essentials Carousel
-      expect(find.text('Quick-Add Essentials (1-Tap)'), findsOneWidget);
-      expect(find.text('1-Tap'), findsOneWidget);
-      expect(find.textContaining('Milk'), findsWidgets);
-      expect(find.textContaining('Eggs'), findsWidgets);
+      
+      // 4. Verify Quick-Add Essentials is removed from ShoppingScreen
+      expect(find.text('Quick-Add Essentials'), findsNothing);
+      expect(find.text('1-Tap Add'), findsNothing);
 
       // 5. Check Clean Empty Guide (No duplicate buttons) & FAB
       expect(find.text('Your Shopping List is Empty'), findsOneWidget);
@@ -135,7 +133,7 @@ void main() {
       );
 
       final lowStockItem = InventoryItemModel(
-        id: 'inv-101',
+        id: 'inv-oil-1',
         homeId: 'home-1',
         name: 'Cooking Oil',
         categoryId: 'cat-oils',
@@ -180,7 +178,7 @@ void main() {
       expect(mockShoppingCtrl.lastAddedItemName, 'Cooking Oil');
     });
 
-    testWidgets('tapping quick staple adds it to the shopping list',
+    testWidgets('submitting quick add in search bar adds item to shopping list',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -219,11 +217,15 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Tap Milk (1 L) staple
-      final milkStapleFinder = find.text('Milk (1 L)');
-      expect(milkStapleFinder, findsOneWidget);
+      // Enter "Milk 1L" into the search bar
+      final searchBarFinder = find.byType(TextField);
+      await tester.enterText(searchBarFinder, 'Milk 1L');
+      await tester.pumpAndSettle();
 
-      await tester.tap(milkStapleFinder);
+      // Tap the Add button in the search bar
+      final addButtonFinder = find.text('Add');
+      expect(addButtonFinder, findsOneWidget);
+      await tester.tap(addButtonFinder);
       await tester.pump();
 
       expect(mockShoppingCtrl.lastAddedItemName, 'Milk');

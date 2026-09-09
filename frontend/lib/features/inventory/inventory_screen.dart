@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/household_staples.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/homestock/homestock_pill_badge.dart';
-import '../../core/widgets/offline_wifi_badge.dart';
 import '../../core/widgets/quantity_stepper.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/stock_status_badge.dart';
@@ -20,6 +21,7 @@ import 'inventory_controller.dart';
 import 'inventory_model.dart';
 import 'item_detail_screen.dart';
 import 'stock_update_dialog.dart';
+import 'staple_quantity_details_sheet.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -30,6 +32,10 @@ class InventoryScreen extends ConsumerStatefulWidget {
 
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   final _searchController = TextEditingController();
+  final Set<String> _justCreatedStaples = {};
+  bool _isEssentialsExpanded = true;
+  bool _isSelectionMode = false;
+  final Set<String> _selectedItemIds = {};
 
   @override
   void dispose() {
@@ -91,6 +97,289 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     }).join(' ');
   }
 
+  /// Opens product-tailored quantity selection & details sheet for suggested household staple
+  void _openStapleQuantityAndDetails(HouseholdStaple staple) {
+    HapticFeedback.lightImpact();
+    final invState = ref.read(inventoryControllerProvider);
+    final existing = invState.items.cast<InventoryItemModel?>().firstWhere(
+          (item) => item?.name.trim().toLowerCase() == staple.name.trim().toLowerCase(),
+          orElse: () => null,
+        );
+
+    StapleQuantityDetailsSheet.show(
+      context,
+      staple: staple,
+      existingItem: existing,
+    );
+  }
+
+  /// Add a created inventory item to the shopping list
+  Future<void> _addItemToShoppingList(InventoryItemModel item, [double? quantity]) async {
+    final neededQty = quantity ?? (item.minimumQuantity > item.quantity
+        ? (item.minimumQuantity - item.quantity)
+        : 1.0);
+
+    final success = await ref.read(shoppingControllerProvider.notifier).addItem(
+          inventoryItemId: item.id,
+          itemName: item.name,
+          quantity: neededQty,
+          unit: item.unit,
+          categoryId: item.categoryId,
+          categoryName: item.categoryName,
+          categoryIcon: item.categoryIcon,
+          categoryColor: item.categoryColor,
+        );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (success) {
+        final qtyStr = '${neededQty.toStringAsFixed(neededQty.truncateToDouble() == neededQty ? 0 : 1)} ${item.unit}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Added ${_formatName(item.name)} ($qtyStr) to shopping list!',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF0F172A),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        final error = ref.read(shoppingControllerProvider).errorMessage ??
+            'Could not add ${_formatName(item.name)} to shopping list';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Batch add multiple selected created items to shopping list
+  Future<void> _addSelectedToShoppingList(List<InventoryItemModel> allItems) async {
+    final selectedItems = allItems.where((i) => _selectedItemIds.contains(i.id)).toList();
+    if (selectedItems.isEmpty) return;
+
+    int addedCount = 0;
+    for (final item in selectedItems) {
+      final neededQty = item.minimumQuantity > item.quantity
+          ? (item.minimumQuantity - item.quantity)
+          : 1.0;
+      final ok = await ref.read(shoppingControllerProvider.notifier).addItem(
+            inventoryItemId: item.id,
+            itemName: item.name,
+            quantity: neededQty,
+            unit: item.unit,
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            categoryIcon: item.categoryIcon,
+            categoryColor: item.categoryColor,
+          );
+      if (ok) addedCount++;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isSelectionMode = false;
+        _selectedItemIds.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Added $addedCount created items to shopping list 🛒'),
+          backgroundColor: const Color(0xFF0F172A),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Open comprehensive sheet modal with all 70+ categorized essentials
+  void _showAllEssentialsBottomSheet(BuildContext context, List<InventoryItemModel> existingItems) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AllEssentialsModal(
+        existingItems: existingItems,
+        onSelectStaple: (staple) {
+          Navigator.of(ctx).pop();
+          _openStapleQuantityAndDetails(staple);
+        },
+        onAddToShoppingList: _addItemToShoppingList,
+      ),
+    );
+  }
+
+  /// Quick-Add Essentials section in Inventory Screen - sleek, non-intrusive suggestion card
+  Widget _buildQuickEssentialsSection(
+    BuildContext context,
+    List<InventoryItemModel> existingItems,
+    InventoryState invState,
+  ) {
+    // Hide when searching or when specifically filtering for low stock / expiring items
+    if (_searchController.text.isNotEmpty || invState.filterType != InventoryFilterType.all) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(left: AppSpacing.lg, right: AppSpacing.lg, top: 4, bottom: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFDE68A).withValues(alpha: 0.8)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.bolt_rounded, size: 14, color: Color(0xFFD97706)),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Quick Add Staples',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF92400E)),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '70+ Items',
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () => _showAllEssentialsBottomSheet(context, existingItems),
+                borderRadius: BorderRadius.circular(50),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Explore All',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                      ),
+                      Icon(Icons.chevron_right_rounded, size: 15, color: Color(0xFFD97706)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () => setState(() => _isEssentialsExpanded = !_isEssentialsExpanded),
+                borderRadius: BorderRadius.circular(50),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(
+                    _isEssentialsExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (_isEssentialsExpanded) ...[
+            const SizedBox(height: 8),
+            // Staples Horizontal Carousel
+            SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: kHouseholdStaples.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final staple = kHouseholdStaples[index];
+                  final inPantry = existingItems.any(
+                    (i) => i.name.trim().toLowerCase() == staple.name.trim().toLowerCase(),
+                  );
+                  final isJustCreated = _justCreatedStaples.contains(staple.name);
+                  final isHighlighted = inPantry || isJustCreated;
+
+                  return Material(
+                    color: isHighlighted ? const Color(0xFFECFDF5) : Colors.white,
+                    borderRadius: BorderRadius.circular(50),
+                    child: InkWell(
+                      onTap: () => _openStapleQuantityAndDetails(staple),
+                      borderRadius: BorderRadius.circular(50),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(50),
+                          border: Border.all(
+                            color: isHighlighted ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                            width: isHighlighted ? 1.3 : 1.0,
+                          ),
+                          boxShadow: [
+                            if (!isHighlighted)
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(staple.emoji, style: const TextStyle(fontSize: 13.5)),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${staple.name} (${staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt() : staple.defaultQty} ${staple.defaultUnit})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isHighlighted ? const Color(0xFF047857) : AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Icon(
+                              isHighlighted ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
+                              size: 15,
+                              color: isHighlighted ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final invState = ref.watch(inventoryControllerProvider);
@@ -120,7 +409,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         .length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: HomeStockAppBar(
         title: 'Household Inventory',
         subtitle: invState.items.isEmpty
@@ -128,9 +417,48 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             : '${invState.items.length} ${invState.items.length == 1 ? "item" : "items"} tracked'
                 '${lowStockCount > 0 ? " • $lowStockCount low stock" : (expiringCount > 0 ? " • $expiringCount expiring" : " • All stocked")}',
         showBackButton: false,
-        actions: const [
-          OfflineWifiBadge(),
-          SizedBox(width: 8),
+        actions: [
+          if (invState.items.isNotEmpty)
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _isSelectionMode = !_isSelectionMode;
+                  if (!_isSelectionMode) _selectedItemIds.clear();
+                });
+              },
+              borderRadius: BorderRadius.circular(50),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _isSelectionMode ? AppColors.primary : Colors.white,
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(
+                    color: _isSelectionMode ? AppColors.primary : AppColors.outline.withValues(alpha: 0.8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isSelectionMode ? Icons.close_rounded : Icons.playlist_add_check_rounded,
+                      size: 14,
+                      color: _isSelectionMode ? Colors.white : AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isSelectionMode ? 'Cancel' : 'Select to Buy',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: _isSelectionMode ? Colors.white : AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
@@ -189,49 +517,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
           ),
 
-          // Status Filter Pills (Tier 1: Urgency & Health)
-          SizedBox(
-            height: 38,
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildUrgencyChip(
-                  label: 'All Items (${invState.items.length})',
-                  icon: Icons.inventory_2_rounded,
-                  isSelected: invState.filterType == InventoryFilterType.all,
-                  onTap: () => ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.all),
-                ),
-                const SizedBox(width: 8),
-                _buildUrgencyChip(
-                  label: lowStockCount > 0 ? 'Low Stock ($lowStockCount)' : 'Low Stock',
-                  icon: Icons.warning_amber_rounded,
-                  isSelected: invState.filterType == InventoryFilterType.lowStock,
-                  selectedColor: AppColors.lowStockBg,
-                  selectedTextColor: AppColors.lowStockText,
-                  badgeCount: lowStockCount,
-                  onTap: () => ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.lowStock),
-                ),
-                const SizedBox(width: 8),
-                _buildUrgencyChip(
-                  label: expiringCount > 0 ? 'Expiring Soon ($expiringCount)' : 'Expiring Soon',
-                  icon: Icons.hourglass_top_rounded,
-                  isSelected: invState.filterType == InventoryFilterType.expiringSoon,
-                  selectedColor: AppColors.expiringSoonBg,
-                  selectedTextColor: AppColors.expiringSoonText,
-                  badgeCount: expiringCount,
-                  onTap: () => ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.expiringSoon),
-                ),
-              ],
-            ),
-          ),
+          // Tier 1: Modern Segmented Status Bar (All | Low Stock | Expiring)
+          _buildStatusSegmentedControl(context, invState, lowStockCount, expiringCount),
 
           const SizedBox(height: 8),
 
-          // Category Pills (Tier 2: Clean, Deduplicated Categories)
+          // Tier 2: Category Pills (Clean, Deduplicated Pantry Categories)
           if (uniqueCategories.isNotEmpty) ...[
             SizedBox(
-              height: 36,
+              height: 34,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 scrollDirection: Axis.horizontal,
@@ -244,12 +538,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       onTap: () => ref.read(inventoryControllerProvider.notifier).selectCategory(null),
                       borderRadius: BorderRadius.circular(50),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isAll ? AppColors.primaryContainer : Colors.white,
+                          color: isAll ? Theme.of(context).colorScheme.primaryContainer : Colors.white,
                           borderRadius: BorderRadius.circular(50),
                           border: Border.all(
-                            color: isAll ? AppColors.primary : AppColors.outline.withValues(alpha: 0.8),
+                            color: isAll ? Theme.of(context).colorScheme.primary : AppColors.outline.withValues(alpha: 0.8),
                             width: isAll ? 1.2 : 0.8,
                           ),
                           boxShadow: [
@@ -266,16 +560,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           children: [
                             Icon(
                               Icons.grid_view_rounded,
-                              size: 14,
-                              color: isAll ? AppColors.primary : AppColors.textMuted,
+                              size: 13,
+                              color: isAll ? Theme.of(context).colorScheme.primary : AppColors.textMuted,
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             Text(
                               'All Categories',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: isAll ? FontWeight.w700 : FontWeight.w500,
-                                color: isAll ? AppColors.primary : AppColors.textSecondary,
+                                color: isAll ? Theme.of(context).colorScheme.primary : AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -291,12 +585,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     onTap: () => ref.read(inventoryControllerProvider.notifier).selectCategory(cat.id),
                     borderRadius: BorderRadius.circular(50),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primaryContainer : Colors.white,
+                        color: isSelected ? Theme.of(context).colorScheme.primaryContainer : Colors.white,
                         borderRadius: BorderRadius.circular(50),
                         border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.outline.withValues(alpha: 0.8),
+                          color: isSelected ? Theme.of(context).colorScheme.primary : AppColors.outline.withValues(alpha: 0.8),
                           width: isSelected ? 1.2 : 0.8,
                         ),
                         boxShadow: [
@@ -313,16 +607,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         children: [
                           Icon(
                             cat.iconData,
-                            size: 14,
-                            color: isSelected ? AppColors.primary : cat.color,
+                            size: 13,
+                            color: isSelected ? Theme.of(context).colorScheme.primary : cat.color,
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           Text(
                             cat.name,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                              color: isSelected ? Theme.of(context).colorScheme.primary : AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -332,8 +626,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 },
               ),
             ),
+            const SizedBox(height: 6),
           ],
-          const SizedBox(height: 8),
+
+          // Tier 3: Quick Add Staples (Collapsible Suggestion Strip)
+          _buildQuickEssentialsSection(context, invState.items, invState),
+          const SizedBox(height: 4),
 
           // Items List with Layout-Stable Skeletons
           Expanded(
@@ -363,7 +661,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.all);
                             ref.read(inventoryControllerProvider.notifier).selectCategory(null);
                           } else {
-                            _showAddItemMenu(context);
+                            _showAddItemMenu(context, invState.items);
                           }
                         },
                       )
@@ -383,18 +681,86 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddItemMenu(context),
+        onPressed: () => _showAddItemMenu(context, invState.items),
         icon: const Icon(Icons.add_rounded, size: 20),
         label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
       ),
+      bottomNavigationBar: _isSelectionMode
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    offset: const Offset(0, -3),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _selectedItemIds.isEmpty
+                                ? 'Tap items to select'
+                                : '${_selectedItemIds.length} created item(s) selected',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.textPrimary),
+                          ),
+                          const Text(
+                            'Add to your shopping list with 1 tap',
+                            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_selectedItemIds.isEmpty)
+                      OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedItemIds.addAll(displayedItems.map((i) => i.id));
+                          });
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Select All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      )
+                    else
+                      ElevatedButton.icon(
+                        onPressed: () => _addSelectedToShoppingList(invState.items),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
+                        label: Text(
+                          'Add to Shopping List (${_selectedItemIds.length})',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            )
+          : null,
     );
   }
 
-  void _showAddItemMenu(BuildContext context) {
+  void _showAddItemMenu(BuildContext context, List<InventoryItemModel> existingItems) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -429,6 +795,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.flash_on_rounded, color: Color(0xFFD97706)),
+                  ),
+                  title: const Text('Quick Essentials', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('1-tap create Milk, Bread, Rice, Salt, and 70+ staples', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showAllEssentialsBottomSheet(context, existingItems);
+                  },
+                ),
+                const HomeStockDottedDivider(),
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -492,53 +876,105 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     );
   }
 
-  Widget _buildUrgencyChip({
+  /// Tier 1 Segmented Status Control (All | Low Stock | Expiring)
+  Widget _buildStatusSegmentedControl(BuildContext context, InventoryState invState, int lowStockCount, int expiringCount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.all(3),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildSegmentTab(
+                context: context,
+                label: 'All Items (${invState.items.length})',
+                icon: Icons.inventory_2_rounded,
+                isSelected: invState.filterType == InventoryFilterType.all,
+                onTap: () => ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.all),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _buildSegmentTab(
+                context: context,
+                label: lowStockCount > 0 ? 'Low Stock ($lowStockCount)' : 'Low Stock',
+                icon: Icons.warning_amber_rounded,
+                isSelected: invState.filterType == InventoryFilterType.lowStock,
+                activeColor: const Color(0xFFB45309),
+                activeBg: const Color(0xFFFEF3C7),
+                onTap: () => ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.lowStock),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _buildSegmentTab(
+                context: context,
+                label: expiringCount > 0 ? 'Expiring ($expiringCount)' : 'Expiring',
+                icon: Icons.hourglass_top_rounded,
+                isSelected: invState.filterType == InventoryFilterType.expiringSoon,
+                activeColor: const Color(0xFFC2410C),
+                activeBg: const Color(0xFFFFEDD5),
+                onTap: () => ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.expiringSoon),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegmentTab({
+    required BuildContext context,
     required String label,
     required IconData icon,
     required bool isSelected,
-    Color? selectedColor,
-    Color? selectedTextColor,
-    int badgeCount = 0,
+    Color? activeColor,
+    Color? activeBg,
     required VoidCallback onTap,
   }) {
-    final bgColor = isSelected ? (selectedColor ?? AppColors.primaryContainer) : Colors.white;
-    final textColor = isSelected ? (selectedTextColor ?? AppColors.primary) : AppColors.textSecondary;
-    final borderColor = isSelected ? (selectedTextColor ?? AppColors.primary) : AppColors.outline.withValues(alpha: 0.8);
+    final defaultActiveColor = Theme.of(context).colorScheme.primary;
+    final fgColor = isSelected ? (activeColor ?? defaultActiveColor) : AppColors.textSecondary;
+    final bg = isSelected ? (activeBg ?? Colors.white) : Colors.transparent;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(50),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      borderRadius: BorderRadius.circular(9),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(50),
-          border: Border.all(color: borderColor, width: isSelected ? 1.2 : 0.8),
-          boxShadow: [
-            if (!isSelected)
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-          ],
+          color: bg,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1.5),
+                  ),
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
-              size: 14,
-              color: textColor,
+              size: 13,
+              color: isSelected ? fgColor : AppColors.textMuted,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: textColor,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: fgColor,
               ),
             ),
           ],
@@ -552,19 +988,51 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final isOut = item.isOutOfStock;
     final formattedName = _formatName(item.name);
 
+    final isSelected = _selectedItemIds.contains(item.id);
+
     return HomeStockCard(
       padding: const EdgeInsets.all(14),
-      onTap: () async {
-        await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ItemDetailScreen(itemId: item.id)),
-        );
-        ref.read(inventoryControllerProvider.notifier).loadData();
-      },
+      onTap: _isSelectionMode
+          ? () {
+              setState(() {
+                if (_selectedItemIds.contains(item.id)) {
+                  _selectedItemIds.remove(item.id);
+                } else {
+                  _selectedItemIds.add(item.id);
+                }
+              });
+            }
+          : () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => ItemDetailScreen(itemId: item.id)),
+              );
+              ref.read(inventoryControllerProvider.notifier).loadData();
+            },
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Selection Checkbox (if in selection mode)
+              if (_isSelectionMode) ...[
+                Checkbox(
+                  value: isSelected,
+                  activeColor: AppColors.primary,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        _selectedItemIds.add(item.id);
+                      } else {
+                        _selectedItemIds.remove(item.id);
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+              ],
+
               // Left Category Indicator with soft pastel color
               Container(
                 width: 48,
@@ -676,6 +1144,39 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ],
           ),
 
+          // Dedicated "+ Shopping List" action for all in-stock created pantry items
+          if (!isLow && !isOut) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                InkWell(
+                  onTap: () => _addItemToShoppingList(item),
+                  borderRadius: BorderRadius.circular(50),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(50),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_shopping_cart_rounded, size: 12, color: AppColors.primary),
+                        SizedBox(width: 4),
+                        Text(
+                          '+ Shopping List',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
           // Helpful Restock Alert banner if Low Stock or Out of Stock
           if (isLow || isOut) ...[
             const SizedBox(height: 10),
@@ -708,44 +1209,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     ),
                   ),
                   InkWell(
-                    onTap: () async {
-                      final neededQty = item.minimumQuantity > item.quantity
-                          ? (item.minimumQuantity - item.quantity)
-                          : 1.0;
-                      final success = await ref.read(shoppingControllerProvider.notifier).addItem(
-                            inventoryItemId: item.id,
-                            itemName: item.name,
-                            quantity: neededQty,
-                            unit: item.unit,
-                            categoryId: item.categoryId,
-                            categoryName: item.categoryName,
-                            categoryIcon: item.categoryIcon,
-                            categoryColor: item.categoryColor,
-                          );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                        if (success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Added $formattedName to shopping list'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: AppColors.primary,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        } else {
-                          final error = ref.read(shoppingControllerProvider).errorMessage ??
-                              'Could not add $formattedName to shopping list';
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(error),
-                              backgroundColor: Colors.red.shade700,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    },
+                    onTap: () => _addItemToShoppingList(item),
                     borderRadius: BorderRadius.circular(6),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -771,6 +1235,304 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Comprehensive sheet modal displaying all 70+ categorized household essentials
+class _AllEssentialsModal extends StatefulWidget {
+  final List<InventoryItemModel> existingItems;
+  final void Function(HouseholdStaple staple) onSelectStaple;
+  final Future<void> Function(InventoryItemModel item) onAddToShoppingList;
+
+  const _AllEssentialsModal({
+    required this.existingItems,
+    required this.onSelectStaple,
+    required this.onAddToShoppingList,
+  });
+
+  @override
+  State<_AllEssentialsModal> createState() => _AllEssentialsModalState();
+}
+
+class _AllEssentialsModalState extends State<_AllEssentialsModal> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedCategory = 'All';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var list = _selectedCategory == 'All'
+        ? kHouseholdStaples
+        : kHouseholdStaples.where((s) => s.category == _selectedCategory).toList();
+
+    if (_searchQuery.isNotEmpty) {
+      list = list.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    }
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Drag Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.outline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Header Title & Subtitle
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.flash_on_rounded, size: 20, color: Color(0xFFD97706)),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Household Essentials',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        ),
+                        Text(
+                          'Select suggested items for quick details & quantity picking',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                  style: const TextStyle(fontSize: 13),
+                  decoration: const InputDecoration(
+                    hintText: 'Search 70+ household staples...',
+                    hintStyle: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                    prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Category Chips
+            SizedBox(
+              height: 32,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: kHouseholdStapleCategories.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final cat = kHouseholdStapleCategories[index];
+                  final isSelected = _selectedCategory == cat;
+                  return InkWell(
+                    onTap: () => setState(() => _selectedCategory = cat),
+                    borderRadius: BorderRadius.circular(50),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : Colors.white,
+                        borderRadius: BorderRadius.circular(50),
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+
+            // Staples List
+            Expanded(
+              child: list.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No matching essentials found.',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      itemCount: list.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final staple = list[index];
+                        final existing = widget.existingItems.cast<InventoryItemModel?>().firstWhere(
+                              (i) => i?.name.trim().toLowerCase() == staple.name.trim().toLowerCase(),
+                              orElse: () => null,
+                            );
+                        final inPantry = existing != null;
+
+                        return InkWell(
+                          onTap: () => widget.onSelectStaple(staple),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: inPantry ? const Color(0xFFF0FDF4) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: inPantry ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
+                                width: inPantry ? 1.2 : 0.8,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(staple.emoji, style: const TextStyle(fontSize: 22)),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        staple.name,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${staple.category} • Pack: ${staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt() : staple.defaultQty} ${staple.defaultUnit}',
+                                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (inPantry) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      borderRadius: BorderRadius.circular(50),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'In Pantry',
+                                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF16A34A)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: () => widget.onAddToShoppingList(existing),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryContainer,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.add_shopping_cart_rounded, size: 13, color: AppColors.primary),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            '+ List',
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  ElevatedButton.icon(
+                                    onPressed: () => widget.onSelectStaple(staple),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD97706),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      visualDensity: VisualDensity.compact,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                                    ),
+                                    icon: const Icon(Icons.add_rounded, size: 14),
+                                    label: const Text(
+                                      'Select & Add',
+                                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

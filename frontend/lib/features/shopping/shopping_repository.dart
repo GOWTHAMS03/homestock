@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/constants/api_endpoints.dart';
 import '../../core/database/app_database.dart';
+import '../../core/database/daos/inventory_dao.dart';
 import '../../core/database/daos/shopping_dao.dart';
 import '../../core/database/daos/sync_dao.dart';
 import '../../core/network/api_client.dart';
@@ -27,6 +28,7 @@ class ShoppingRepository {
   final ApiClient _apiClient;
   final SyncEngine _syncEngine;
   final ConnectivityMonitor? _connectivity;
+  final InventoryDao? _inventoryDao;
 
   ShoppingRepository({
     required ShoppingDao shoppingDao,
@@ -34,11 +36,13 @@ class ShoppingRepository {
     required ApiClient apiClient,
     required SyncEngine syncEngine,
     ConnectivityMonitor? connectivity,
+    InventoryDao? inventoryDao,
   })  : _shoppingDao = shoppingDao,
         _syncDao = syncDao,
         _apiClient = apiClient,
         _syncEngine = syncEngine,
-        _connectivity = connectivity;
+        _connectivity = connectivity,
+        _inventoryDao = inventoryDao;
 
   bool get isOnline => _connectivity?.isOnline ?? true;
 
@@ -68,6 +72,8 @@ class ShoppingRepository {
                 completedByName: item.completedByName,
                 completedAt: item.completedAt,
                 notes: item.notes,
+                barcode: item.barcode,
+                productId: item.productId,
               ))
           .toList();
 
@@ -106,6 +112,8 @@ class ShoppingRepository {
               completedByName: item.completedByName,
               completedAt: item.completedAt,
               notes: item.notes,
+              barcode: item.barcode,
+              productId: item.productId,
             ))
         .toList();
 
@@ -133,6 +141,7 @@ class ShoppingRepository {
   // ──── WRITE (local-first) ────
 
   /// Add an item to the shopping list locally and queue for sync.
+  /// Automatically connects to matching inventory item in the active home if one exists!
   Future<ShoppingItemModel> addItem(
     String homeId,
     String? listId, {
@@ -154,11 +163,24 @@ class ShoppingRepository {
     final operationId = _uuid.v4();
     final now = DateTime.now();
 
+    // Auto-connect with existing inventory item if not already supplied
+    String? effectiveInventoryItemId = inventoryItemId;
+    final invDao = _inventoryDao;
+    if ((effectiveInventoryItemId == null || effectiveInventoryItemId.isEmpty) && invDao != null) {
+      final existingInv = await invDao.findItemByName(homeId, itemName);
+      if (existingInv != null) {
+        effectiveInventoryItemId = existingInv.id;
+        categoryName ??= existingInv.categoryName;
+        categoryIcon ??= existingInv.categoryIcon;
+        categoryColor ??= existingInv.categoryColor;
+      }
+    }
+
     // 1. Insert locally
     await _shoppingDao.upsertShoppingItem(LocalShoppingListItemsCompanion(
       id: Value(itemId),
       shoppingListId: Value(effectiveListId),
-      inventoryItemId: Value(inventoryItemId),
+      inventoryItemId: Value(effectiveInventoryItemId),
       itemName: Value(itemName),
       categoryName: Value(categoryName),
       categoryIcon: Value(categoryIcon ?? 'category'),
@@ -182,7 +204,7 @@ class ShoppingRepository {
       entityId: Value(itemId),
       payload: Value(jsonEncode({
         'listId': listId,
-        'inventoryItemId': inventoryItemId,
+        'inventoryItemId': effectiveInventoryItemId,
         'itemName': itemName,
         'categoryId': categoryId,
         'quantity': quantity,
@@ -199,7 +221,7 @@ class ShoppingRepository {
     return ShoppingItemModel(
       id: itemId,
       shoppingListId: effectiveListId,
-      inventoryItemId: inventoryItemId,
+      inventoryItemId: effectiveInventoryItemId,
       itemName: itemName,
       categoryName: categoryName,
       categoryIcon: categoryIcon ?? 'category',
@@ -214,6 +236,7 @@ class ShoppingRepository {
   }
 
   /// Toggle a shopping item's completion locally and queue for sync.
+  /// Automatically updates connected inventory items and clears/resolves low-stock status!
   Future<void> toggleItem(String homeId, String listId, String itemId) async {
     final operationId = _uuid.v4();
     final now = DateTime.now();
@@ -231,7 +254,10 @@ class ShoppingRepository {
       completedByName: newCompleted ? 'You' : null,
     );
 
-    // 2. Enqueue sync
+    // 2. Automatically sync with inventory & update low-stock status
+    await _syncInventoryOnItemToggle(homeId, item, newCompleted);
+
+    // 3. Enqueue sync
     await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
       operationId: Value(operationId),
       operationType: const Value(SyncOperationType.toggleShoppingItem),
@@ -245,7 +271,229 @@ class ShoppingRepository {
       homeId: Value(homeId),
     ));
 
-    // 3. Background sync
+    // 4. Background sync
+    _syncEngine.trySyncImmediate();
+  }
+
+  /// Automatically updates connected inventory item stock and resolves/sets low-stock status.
+  Future<void> _syncInventoryOnItemToggle(
+    String homeId,
+    LocalShoppingListItem item,
+    bool isCompleted,
+  ) async {
+    final invDao = _inventoryDao;
+    if (invDao == null) return;
+    final now = DateTime.now();
+
+    // 1. Locate matching inventory item
+    LocalInventoryItem? invItem;
+    if (item.inventoryItemId != null && item.inventoryItemId!.isNotEmpty) {
+      invItem = await invDao.getItemById(item.inventoryItemId!);
+    }
+    invItem ??= await invDao.findItemByName(homeId, item.itemName);
+
+    if (isCompleted) {
+      // ──── ITEM PURCHASED / BOUGHT ────
+      if (invItem != null) {
+        // Link shopping item if not already linked
+        if (item.inventoryItemId != invItem.id) {
+          await _shoppingDao.linkInventoryItem(item.id, invItem.id);
+        }
+
+        // Unit conversion if needed (e.g. g <-> kg, ml <-> L)
+        final effectiveAddedQty = _convertQuantity(
+          fromQty: item.quantity,
+          fromUnit: item.unit,
+          toUnit: invItem.unit,
+        );
+
+        final prevQty = invItem.quantity;
+        final newQty = prevQty + effectiveAddedQty;
+        final newStockStatus = newQty <= 0
+            ? 'OUT_OF_STOCK'
+            : (newQty <= invItem.minimumQuantity ? 'LOW_STOCK' : 'IN_STOCK');
+
+        // Update local stock in SQLite (clears low stock if newQty > minimumQuantity)
+        await invDao.updateLocalStock(invItem.id, newQty, newStockStatus);
+
+        // Record local STOCK_IN audit transaction
+        final txId = _uuid.v4();
+        await invDao.insertTransaction(LocalStockTransactionsCompanion(
+          id: Value(txId),
+          inventoryItemId: Value(invItem.id),
+          itemName: Value(invItem.name),
+          userName: const Value('You'),
+          transactionType: const Value('STOCK_IN'),
+          quantityChange: Value(effectiveAddedQty),
+          previousQuantity: Value(prevQty),
+          newQuantity: Value(newQty),
+          unit: Value(invItem.unit),
+          reason: const Value('Purchased from shopping list'),
+          createdAt: Value(now.toIso8601String()),
+          isLocalOnly: const Value(true),
+        ));
+
+        // Enqueue sync operation for inventory item
+        await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+          operationId: Value(_uuid.v4()),
+          operationType: const Value('STOCK_IN'),
+          entityType: const Value(SyncEntityType.inventoryItem),
+          entityId: Value(invItem.id),
+          payload: Value(jsonEncode({
+            'transactionType': 'STOCK_IN',
+            'quantityChange': effectiveAddedQty,
+            'reason': 'Purchased from shopping list',
+          })),
+          createdAt: Value(now),
+          homeId: Value(homeId),
+        ));
+      } else {
+        // Item does not exist in inventory yet: automatically create it!
+        final newInvId = _uuid.v4();
+        const stockStatus = 'IN_STOCK';
+
+        await invDao.upsertItem(LocalInventoryItemsCompanion(
+          id: Value(newInvId),
+          homeId: Value(homeId),
+          name: Value(item.itemName),
+          categoryName: Value(item.categoryName ?? 'Other'),
+          categoryIcon: Value(item.categoryIcon),
+          categoryColor: Value(item.categoryColor),
+          quantity: Value(item.quantity),
+          unit: Value(item.unit),
+          minimumQuantity: const Value(1.0),
+          stockStatus: const Value(stockStatus),
+          isLocalOnly: const Value(true),
+          isDeleted: const Value(false),
+          updatedAt: Value(now),
+        ));
+
+        await _shoppingDao.linkInventoryItem(item.id, newInvId);
+
+        await invDao.insertTransaction(LocalStockTransactionsCompanion(
+          id: Value(_uuid.v4()),
+          inventoryItemId: Value(newInvId),
+          itemName: Value(item.itemName),
+          userName: const Value('You'),
+          transactionType: const Value('STOCK_IN'),
+          quantityChange: Value(item.quantity),
+          previousQuantity: const Value(0.0),
+          newQuantity: Value(item.quantity),
+          unit: Value(item.unit),
+          reason: const Value('Added to inventory via shopping purchase'),
+          createdAt: Value(now.toIso8601String()),
+          isLocalOnly: const Value(true),
+        ));
+
+        await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+          operationId: Value(_uuid.v4()),
+          operationType: const Value('CREATE_ITEM'),
+          entityType: const Value(SyncEntityType.inventoryItem),
+          entityId: Value(newInvId),
+          payload: Value(jsonEncode({
+            'name': item.itemName,
+            'categoryName': item.categoryName,
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'minimumQuantity': 1.0,
+            'stockStatus': stockStatus,
+          })),
+          createdAt: Value(now),
+          homeId: Value(homeId),
+        ));
+      }
+    } else {
+      // ──── ITEM UNCHECKED / REVERTED ────
+      if (invItem != null) {
+        final effectiveDeductedQty = _convertQuantity(
+          fromQty: item.quantity,
+          fromUnit: item.unit,
+          toUnit: invItem.unit,
+        );
+
+        final prevQty = invItem.quantity;
+        final newQty = (prevQty - effectiveDeductedQty).clamp(0.0, 999999.0);
+        final newStockStatus = newQty <= 0
+            ? 'OUT_OF_STOCK'
+            : (newQty <= invItem.minimumQuantity ? 'LOW_STOCK' : 'IN_STOCK');
+
+        await invDao.updateLocalStock(invItem.id, newQty, newStockStatus);
+
+        await invDao.insertTransaction(LocalStockTransactionsCompanion(
+          id: Value(_uuid.v4()),
+          inventoryItemId: Value(invItem.id),
+          itemName: Value(invItem.name),
+          userName: const Value('You'),
+          transactionType: const Value('STOCK_OUT'),
+          quantityChange: Value(effectiveDeductedQty),
+          previousQuantity: Value(prevQty),
+          newQuantity: Value(newQty),
+          unit: Value(invItem.unit),
+          reason: const Value('Unmarked as bought from shopping list'),
+          createdAt: Value(now.toIso8601String()),
+          isLocalOnly: const Value(true),
+        ));
+
+        await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+          operationId: Value(_uuid.v4()),
+          operationType: const Value('STOCK_OUT'),
+          entityType: const Value(SyncEntityType.inventoryItem),
+          entityId: Value(invItem.id),
+          payload: Value(jsonEncode({
+            'transactionType': 'STOCK_OUT',
+            'quantityChange': effectiveDeductedQty,
+            'reason': 'Unmarked as bought from shopping list',
+          })),
+          createdAt: Value(now),
+          homeId: Value(homeId),
+        ));
+      }
+    }
+  }
+
+  /// Converts quantities when units differ (e.g. 500g -> 0.5kg, 500ml -> 0.5L).
+  double _convertQuantity({
+    required double fromQty,
+    required String fromUnit,
+    required String toUnit,
+  }) {
+    final from = fromUnit.trim().toLowerCase();
+    final to = toUnit.trim().toLowerCase();
+
+    if (from == to) return fromQty;
+
+    // Grams to Kilograms
+    if (from == 'g' && to == 'kg') return fromQty / 1000.0;
+    // Kilograms to Grams
+    if (from == 'kg' && to == 'g') return fromQty * 1000.0;
+    // Milliliters to Liters
+    if (from == 'ml' && (to == 'l' || to == 'litre' || to == 'liter')) return fromQty / 1000.0;
+    // Liters to Milliliters
+    if ((from == 'l' || from == 'litre' || from == 'liter') && to == 'ml') return fromQty * 1000.0;
+
+    return fromQty;
+  }
+
+  /// Batch mark items as completed (e.g. from In-store Shopping Mode or receipt recording).
+  Future<void> markItemsCompleted(String homeId, List<String> itemIds, {String? completedByName}) async {
+    if (itemIds.isEmpty) return;
+    await _shoppingDao.markItemsCompleted(itemIds, completedByName: completedByName ?? 'You');
+    for (final id in itemIds) {
+      final item = await _shoppingDao.getShoppingItemById(id);
+      if (item != null) {
+        await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+          operationId: Value(_uuid.v4()),
+          operationType: const Value(SyncOperationType.toggleShoppingItem),
+          entityType: const Value(SyncEntityType.shoppingListItem),
+          entityId: Value(id),
+          payload: Value(jsonEncode({
+            'isCompleted': true,
+          })),
+          createdAt: Value(DateTime.now()),
+          homeId: Value(homeId),
+        ));
+      }
+    }
     _syncEngine.trySyncImmediate();
   }
 
