@@ -1061,3 +1061,71 @@ const List<HouseholdStaple> kHouseholdStaples = [
   ...kCuratedStaples,
   ...kMasterProductCatalogStaples,
 ];
+
+final Map<String, HouseholdStaple?> _stapleLookupCache = {};
+
+/// Finds the matching household staple for any item name (with fast memoized cache).
+HouseholdStaple? findStapleForName(String name, [String? category]) {
+  final cleanName = name.trim();
+  if (cleanName.isEmpty) return null;
+  final cacheKey = cleanName.toLowerCase();
+
+  if (_stapleLookupCache.containsKey(cacheKey)) {
+    return _stapleLookupCache[cacheKey];
+  }
+
+  // 1. Direct exact name match
+  for (final s in kHouseholdStaples) {
+    if (s.name.toLowerCase() == cacheKey) {
+      _stapleLookupCache[cacheKey] = s;
+      return s;
+    }
+  }
+
+  // 2. Exact Tamil name match
+  for (final s in kHouseholdStaples) {
+    if (s.tamilName != null && s.tamilName!.toLowerCase() == cacheKey) {
+      _stapleLookupCache[cacheKey] = s;
+      return s;
+    }
+  }
+
+  // 3. Alias / common names match
+  for (final s in kHouseholdStaples) {
+    if (s.commonNames != null) {
+      for (final alias in s.commonNames!) {
+        if (alias.toLowerCase() == cacheKey) {
+          _stapleLookupCache[cacheKey] = s;
+          return s;
+        }
+      }
+    }
+  }
+
+  // 4. Substring match (e.g., item name is "Butter", staple is "Butter / Amul" or vice versa)
+  for (final s in kHouseholdStaples) {
+    final sName = s.name.toLowerCase();
+    if (sName.contains(cacheKey) || cacheKey.contains(sName)) {
+      _stapleLookupCache[cacheKey] = s;
+      return s;
+    }
+  }
+
+  // 5. Token / keyword match (e.g. "White Whole Urad Dal" contains "urad" -> matches Urad Dal)
+  final tokens = cacheKey.split(RegExp(r'[\s/,\-\(\)]+')).where((t) => t.length > 2).toList();
+  for (final s in kHouseholdStaples) {
+    final sName = s.name.toLowerCase();
+    int matchCount = 0;
+    for (final token in tokens) {
+      if (sName.contains(token)) matchCount++;
+    }
+    if (matchCount >= 2 || (tokens.length == 1 && matchCount == 1)) {
+      _stapleLookupCache[cacheKey] = s;
+      return s;
+    }
+  }
+
+  _stapleLookupCache[cacheKey] = null;
+  return null;
+}
+

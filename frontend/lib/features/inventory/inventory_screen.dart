@@ -205,7 +205,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     }
   }
 
-  /// Open comprehensive sheet modal with all 70+ categorized essentials
+  /// Open comprehensive sheet modal with all 650+ categorized essentials
   void _showAllEssentialsBottomSheet(BuildContext context, List<InventoryItemModel> existingItems) {
     showModalBottomSheet(
       context: context,
@@ -268,7 +268,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
-                  '70+ Items',
+                  '650+ Items',
                   style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
                 ),
               ),
@@ -807,7 +807,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     child: const Icon(Icons.flash_on_rounded, color: Color(0xFFD97706)),
                   ),
                   title: const Text('Quick Essentials', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('1-tap create Milk, Bread, Rice, Salt, and 70+ staples', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  subtitle: const Text('1-tap create Milk, Bread, Rice, Salt, and 650+ staples', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -1035,23 +1035,31 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 const SizedBox(width: 4),
               ],
 
-              // Left Category Indicator with soft pastel color
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: item.categoryColorParsed.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: item.categoryColorParsed.withValues(alpha: 0.28),
-                    width: 1,
-                  ),
-                ),
-                child: Icon(
-                  item.categoryIconData,
-                  size: 24,
-                  color: item.categoryColorParsed,
-                ),
+              // Left Category / Staple Indicator with soft pastel color
+              Builder(
+                builder: (context) {
+                  final staple = findStapleForName(item.name, item.categoryName);
+                  return Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: item.categoryColorParsed.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: item.categoryColorParsed.withValues(alpha: 0.28),
+                        width: 1,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: staple != null && staple.emoji.isNotEmpty
+                        ? Text(staple.emoji, style: const TextStyle(fontSize: 24))
+                        : Icon(
+                            item.categoryIconData,
+                            size: 24,
+                            color: item.categoryColorParsed,
+                          ),
+                  );
+                },
               ),
               const SizedBox(width: 12),
 
@@ -1242,7 +1250,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   }
 }
 
-/// Comprehensive sheet modal displaying all 70+ categorized household essentials
+/// Comprehensive sheet modal displaying all 650+ categorized household essentials
 class _AllEssentialsModal extends StatefulWidget {
   final List<InventoryItemModel> existingItems;
   final void Function(HouseholdStaple staple) onSelectStaple;

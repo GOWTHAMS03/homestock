@@ -109,9 +109,9 @@ void main() {
     expect(find.text('Low Stock'), findsOneWidget);
     expect(find.text('Expiring'), findsOneWidget);
 
-    // 6. Verify Quick Add Staples suggestion card (non-intrusive, collapsible, 70+ items)
+    // 6. Verify Quick Add Staples suggestion card (non-intrusive, collapsible, 650+ items)
     expect(find.text('Quick Add Staples'), findsOneWidget);
-    expect(find.text('70+ Items'), findsOneWidget);
+    expect(find.text('650+ Items'), findsOneWidget);
     expect(find.text('Explore All'), findsOneWidget);
   });
 }
