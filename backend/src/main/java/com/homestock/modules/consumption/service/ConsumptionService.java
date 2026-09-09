@@ -140,10 +140,17 @@ public class ConsumptionService {
                 }
             });
         } else if ("STILL_HAVE_ENOUGH".equalsIgnoreCase(request.getAction())) {
-            // User confirms they still have stock: reset consumption reference timestamp to now!
+            // User confirms they still have stock: reset consumption reference timestamp to now and restore healthy stock!
             item.setQuantitySource(QuantitySource.VERIFIED);
             item.setLastVerifiedAt(Instant.now());
-            item.setQuantityStatus(QuantityStatus.ABOUT_HALF);
+            item.setQuantityStatus(QuantityStatus.ALMOST_FULL);
+
+            BigDecimal referenceCapacity = item.getMaximumQuantity() != null && item.getMaximumQuantity().compareTo(BigDecimal.ZERO) > 0
+                    ? item.getMaximumQuantity()
+                    : item.getMinimumQuantity().multiply(BigDecimal.valueOf(2));
+
+            BigDecimal updatedQty = referenceCapacity.multiply(BigDecimal.valueOf(0.85)).setScale(2, RoundingMode.HALF_UP);
+            item.setQuantity(updatedQty);
             inventoryItemRepository.save(item);
         } else if (request.getStatus() != null) {
             // Qualitative ratio selection

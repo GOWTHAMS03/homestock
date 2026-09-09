@@ -6,6 +6,7 @@ import '../../features/auth/auth_controller.dart';
 import '../../features/auth/auth_state.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
+import '../../features/dashboard/attention_items_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/inventory/inventory_screen.dart';
 import '../../features/inventory/item_detail_screen.dart';
@@ -93,6 +94,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/analytics',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/attention',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AttentionItemsScreen(),
       ),
       GoRoute(
         path: '/inventory/detail/:id',

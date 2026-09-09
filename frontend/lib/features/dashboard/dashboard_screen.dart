@@ -26,6 +26,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/household_staples.dart';
 import 'dashboard_controller.dart';
 import 'dashboard_model.dart';
+import 'dashboard_svg_icons.dart';
 import 'what_do_i_need_sheet.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -169,9 +170,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     String? fullName,
   ) {
     final hour = DateTime.now().hour;
-    final (greeting, timeEmoji) = hour < 12
-        ? ('Good morning', '🌅')
-        : (hour < 17 ? ('Good afternoon', '☀️') : ('Good evening', '🌙'));
+    final (greeting, timeSvg) = hour < 12
+        ? ('Good morning', DashboardSvgIcons.sunMorning)
+        : (hour < 17
+            ? ('Good afternoon', DashboardSvgIcons.sunAfternoon)
+            : ('Good evening', DashboardSvgIcons.moonEvening));
     final firstName = (fullName != null && fullName.trim().isNotEmpty)
         ? fullName.trim().split(' ').first
         : 'There';
@@ -197,11 +200,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Sub-Greeting with Time-of-Day Emoji
+                    // Sub-Greeting with Time-of-Day Animated SVG
                     Row(
                       children: [
+                        SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: SvgPicture.string(timeSvg),
+                        ),
+                        const SizedBox(width: 5),
                         Text(
-                          '$greeting $timeEmoji',
+                          greeting,
                           style: const TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
@@ -211,16 +220,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
 
-                    // Prominent Name: Clean, Bold, High Readability
+                    // Prominent Name + Animated SVG Waving Hand ("Say Hello")
                     Row(
                       children: [
                         Flexible(
                           child: Text(
-                            '$firstName 👋',
+                            firstName,
                             style: const TextStyle(
-                              fontSize: 20,
+                              fontSize: 21,
                               fontWeight: FontWeight.w900,
                               color: AppColors.textPrimary,
                               letterSpacing: -0.5,
@@ -230,18 +239,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 6),
+                        const _AnimatedWavingHandSvgWidget(),
                       ],
                     ),
                     const SizedBox(height: 5),
 
-                    // Modern Location / Home Switcher Chip
+                    // Modern Location / Home Switcher Chip with Home Cottage SVG
                     InkWell(
                       onTap: () => _showHomeSwitcher(context, ref),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.85),
+                          color: Colors.white.withValues(alpha: 0.88),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: AppColors.outline.withValues(alpha: 0.6), width: 0.8),
                           boxShadow: [
@@ -255,8 +266,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.cottage_rounded, size: 12.5, color: AppColors.primary),
-                            const SizedBox(width: 4),
+                            SizedBox(
+                              width: 13,
+                              height: 13,
+                              child: SvgPicture.string(DashboardSvgIcons.homeCottage),
+                            ),
+                            const SizedBox(width: 5),
                             ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 130),
                               child: Text(
@@ -376,13 +391,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: const Color(0xFFEDE9FE),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(11),
                     ),
-                    child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF7C3AED), size: 20),
+                    child: const Center(
+                      child: _AnimatedPromoCardSvg(
+                        svgString: DashboardSvgIcons.shoppingBagCard,
+                        animationType: _CardAnimationType.float,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -413,7 +433,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         const SizedBox(width: 10),
 
-        // Card 2: Indigo-tinted Inventory count summary
+        // Card 2: Indigo-tinted Inventory count summary with Animated SVG
         Expanded(
           child: InkWell(
             onTap: () => context.go('/inventory'),
@@ -435,13 +455,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: const Color(0xFFE0E7FF),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(11),
                     ),
-                    child: const Icon(Icons.inventory_2_outlined, color: AppColors.primary, size: 20),
+                    child: const Center(
+                      child: _AnimatedPromoCardSvg(
+                        svgString: DashboardSvgIcons.pantryStockedCard,
+                        animationType: _CardAnimationType.pulse,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -610,214 +635,424 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Section Header with Interactive "Explore All" Button
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF59E0B),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${items.length} ${items.length == 1 ? 'Thing Needs' : 'Things Need'} Attention',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              'Quick Confirm',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        ...items.take(4).map((attentionItem) {
-          final matchedItem = invState.items.cast<InventoryItemModel?>().firstWhere(
-                (it) => it?.id == attentionItem.itemId,
-                orElse: () => null,
-              );
-
-          final itemToConfirm = matchedItem ??
-              InventoryItemModel(
-                id: attentionItem.itemId,
-                homeId: '',
-                categoryName: attentionItem.categoryName,
-                categoryIcon: 'inventory',
-                categoryColor: '#F59E0B',
-                name: attentionItem.name,
-                quantity: attentionItem.quantity,
-                unit: attentionItem.unit,
-                minimumQuantity: 1.0,
-                stockStatus: attentionItem.stockStatus,
-                expiryStatus: attentionItem.expiryStatus,
-                daysUntilExpiry: attentionItem.daysUntilExpiry,
-              );
-
-          final isOut = attentionItem.stockStatus == 'OUT_OF_STOCK';
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isOut ? const Color(0xFFFECDD3) : const Color(0xFFFDE68A),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: InkWell(
-              onTap: () => SmartConfirmationSheet.show(context, itemToConfirm),
-              borderRadius: BorderRadius.circular(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            InkWell(
+              onTap: () => context.push('/attention'),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: isOut ? const Color(0xFFFFF1F2) : const Color(0xFFFFFBEB),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          isOut ? Icons.battery_alert_rounded : Icons.battery_2_bar_rounded,
-                          size: 18,
-                          color: isOut ? const Color(0xFFE11D48) : const Color(0xFFD97706),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _formatName(attentionItem.name),
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            Text(
-                              attentionItem.reasonMessage.isNotEmpty
-                                  ? attentionItem.reasonMessage
-                                  : (isOut ? 'Out of stock' : 'Running low in pantry'),
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
-                    ],
+                  Container(
+                    width: 9,
+                    height: 9,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF59E0B),
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      // Action 1: Still Have Enough (One tap fast confirmation)
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            try {
-                              final api = ref.read(apiClientProvider);
-                              await api.post('/items/${attentionItem.itemId}/confirm-status', data: {
-                                'action': 'STILL_HAVE_ENOUGH',
-                              });
-                              await ref.read(inventoryControllerProvider.notifier).loadData();
-                              await ref.read(dashboardControllerProvider.notifier).loadDashboard();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Confirmed "${attentionItem.name}" is stocked 👍'),
-                                    duration: const Duration(seconds: 1),
-                                    backgroundColor: AppColors.hsGreen,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } catch (_) {}
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.hsGreen,
-                            side: const BorderSide(color: Color(0xFF86EFAC)),
-                            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          child: const Text(
-                            'Still have enough',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                          ),
-                        ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${items.length} ${items.length == 1 ? 'Thing Needs' : 'Things Need'} Attention',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${items.length}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFB45309),
                       ),
-                      const SizedBox(width: 8),
-                      // Action 2: Add to Shopping (One tap fast action)
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final success = await ref.read(shoppingControllerProvider.notifier).addItem(
-                                  inventoryItemId: attentionItem.itemId,
-                                  itemName: attentionItem.name,
-                                  quantity: attentionItem.quantity > 0 ? attentionItem.quantity : 1.0,
-                                  unit: attentionItem.unit,
-                                );
-                            if (context.mounted && success) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Added "${attentionItem.name}" to Shopping List 🛒'),
-                                  duration: const Duration(seconds: 1),
-                                  backgroundColor: AppColors.primary,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            visualDensity: VisualDensity.compact,
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            '+ Add to Shopping',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
             ),
-          );
-        }),
+
+            // Interactive "Explore All" Button to open the dedicated full attention screen
+            InkWell(
+              onTap: () => context.push('/attention'),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFFDE68A), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1.5),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Explore All',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFFB45309)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // Horizontal Swipeable Attention Cards (Compact height ~154px instead of 550px+ vertical scroll)
+        SizedBox(
+          height: 154,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: items.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final attentionItem = items[index];
+              final matchedItem = invState.items.cast<InventoryItemModel?>().firstWhere(
+                    (it) => it?.id == attentionItem.itemId,
+                    orElse: () => null,
+                  );
+
+              final itemToConfirm = matchedItem ??
+                  InventoryItemModel(
+                    id: attentionItem.itemId,
+                    homeId: '',
+                    categoryName: attentionItem.categoryName,
+                    categoryIcon: 'inventory',
+                    categoryColor: '#F59E0B',
+                    name: attentionItem.name,
+                    quantity: attentionItem.quantity,
+                    unit: attentionItem.unit,
+                    minimumQuantity: 1.0,
+                    stockStatus: attentionItem.stockStatus,
+                    expiryStatus: attentionItem.expiryStatus,
+                    daysUntilExpiry: attentionItem.daysUntilExpiry,
+                  );
+
+              final isOut = attentionItem.stockStatus == 'OUT_OF_STOCK' || attentionItem.quantity <= 0;
+              final staple = findStapleForName(attentionItem.name);
+              final emoji = staple?.emoji ?? '📦';
+
+              final refCap = (matchedItem != null && matchedItem.maximumQuantity != null && matchedItem.maximumQuantity! > 0)
+                  ? matchedItem.maximumQuantity!
+                  : (matchedItem != null && matchedItem.minimumQuantity > 0
+                      ? matchedItem.minimumQuantity * 2.0
+                      : (attentionItem.quantity > 0 ? attentionItem.quantity * 1.5 : 2.0));
+
+              final stockRatio = refCap > 0 ? (attentionItem.quantity / refCap).clamp(0.0, 1.0) : 0.0;
+
+              return Container(
+                width: 268,
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isOut
+                        ? [Colors.white, const Color(0xFFFFF5F5)]
+                        : [Colors.white, const Color(0xFFFFFDF5)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isOut ? const Color(0xFFFECDD3) : const Color(0xFFFDE68A),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isOut ? Colors.red : Colors.amber).withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: () => SmartConfirmationSheet.show(context, itemToConfirm),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Top Row: Emoji Avatar + Title & Reason + Arrow
+                      Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: isOut ? const Color(0xFFFFF1F2) : const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(11),
+                              border: Border.all(
+                                color: isOut ? const Color(0xFFFECDD3) : const Color(0xFFFDE68A),
+                                width: 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _formatName(attentionItem.name),
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                    letterSpacing: -0.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: isOut ? const Color(0xFFFEE2E2) : const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    isOut
+                                        ? 'Out of stock'
+                                        : (attentionItem.reasonMessage.isNotEmpty
+                                            ? attentionItem.reasonMessage
+                                            : 'Running low'),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: isOut ? const Color(0xFFB91C1C) : const Color(0xFFB45309),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
+                        ],
+                      ),
+
+                      // Middle: Stock progress meter
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isOut
+                                    ? '0 ${attentionItem.unit} remaining'
+                                    : '${attentionItem.quantity == attentionItem.quantity.roundToDouble() ? attentionItem.quantity.toInt() : attentionItem.quantity.toStringAsFixed(1)} ${attentionItem.unit} remaining',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isOut ? const Color(0xFFE11D48) : Colors.grey.shade700,
+                                ),
+                              ),
+                              Text(
+                                '${(stockRatio * 100).toInt()}%',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: isOut ? const Color(0xFFE11D48) : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: isOut ? 0.04 : stockRatio.clamp(0.04, 1.0),
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                isOut
+                                    ? const Color(0xFFEF4444)
+                                    : (stockRatio < 0.3
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF10B981)),
+                              ),
+                              minHeight: 4,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Bottom Row: Two Fast Action Buttons (Still enough & + Add)
+                      Row(
+                        children: [
+                          // Action 1: Still have enough (Immediately updates stock quantity in Drift SQLite!)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                final rawQty = refCap * 0.85;
+                                final isDiscrete = attentionItem.unit.toLowerCase().contains('pc') ||
+                                    attentionItem.unit.toLowerCase().contains('pack') ||
+                                    attentionItem.unit.toLowerCase().contains('bottle') ||
+                                    attentionItem.unit.toLowerCase().contains('can') ||
+                                    attentionItem.unit.toLowerCase().contains('box');
+                                final finalQty = isDiscrete
+                                    ? rawQty.roundToDouble().clamp(1.0, 9999.0)
+                                    : double.parse(rawQty.toStringAsFixed(1));
+
+                                try {
+                                  // 1. Immediately reflect updated quantity in local Drift inventory!
+                                  await ref.read(inventoryControllerProvider.notifier).updateItem(
+                                    attentionItem.itemId,
+                                    {
+                                      'quantity': finalQty,
+                                      'quantityStatus': 'ALMOST_FULL',
+                                      'stockStatus': 'IN_STOCK',
+                                    },
+                                  );
+
+                                  // 2. Sync to API backend
+                                  final api = ref.read(apiClientProvider);
+                                  await api.post('/items/${attentionItem.itemId}/confirm-status', data: {
+                                    'action': 'STILL_HAVE_ENOUGH',
+                                  });
+
+                                  // 3. Background refresh
+                                  ref.read(inventoryControllerProvider.notifier).loadData();
+                                  ref.read(dashboardControllerProvider.notifier).loadDashboard();
+
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Text('🌿', style: TextStyle(fontSize: 16)),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                'Confirmed "${attentionItem.name}" stocked: $finalQty ${attentionItem.unit} 👍',
+                                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                        backgroundColor: AppColors.hsGreen,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } catch (_) {}
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.hsGreen,
+                                side: const BorderSide(color: Color(0xFF86EFAC)),
+                                backgroundColor: const Color(0xFFF0FDF4),
+                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.hsGreen),
+                                  SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      'Still enough',
+                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+
+                          // Action 2: Add to Shopping
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final success = await ref.read(shoppingControllerProvider.notifier).addItem(
+                                      inventoryItemId: attentionItem.itemId,
+                                      itemName: attentionItem.name,
+                                      quantity: attentionItem.quantity > 0 ? attentionItem.quantity : 1.0,
+                                      unit: attentionItem.unit,
+                                    );
+                                if (context.mounted && success) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Row(
+                                        children: [
+                                          const Text('🛒', style: TextStyle(fontSize: 16)),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text('Added "${attentionItem.name}" to Shopping List'),
+                                          ),
+                                        ],
+                                      ),
+                                      duration: const Duration(seconds: 2),
+                                      backgroundColor: AppColors.primary,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                visualDensity: VisualDensity.compact,
+                                elevation: 0,
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_shopping_cart_rounded, size: 13, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      '+ Add',
+                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
@@ -956,10 +1191,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               if (index == 0) {
-                // "All" Category Pill
+                // "All" Category Pill with SVG
                 final isSelected = !_isLowStockFilter && _selectedCategoryId == null;
                 return _CategoryBadgeItem(
-                  icon: Icons.grid_view_rounded,
+                  svgString: DashboardSvgIcons.catAll,
                   label: 'All',
                   gradientColors: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
                   shadowColor: const Color(0x406366F1),
@@ -974,11 +1209,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               }
 
               if (index == 1) {
-                // Special Low Stock 3D Badge
+                // Special Low Stock 3D Badge with SVG
                 final theme = _getCategoryTheme('Low Stock');
                 final isSelected = _isLowStockFilter;
                 return _CategoryBadgeItem(
-                  icon: theme.icon,
+                  svgString: DashboardSvgIcons.catLowStock,
                   label: 'Low Stock',
                   gradientColors: theme.gradientColors,
                   shadowColor: theme.shadowColor,
@@ -1000,7 +1235,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               final theme = _getCategoryTheme(cat.name);
               final isSelected = !_isLowStockFilter && _selectedCategoryId == cat.id;
               return _CategoryBadgeItem(
-                icon: theme.icon,
+                svgString: DashboardSvgIcons.getCategorySvg(cat.name),
                 label: cat.name,
                 gradientColors: theme.gradientColors,
                 shadowColor: theme.shadowColor,
@@ -1767,9 +2002,9 @@ class _AnimatedSmartPredictButtonState extends State<_AnimatedSmartPredictButton
   }
 }
 
-/// Animated 3D-styled Category Badge Item with tactile bounce, glowing halo, and active indicator
+/// Animated 3D-styled Category Badge Item with tactile bounce, glowing halo, active indicator, and SVG animation
 class _CategoryBadgeItem extends StatefulWidget {
-  final IconData icon;
+  final String svgString;
   final String label;
   final List<Color> gradientColors;
   final Color shadowColor;
@@ -1777,7 +2012,7 @@ class _CategoryBadgeItem extends StatefulWidget {
   final VoidCallback onTap;
 
   const _CategoryBadgeItem({
-    required this.icon,
+    required this.svgString,
     required this.label,
     required this.gradientColors,
     required this.shadowColor,
@@ -1789,8 +2024,25 @@ class _CategoryBadgeItem extends StatefulWidget {
   State<_CategoryBadgeItem> createState() => _CategoryBadgeItemState();
 }
 
-class _CategoryBadgeItemState extends State<_CategoryBadgeItem> {
+class _CategoryBadgeItemState extends State<_CategoryBadgeItem>
+    with SingleTickerProviderStateMixin {
   bool _isPressed = false;
+  late final AnimationController _hoverController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hoverController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _hoverController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1855,10 +2107,21 @@ class _CategoryBadgeItemState extends State<_CategoryBadgeItem> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Icon(
-                      widget.icon,
-                      color: isSel ? Colors.white : widget.gradientColors.last,
-                      size: 26,
+                    AnimatedBuilder(
+                      animation: _hoverController,
+                      builder: (context, child) {
+                        return _buildSemanticCategoryAnimation(
+                          context,
+                          child!,
+                          _hoverController.value,
+                          isSel,
+                        );
+                      },
+                      child: SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: SvgPicture.string(widget.svgString),
+                      ),
                     ),
                     if (isSel)
                       Positioned(
@@ -1915,6 +2178,175 @@ class _CategoryBadgeItemState extends State<_CategoryBadgeItem> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Semantic animation tailor-crafted for each category's real-world nature
+  Widget _buildSemanticCategoryAnimation(
+    BuildContext context,
+    Widget child,
+    double t,
+    bool isSelected,
+  ) {
+    final label = widget.label.toLowerCase();
+
+    if (label == 'all') {
+      // 2x2 App Grid: subtle diagonal breathing twist & micro-scale
+      final angle = isSelected ? (sin(t * 2 * pi) * 0.08) : (sin(t * 2 * pi) * 0.05);
+      final scale = 1.0 + (sin(t * 2 * pi) * 0.05);
+      return Transform.rotate(
+        angle: angle,
+        alignment: Alignment.center,
+        child: Transform.scale(scale: scale, child: child),
+      );
+    }
+
+    if (label.contains('low stock') || label.contains('out of stock')) {
+      // Warning Alert: Urgent Heartbeat Pulse (Thump-Thump double-beat like an alert siren)
+      final beatT = (t * 2) % 1.0;
+      double scale = 1.0;
+      if (beatT < 0.25) {
+        scale = 1.0 + sin(beatT * 4 * pi) * 0.16; // First thump
+      } else if (beatT < 0.5) {
+        scale = 1.0 + sin((beatT - 0.25) * 4 * pi) * 0.10; // Second thump
+      }
+      return Transform.scale(
+        scale: isSelected ? (scale * 1.05) : scale,
+        alignment: Alignment.center,
+        child: child,
+      );
+    }
+
+    if (label.contains('clean') || label.contains('wash') || label.contains('detergent')) {
+      // Spray Bottle: Forward spritz tilt + pump compression
+      final tiltAngle = sin(t * 2 * pi) * -0.14; // tilts forward like aiming to spray
+      final pumpScaleY = 1.0 - (sin(t * 4 * pi).clamp(0.0, 1.0) * 0.06); // trigger pump
+      return Transform.rotate(
+        angle: tiltAngle,
+        alignment: Alignment.bottomCenter,
+        child: Transform.scale(
+          scaleY: pumpScaleY,
+          alignment: Alignment.bottomCenter,
+          child: child,
+        ),
+      );
+    }
+
+    if (label.contains('kitchen') || label.contains('storage') || label.contains('general') || label.contains('staple')) {
+      // Pantry Storage Box: Lid opening / peeking lift & slight perspective tilt
+      final openAngle = -sin(t * 2 * pi).clamp(0.0, 1.0) * 0.12;
+      final liftY = -sin(t * 2 * pi).clamp(0.0, 1.0) * 1.8;
+      return Transform(
+        transform: Matrix4.identity()
+          ..setTranslationRaw(0, liftY, 0)
+          ..rotateZ(openAngle),
+        alignment: Alignment.bottomLeft,
+        child: child,
+      );
+    }
+
+    if (label.contains('produce') || label.contains('veg') || label.contains('fruit')) {
+      // Fresh Produce: Gentle organic leaf breeze sway (from base)
+      final swayAngle = sin(t * 2 * pi) * 0.14;
+      return Transform.rotate(
+        angle: swayAngle,
+        alignment: Alignment.bottomCenter,
+        child: child,
+      );
+    }
+
+    if (label.contains('dairy') || label.contains('milk') || label.contains('bakery') || label.contains('bread')) {
+      // Milk Bottle / Dairy: Gentle liquid sloshing rock back & forth
+      final rockAngle = sin(t * 2 * pi) * 0.11;
+      final bob = sin(t * 4 * pi) * 0.8;
+      return Transform.translate(
+        offset: Offset(0, bob),
+        child: Transform.rotate(
+          angle: rockAngle,
+          alignment: Alignment.center,
+          child: child,
+        ),
+      );
+    }
+
+    if (label.contains('grain') || label.contains('rice') || label.contains('flour') || label.contains('atta')) {
+      // Hot Bowl of Grains: Warm steam drift upward
+      final driftX = sin(t * 2 * pi) * 1.0;
+      final driftY = -sin((t * 2 * pi).abs()) * 1.8;
+      return Transform.translate(
+        offset: Offset(driftX, driftY),
+        child: child,
+      );
+    }
+
+    if (label.contains('oil') || label.contains('ghee')) {
+      // Golden Oil: Viscous drop stretch & flow
+      final scaleY = 1.0 + (sin(t * 2 * pi) * 0.08);
+      final scaleX = 1.0 - (sin(t * 2 * pi) * 0.04);
+      return Transform.scale(
+        scaleX: scaleX,
+        scaleY: scaleY,
+        alignment: Alignment.center,
+        child: child,
+      );
+    }
+
+    if (label.contains('spice') || label.contains('masala')) {
+      // Spice Mortar/Shaker: Quick sprinkle vibration
+      final shakeAngle = sin(t * 6 * pi) * 0.09;
+      return Transform.rotate(
+        angle: shakeAngle,
+        alignment: const Alignment(0, 0.5),
+        child: child,
+      );
+    }
+
+    if (label.contains('snack') || label.contains('biscuit') || label.contains('sweet')) {
+      // Cookie / Snack: Playful energetic hop & wiggle
+      final hopY = -sin((t * 2 * pi).abs()) * 2.0;
+      final wiggle = sin(t * 4 * pi) * 0.08;
+      return Transform(
+        transform: Matrix4.identity()
+          ..setTranslationRaw(0, hopY, 0)
+          ..rotateZ(wiggle),
+        alignment: Alignment.center,
+        child: child,
+      );
+    }
+
+    if (label.contains('beverag') || label.contains('tea') || label.contains('coffee')) {
+      // Hot Cup of Tea/Coffee: Steam rising lift
+      final steamLift = -sin(t * 2 * pi) * 1.6;
+      final steamTilt = sin(t * 2 * pi) * 0.06;
+      return Transform(
+        transform: Matrix4.identity()
+          ..setTranslationRaw(0, steamLift, 0)
+          ..rotateZ(steamTilt),
+        alignment: Alignment.center,
+        child: child,
+      );
+    }
+
+    if (label.contains('person') || label.contains('bath') || label.contains('care') || label.contains('soap')) {
+      // Bath / Spa Lotus: Floating bubble shimmer float
+      final floatX = sin(t * 2 * pi) * 1.2;
+      final floatY = -cos(t * 2 * pi) * 1.2;
+      final scale = 1.0 + (sin(t * 2 * pi) * 0.06);
+      return Transform.translate(
+        offset: Offset(floatX, floatY),
+        child: Transform.scale(scale: scale, child: child),
+      );
+    }
+
+    // Default: Gentle natural organic float & micro-rotate
+    final dy = sin(t * 2 * pi) * 1.4;
+    final rotate = sin(t * 2 * pi) * 0.04;
+    return Transform(
+      transform: Matrix4.identity()
+        ..setTranslationRaw(0, dy, 0)
+        ..rotateZ(rotate),
+      alignment: Alignment.center,
+      child: child,
     );
   }
 }
@@ -2085,7 +2517,7 @@ class _AnimatedNotificationBellState extends State<_AnimatedNotificationBell>
   }
 }
 
-/// 3D Animated "Say Hello" Avatar with Circular Inventory Health Progress Ring
+/// 3D Animated "Say Hello" Avatar with Gamified Crown Tiers and Sliding Crown Animation
 class _ProfileHealthAvatar extends ConsumerStatefulWidget {
   const _ProfileHealthAvatar();
 
@@ -2094,21 +2526,38 @@ class _ProfileHealthAvatar extends ConsumerStatefulWidget {
 }
 
 class _ProfileHealthAvatarState extends ConsumerState<_ProfileHealthAvatar>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _waveController;
+  late final AnimationController _crownSlideController;
+  late final AnimationController _depthPulseController;
 
   @override
   void initState() {
     super.initState();
+    // 1. Waving hand rotation (Say Hello)
     _waveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1300),
+    )..repeat(reverse: true);
+
+    // 2. Crown sliding/floating horizontal & vertical motion
+    _crownSlideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+
+    // 3. 3D depth perspective & breathing pulse
+    _depthPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
     )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _waveController.dispose();
+    _crownSlideController.dispose();
+    _depthPulseController.dispose();
     super.dispose();
   }
 
@@ -2123,86 +2572,170 @@ class _ProfileHealthAvatarState extends ConsumerState<_ProfileHealthAvatar>
     final healthScore = total == 0 ? 1.0 : (healthy / total).clamp(0.0, 1.0);
     final percent = (healthScore * 100).round();
 
+    // Gamified Crown Tier Determination based on inventory health
+    final String crownSvg;
+    final String tierName;
+    final Color tierColor;
+
+    if (healthScore >= 0.85) {
+      crownSvg = DashboardSvgIcons.kingCrown;
+      tierName = 'Royal Pantry King 👑';
+      tierColor = const Color(0xFFD97706);
+    } else if (healthScore >= 0.65) {
+      crownSvg = DashboardSvgIcons.masterCrown;
+      tierName = 'Pantry Master 🥈';
+      tierColor = const Color(0xFF059669);
+    } else {
+      crownSvg = DashboardSvgIcons.normalCrown;
+      tierName = 'Pantry Apprentice 🥉';
+      tierColor = const Color(0xFFEA580C);
+    }
+
     return GestureDetector(
       onTap: () {
-        _showHealthSheet(context, percent, healthy, lowStock, outOfStock, total);
+        _showHealthSheet(
+          context,
+          percent,
+          healthy,
+          lowStock,
+          outOfStock,
+          total,
+          crownSvg,
+          tierName,
+          tierColor,
+          healthScore,
+        );
       },
       child: Tooltip(
-        message: 'Pantry Health: $percent%',
+        message: '$tierName ($percent% Health) - Tap to inspect',
         child: SizedBox(
-          width: 50,
-          height: 50,
+          width: 52,
+          height: 56,
           child: Stack(
+            clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
               // Circular Progress Ring indicating Inventory Health
-              CustomPaint(
-                size: const Size(50, 50),
-                painter: _HealthRingPainter(
-                  healthScore: healthScore,
-                ),
-              ),
-
-              // 3D Styled Avatar Container
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const RadialGradient(
-                    center: Alignment(-0.3, -0.3),
-                    radius: 1.0,
-                    colors: [
-                      Color(0xFFA855F7),
-                      Color(0xFF7C3AED),
-                      Color(0xFF4C1D95),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.face_retouching_natural_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-              ),
-
-              // Animated "Say Hello" Waving Hand Badge
               Positioned(
-                bottom: 0,
-                right: 0,
+                top: 8,
+                child: CustomPaint(
+                  size: const Size(46, 46),
+                  painter: _HealthRingPainter(
+                    healthScore: healthScore,
+                  ),
+                ),
+              ),
+
+              // 3D Styled Avatar with Depth Gradient & Breathing Scale
+              Positioned(
+                top: 13,
                 child: AnimatedBuilder(
-                  animation: _waveController,
+                  animation: _depthPulseController,
                   builder: (context, child) {
-                    final angle = (sin(_waveController.value * pi * 2) * 0.3);
-                    return Transform.rotate(
-                      angle: angle,
-                      alignment: Alignment.bottomRight,
+                    final scale = 1.0 + (_depthPulseController.value * 0.035);
+                    return Transform.scale(
+                      scale: scale,
                       child: child,
                     );
                   },
                   child: Container(
-                    padding: const EdgeInsets.all(1.5),
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white,
                       shape: BoxShape.circle,
+                      gradient: const RadialGradient(
+                        center: Alignment(-0.35, -0.35),
+                        radius: 0.95,
+                        colors: [
+                          Color(0xFFC084FC),
+                          Color(0xFF8B5CF6),
+                          Color(0xFF4C1D95),
+                        ],
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 3,
+                          color: tierColor.withValues(alpha: 0.35),
+                          blurRadius: 7,
+                          offset: const Offset(0, 2.5),
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
                         ),
                       ],
+                      border: Border.all(color: Colors.white, width: 1.8),
                     ),
-                    child: const Text('👋', style: TextStyle(fontSize: 10)),
+                    child: const Center(
+                      child: Icon(
+                        Icons.face_retouching_natural_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Gamified Sliding & Floating Crown (slides and tilts continuously above avatar)
+              Positioned(
+                top: 0,
+                child: AnimatedBuilder(
+                  animation: _crownSlideController,
+                  builder: (context, child) {
+                    final t = _crownSlideController.value;
+                    final slideX = (t - 0.5) * 5.0; // slides -2.5px to +2.5px horizontally
+                    final slideY = sin(t * pi) * 1.5; // gentle vertical bob
+                    final angle = (t - 0.5) * 0.12; // tilt with sliding
+                    return Transform.translate(
+                      offset: Offset(slideX, -slideY),
+                      child: Transform.rotate(
+                        angle: angle,
+                        alignment: Alignment.bottomCenter,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: SizedBox(
+                    width: 26,
+                    height: 20,
+                    child: SvgPicture.string(crownSvg),
+                  ),
+                ),
+              ),
+
+              // Animated "Say Hello" Waving Hand SVG Badge
+              Positioned(
+                bottom: 2,
+                right: 2,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, child) {
+                        final angle = (sin(_waveController.value * pi * 2) * 0.32);
+                        return Transform.rotate(
+                          angle: angle,
+                          alignment: const Alignment(0.0, 0.95), // Natural wrist base pivot
+                          child: child,
+                        );
+                      },
+                      child: SvgPicture.string(DashboardSvgIcons.wavingHand),
+                    ),
                   ),
                 ),
               ),
@@ -2213,20 +2746,37 @@ class _ProfileHealthAvatarState extends ConsumerState<_ProfileHealthAvatar>
     );
   }
 
-  void _showHealthSheet(BuildContext context, int percent, int healthy, int lowStock, int outOfStock, int total) {
+  void _showHealthSheet(
+    BuildContext context,
+    int percent,
+    int healthy,
+    int lowStock,
+    int outOfStock,
+    int total,
+    String crownSvg,
+    String tierName,
+    Color tierColor,
+    double healthScore,
+  ) {
+    // Calculate items needed for next tier
+    final neededForKing = ((0.85 * total) - healthy).ceil().clamp(1, 99);
+    final neededForMaster = ((0.65 * total) - healthy).ceil().clamp(1, 99);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => Container(
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Sheet Handle
             Center(
               child: Container(
                 width: 36,
@@ -2238,55 +2788,159 @@ class _ProfileHealthAvatarState extends ConsumerState<_ProfileHealthAvatar>
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: percent >= 80
-                        ? const Color(0xFFECFDF5)
-                        : (percent >= 50 ? const Color(0xFFFFFBEB) : const Color(0xFFFFF1F2)),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '$percent%',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: percent >= 80
-                            ? const Color(0xFF059669)
-                            : (percent >= 50 ? const Color(0xFFD97706) : const Color(0xFFE11D48)),
+
+            // Crown Pedestal Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    tierColor.withValues(alpha: 0.08),
+                    const Color(0xFFF8FAFC),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: tierColor.withValues(alpha: 0.25), width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: tierColor.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                      border: Border.all(color: tierColor.withValues(alpha: 0.3), width: 1),
+                    ),
+                    child: Center(
+                      child: SizedBox(
+                        width: 38,
+                        height: 30,
+                        child: SvgPicture.string(crownSvg),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              tierName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: tierColor,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          healthScore >= 0.85
+                              ? 'Royal Status! Your household inventory is fully stocked & optimal.'
+                              : (healthScore >= 0.65
+                                  ? 'Stock $neededForKing more item${neededForKing > 1 ? 's' : ''} to reach the Royal King Crown 👑!'
+                                  : 'Restock $neededForMaster items for Master 🥈 or $neededForKing for King 👑!'),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Crown Achievement Progress Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.outline),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Pantry Health Score',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        'Pantry Health Progress',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                       ),
                       Text(
-                        percent >= 80
-                            ? 'Excellent! Your household inventory is well-stocked.'
-                            : (percent >= 50
-                                ? 'Good. A few items are running low.'
-                                : 'Needs attention! Several items are out of stock.'),
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        '$percent% / 100%',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: tierColor),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: healthScore,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: AlwaysStoppedAnimation<Color>(tierColor),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '🥉 Apprentice (<65%)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: healthScore < 0.65 ? FontWeight.w800 : FontWeight.w500,
+                          color: healthScore < 0.65 ? const Color(0xFFEA580C) : AppColors.textMuted,
+                        ),
+                      ),
+                      Text(
+                        '🥈 Master (65-84%)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: (healthScore >= 0.65 && healthScore < 0.85) ? FontWeight.w800 : FontWeight.w500,
+                          color: (healthScore >= 0.65 && healthScore < 0.85) ? const Color(0xFF059669) : AppColors.textMuted,
+                        ),
+                      ),
+                      Text(
+                        '👑 King (85%+)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: healthScore >= 0.85 ? FontWeight.w800 : FontWeight.w500,
+                          color: healthScore >= 0.85 ? const Color(0xFFD97706) : AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
+
+            // 3-Part Health Metric Counters
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(14),
@@ -2296,12 +2950,16 @@ class _ProfileHealthAvatarState extends ConsumerState<_ProfileHealthAvatar>
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildHealthMetric('Well Stocked', '$healthy', const Color(0xFF10B981)),
+                  Container(width: 1, height: 28, color: Colors.grey.shade200),
                   _buildHealthMetric('Low Stock', '$lowStock', const Color(0xFFF59E0B)),
+                  Container(width: 1, height: 28, color: Colors.grey.shade200),
                   _buildHealthMetric('Out of Stock', '$outOfStock', const Color(0xFFEF4444)),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
+
+            // Action Buttons
             Row(
               children: [
                 Expanded(
@@ -2353,7 +3011,7 @@ class _ProfileHealthAvatarState extends ConsumerState<_ProfileHealthAvatar>
   }
 }
 
-/// Custom Painter for the Circular Inventory Health Ring
+/// Custom Painter for the Circular Inventory Health Ring with Gamified Tier Colors
 class _HealthRingPainter extends CustomPainter {
   final double healthScore;
 
@@ -2362,7 +3020,7 @@ class _HealthRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width / 2) - 2.0;
+    final radius = (size.width / 2) - 1.8;
 
     // Background track
     final trackPaint = Paint()
@@ -2380,14 +3038,17 @@ class _HealthRingPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 3.2;
 
-    // Gradient based on health score
+    // Dynamic Gradient based on Gamified Crown Health Tiers
     final List<Color> colors;
-    if (healthScore >= 0.8) {
-      colors = const [Color(0xFF10B981), Color(0xFF06B6D4)];
-    } else if (healthScore >= 0.5) {
-      colors = const [Color(0xFFF59E0B), Color(0xFFEA580C)];
+    if (healthScore >= 0.85) {
+      // Royal King Tier: Golden Amber
+      colors = const [Color(0xFFFDE047), Color(0xFFF59E0B), Color(0xFFD97706)];
+    } else if (healthScore >= 0.65) {
+      // Master Tier: Emerald & Teal
+      colors = const [Color(0xFF34D399), Color(0xFF10B981), Color(0xFF06B6D4)];
     } else {
-      colors = const [Color(0xFFF43F5E), Color(0xFFE11D48)];
+      // Apprentice Tier: Coral & Orange
+      colors = const [Color(0xFFFB923C), Color(0xFFF97316), Color(0xFFEF4444)];
     }
 
     final rect = Rect.fromCircle(center: center, radius: radius);
@@ -2404,6 +3065,131 @@ class _HealthRingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _HealthRingPainter oldDelegate) {
     return oldDelegate.healthScore != healthScore;
+  }
+}
+
+/// Animated SVG Waving Hand ("Say Hello") Widget with smooth pendulum wave
+class _AnimatedWavingHandSvgWidget extends StatefulWidget {
+  const _AnimatedWavingHandSvgWidget();
+
+  @override
+  State<_AnimatedWavingHandSvgWidget> createState() => _AnimatedWavingHandSvgWidgetState();
+}
+
+class _AnimatedWavingHandSvgWidgetState extends State<_AnimatedWavingHandSvgWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        // Natural waving oscillation anchored at the wrist base
+        final angle = (sin(_controller.value * 2 * pi) * 0.32);
+        return Transform.rotate(
+          angle: angle,
+          alignment: const Alignment(0.0, 0.95), // Pivots realistically at the wrist!
+          child: child,
+        );
+      },
+      child: SizedBox(
+        width: 22,
+        height: 22,
+        child: SvgPicture.string(DashboardSvgIcons.wavingHand),
+      ),
+    );
+  }
+}
+
+/// Animation mode for dual promo card SVG icons
+enum _CardAnimationType { float, pulse }
+
+/// Animated SVG Vector for Promo Cards (Shopping List & Pantry Stocked)
+class _AnimatedPromoCardSvg extends StatefulWidget {
+  final String svgString;
+  final _CardAnimationType animationType;
+
+  const _AnimatedPromoCardSvg({
+    required this.svgString,
+    required this.animationType,
+  });
+
+  @override
+  State<_AnimatedPromoCardSvg> createState() => _AnimatedPromoCardSvgState();
+}
+
+class _AnimatedPromoCardSvgState extends State<_AnimatedPromoCardSvg>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        if (widget.animationType == _CardAnimationType.float) {
+          // Shopping Bag: Real Handbag Pendulum Swing anchored at the top handle
+          final swingAngle = sin(t * 2 * pi) * 0.16; // -9 to +9 deg handle swing
+          final liftY = -sin((t * 2 * pi).abs()) * 1.4; // subtle centrifugal lift
+          return Transform(
+            transform: Matrix4.identity()
+              ..setTranslationRaw(0, liftY, 0)
+              ..rotateZ(swingAngle),
+            alignment: Alignment.topCenter, // Pivots by the bag handle!
+            child: child,
+          );
+        } else {
+          // Pantry Stocked: Stacked cupboard shelf organizing & settling motion
+          final shelfSway = sin(t * 2 * pi) * 1.2;
+          final breatheScale = 1.0 + (sin(t * 2 * pi) * 0.05);
+          return Transform.translate(
+            offset: Offset(shelfSway, 0),
+            child: Transform.scale(
+              scale: breatheScale,
+              alignment: Alignment.center,
+              child: child,
+            ),
+          );
+        }
+      },
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: SvgPicture.string(widget.svgString),
+      ),
+    );
   }
 }
 
