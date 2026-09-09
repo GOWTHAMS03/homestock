@@ -324,19 +324,36 @@ class _StapleQuantityDetailsSheetState extends ConsumerState<StapleQuantityDetai
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        staple.name,
-                                        style: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.textPrimary,
-                                        ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            staple.name,
+                                            style: const TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          if (staple.tamilName != null && staple.tamilName!.isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              staple.tamilName!,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFFD97706),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
                                     ),
                                     HomeStockPillBadge(
-                                      label: staple.category,
+                                      label: staple.subCategory ?? staple.category,
                                       variant: HomeStockPillVariant.purple,
                                       fontSize: 10,
                                     ),

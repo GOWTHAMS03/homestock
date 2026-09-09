@@ -353,7 +353,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             Text(staple.emoji, style: const TextStyle(fontSize: 13.5)),
                             const SizedBox(width: 5),
                             Text(
-                              '${staple.name} (${staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt() : staple.defaultQty} ${staple.defaultUnit})',
+                              staple.tamilName != null && staple.tamilName!.isNotEmpty
+                                  ? '${staple.name} • ${staple.tamilName} (${staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt() : staple.defaultQty} ${staple.defaultUnit})'
+                                  : '${staple.name} (${staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt() : staple.defaultQty} ${staple.defaultUnit})',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
@@ -1274,7 +1276,14 @@ class _AllEssentialsModalState extends State<_AllEssentialsModal> {
         : kHouseholdStaples.where((s) => s.category == _selectedCategory).toList();
 
     if (_searchQuery.isNotEmpty) {
-      list = list.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+      final q = _searchQuery.toLowerCase();
+      list = list.where((s) {
+        final matchName = s.name.toLowerCase().contains(q);
+        final matchTamil = s.tamilName != null && s.tamilName!.toLowerCase().contains(q);
+        final matchAlias = s.commonNames != null && s.commonNames!.any((a) => a.toLowerCase().contains(q));
+        final matchSub = s.subCategory != null && s.subCategory!.toLowerCase().contains(q);
+        return matchName || matchTamil || matchAlias || matchSub;
+      }).toList();
     }
 
     return Container(
@@ -1353,7 +1362,7 @@ class _AllEssentialsModalState extends State<_AllEssentialsModal> {
                   onChanged: (val) => setState(() => _searchQuery = val.trim()),
                   style: const TextStyle(fontSize: 13),
                   decoration: const InputDecoration(
-                    hintText: 'Search 70+ household staples...',
+                    hintText: 'Search 650+ essentials in English or தமிழ்...',
                     hintStyle: TextStyle(fontSize: 13, color: AppColors.textMuted),
                     prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
                     border: InputBorder.none,
@@ -1447,17 +1456,43 @@ class _AllEssentialsModalState extends State<_AllEssentialsModal> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        staple.name,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.textPrimary,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              staple.name,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (staple.tamilName != null && staple.tamilName!.isNotEmpty) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFEF3C7),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFFDE68A)),
+                                              ),
+                                              child: Text(
+                                                staple.tamilName!,
+                                                style: const TextStyle(
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF92400E),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${staple.category} • Pack: ${staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt() : staple.defaultQty} ${staple.defaultUnit}',
+                                        '${staple.subCategory ?? staple.category} • Pack: ${staple.defaultQty == staple.defaultQty.roundToDouble() ? staple.defaultQty.toInt() : staple.defaultQty} ${staple.defaultUnit}',
                                         style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                       ),
                                     ],

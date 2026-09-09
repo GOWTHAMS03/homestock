@@ -108,6 +108,40 @@ void main() {
       expect(butter.suggestedQuantities, contains(500.0));
       expect(butter.suggestedBrands, contains('Amul'));
     });
+
+    test('all curated staples have non-empty authentic Tamil names and icons', () {
+      expect(kCuratedStaples.length, greaterThanOrEqualTo(70));
+      for (final s in kCuratedStaples) {
+        expect(s.tamilName, isNotNull);
+        expect(s.tamilName!.trim().isNotEmpty, isTrue);
+        expect(s.icon, isNotNull);
+        expect(s.iconData, isNotNull);
+        expect(s.displayName, contains(s.tamilName!));
+      }
+
+      final milk = kCuratedStaples.firstWhere((s) => s.name == 'Milk');
+      expect(milk.tamilName, equals('பால்'));
+
+      final toorDal = kCuratedStaples.firstWhere((s) => s.name == 'Toor Dal');
+      expect(toorDal.tamilName, equals('துவரம் பருப்பு'));
+
+      final onions = kCuratedStaples.firstWhere((s) => s.name == 'Onions');
+      expect(onions.tamilName, equals('வெங்காயம்'));
+    });
+
+    test('master product catalog contains 587 items with full Tamil names, icons and emojis', () {
+      expect(kMasterProductCatalogStaples.length, equals(587));
+      expect(kHouseholdStaples.length, greaterThanOrEqualTo(650));
+
+      for (final s in kMasterProductCatalogStaples) {
+        expect(s.name.trim().isNotEmpty, isTrue);
+        expect(s.tamilName, isNotNull);
+        expect(s.tamilName!.trim().isNotEmpty, isTrue);
+        expect(s.emoji.isNotEmpty, isTrue);
+        expect(s.icon, isNotNull);
+        expect(s.category.isNotEmpty, isTrue);
+      }
+    });
   });
 
   group('Inventory Quick Essentials & Created Items Shopping Flow', () {

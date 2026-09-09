@@ -276,7 +276,9 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
                                   Text(s.emoji, style: const TextStyle(fontSize: 14)),
                                   const SizedBox(width: 6),
                                   Text(
-                                    s.name,
+                                    s.tamilName != null && s.tamilName!.isNotEmpty
+                                        ? '${s.name} • ${s.tamilName}'
+                                        : s.name,
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                                   ),
                                   const SizedBox(width: 4),
