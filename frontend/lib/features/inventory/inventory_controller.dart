@@ -18,6 +18,7 @@ final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
     apiClient: ref.watch(apiClientProvider),
     connectivity: ref.watch(connectivityMonitorProvider),
     syncEngine: ref.watch(syncEngineProvider),
+    database: ref.watch(databaseProvider),
   );
 });
 

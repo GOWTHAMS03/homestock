@@ -15,6 +15,7 @@ final purchaseRepositoryProvider = Provider<PurchaseRepository>((ref) {
     apiClient: ref.watch(apiClientProvider),
     syncEngine: ref.watch(syncEngineProvider),
     connectivity: ref.watch(connectivityMonitorProvider),
+    database: ref.watch(databaseProvider),
   );
 });
 

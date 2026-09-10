@@ -29,6 +29,8 @@ public class HomeService {
     private final HomeMemberRepository homeMemberRepository;
     private final UserRepository userRepository;
     private final CategoryService categoryService;
+    private final com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
+    private final com.homestock.modules.notification.service.NotificationEngine notificationEngine;
 
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private final SecureRandom random = new SecureRandom();
@@ -54,10 +56,14 @@ public class HomeService {
                 .user(currentUser)
                 .role(HomeRole.OWNER)
                 .build();
-        homeMemberRepository.save(ownerMember);
+        HomeMember savedOwner = homeMemberRepository.save(ownerMember);
 
         // Seed default household categories
         categoryService.seedDefaultCategoriesForHome(savedHome);
+
+        // Record change log for sync
+        homeChangeLogService.recordChange(savedHome, "HOME", savedHome.getId(), "INSERT", null, null);
+        homeChangeLogService.recordChange(savedHome, "HOME_MEMBER", savedOwner.getId(), "INSERT", null, null);
 
         return HomeDto.fromEntity(savedHome, HomeRole.OWNER, 1);
     }
@@ -81,7 +87,11 @@ public class HomeService {
                 .user(currentUser)
                 .role(HomeRole.MEMBER)
                 .build();
-        homeMemberRepository.save(newMember);
+        HomeMember savedMember = homeMemberRepository.save(newMember);
+
+        // Record change log & notify family members
+        homeChangeLogService.recordChange(home, "HOME_MEMBER", savedMember.getId(), "INSERT", null, null);
+        notificationEngine.notifyHomeChanged(home, currentUserId);
 
         int memberCount = homeMemberRepository.findAllByHomeId(home.getId()).size();
         return HomeDto.fromEntity(home, HomeRole.MEMBER, memberCount);
@@ -124,6 +134,10 @@ public class HomeService {
         home.setName(request.getName().trim());
         Home updatedHome = homeRepository.save(home);
 
+        // Record change log & notify family members
+        homeChangeLogService.recordChange(updatedHome, "HOME", updatedHome.getId(), "UPDATE", null, null);
+        notificationEngine.notifyHomeChanged(updatedHome, currentUserId);
+
         int memberCount = homeMemberRepository.findAllByHomeId(homeId).size();
         return HomeDto.fromEntity(updatedHome, membership.getRole(), memberCount);
     }
@@ -154,6 +168,11 @@ public class HomeService {
 
         targetMember.setRole(request.getRole());
         HomeMember updated = homeMemberRepository.save(targetMember);
+
+        // Record change log & notify family members
+        homeChangeLogService.recordChange(currentMember.getHome(), "HOME_MEMBER", updated.getId(), "UPDATE", null, null);
+        notificationEngine.notifyHomeChanged(currentMember.getHome(), currentUserId);
+
         return HomeMemberDto.fromEntity(updated);
     }
 
@@ -178,7 +197,12 @@ public class HomeService {
             throw new BusinessRuleException("The OWNER cannot be removed. Transfer ownership or delete the home.");
         }
 
+        Home memberHome = targetMember.getHome();
         homeMemberRepository.delete(targetMember);
+
+        // Record change log with the targetUserId so clients remove from local DB & notify family members
+        homeChangeLogService.recordChange(memberHome, "HOME_MEMBER", targetUserId, "DELETE", null, null);
+        notificationEngine.notifyHomeChanged(memberHome, currentUserId);
     }
 
     private String generateUniqueInviteCode() {

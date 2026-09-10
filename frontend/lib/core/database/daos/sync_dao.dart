@@ -46,8 +46,9 @@ class SyncDao {
   Future<void> markSyncing(String operationId) {
     return (_db.update(_db.syncQueueEntries)
           ..where((t) => t.operationId.equals(operationId)))
-        .write(const SyncQueueEntriesCompanion(
-      status: Value('SYNCING'),
+        .write(SyncQueueEntriesCompanion(
+      status: const Value('SYNCING'),
+      lastAttemptAt: Value(DateTime.now().toUtc()),
     ));
   }
 
@@ -55,8 +56,9 @@ class SyncDao {
   Future<void> markSynced(String operationId) {
     return (_db.update(_db.syncQueueEntries)
           ..where((t) => t.operationId.equals(operationId)))
-        .write(const SyncQueueEntriesCompanion(
-      status: Value('SYNCED'),
+        .write(SyncQueueEntriesCompanion(
+      status: const Value('SYNCED'),
+      serverAcknowledgedAt: Value(DateTime.now().toUtc()),
     ));
   }
 
@@ -111,12 +113,19 @@ class SyncDao {
     return query.watch().map((ops) => ops.length);
   }
 
-  /// Delete all synced operations (cleanup).
-  Future<void> cleanupSyncedOperations() {
+  /// Delete synced operations older than retention duration (defaults to 24 hours).
+  Future<void> cleanupOldSyncedOperations({Duration retention = const Duration(hours: 24)}) {
+    final cutoff = DateTime.now().toUtc().subtract(retention);
     return (_db.delete(_db.syncQueueEntries)
-          ..where((t) => t.status.equals('SYNCED')))
+          ..where((t) =>
+              t.status.equals('SYNCED') &
+              (t.serverAcknowledgedAt.isSmallerOrEqualValue(cutoff) |
+                  t.serverAcknowledgedAt.isNull())))
         .go();
   }
+
+  /// Delete all synced operations (cleanup).
+  Future<void> cleanupSyncedOperations() => cleanupOldSyncedOperations();
 
   /// Delete all operations for a specific entity (e.g., when item is deleted remotely).
   Future<void> deleteOperationsForEntity(String entityId) {
@@ -182,10 +191,13 @@ class SyncDao {
     required List<LocalPurchasesCompanion> purchases,
     required List<LocalPurchaseItemsCompanion> purchaseItems,
     required List<LocalStoresCompanion> stores,
+    List<LocalHomeMembersCompanion> homeMembers = const [],
+    LocalHomesCompanion? homeDetails,
     required List<String> deletedShoppingItemIds,
     required List<String> deletedInventoryItemIds,
     required List<String> deletedStoreIds,
     required List<String> deletedCategoryIds,
+    List<String> deletedMemberUserIds = const [],
     required DateTime serverTimestamp,
     int? nextServerVersion,
   }) {
@@ -241,7 +253,22 @@ class SyncDao {
         await (_db.delete(_db.localStores)..where((t) => t.id.equals(storeId))).go();
       }
 
-      // 8. Update sync metadata cursor atomically
+      // 8. Home Members & Home Details
+      for (final m in homeMembers) {
+        await _db.into(_db.localHomeMembers).insertOnConflictUpdate(m);
+      }
+      if (deletedMemberUserIds.isNotEmpty) {
+        await (_db.delete(_db.localHomeMembers)
+              ..where((t) =>
+                  t.homeId.equals(homeId) &
+                  t.userId.isIn(deletedMemberUserIds)))
+            .go();
+      }
+      if (homeDetails != null) {
+        await _db.into(_db.localHomes).insertOnConflictUpdate(homeDetails);
+      }
+
+      // 9. Update sync metadata cursor atomically
       await _db.into(_db.syncMetadataEntries).insertOnConflictUpdate(
             SyncMetadataEntriesCompanion(
               homeId: Value(homeId),

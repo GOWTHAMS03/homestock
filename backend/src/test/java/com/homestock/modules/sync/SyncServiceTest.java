@@ -60,6 +60,8 @@ class SyncServiceTest {
     @Mock
     private HomeRepository homeRepository;
     @Mock
+    private com.homestock.modules.home.repository.HomeMemberRepository homeMemberRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private ShoppingService shoppingService;
@@ -238,13 +240,6 @@ class SyncServiceTest {
 
         when(homeChangeLogService.getMaxVersion(homeId)).thenReturn(50L);
         when(homeChangeLogService.getChangesSince(eq(homeId), eq(40L), anyInt())).thenReturn(List.of(change));
-        when(categoryRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
-        when(inventoryItemRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
-        when(stockTransactionRepository.findByHomeIdAndCreatedAtAfter(eq(homeId), any())).thenReturn(List.of());
-        when(shoppingListRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
-        when(shoppingListItemRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
-        when(purchaseRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
-        when(storeRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
 
         SyncPullResponse response = syncService.pullChanges(homeId, Instant.EPOCH, 40L);
 
@@ -295,5 +290,71 @@ class SyncServiceTest {
         assertEquals(new BigDecimal("3.0"), existingItem.getQuantity());
         assertEquals("L", existingItem.getUnit());
         verify(homeChangeLogService).recordChange(eq(home), eq("SHOPPING_LIST_ITEM"), eq(itemId), eq("UPDATE"), any(), eq("op-update-shop-1"));
+        verify(notificationEngine).notifyHomeChanged(eq(home), any());
+    }
+
+    @Test
+    void pushOperations_changeRole_updatesRoleAndRecordsChange() {
+        UUID targetUserId = UUID.randomUUID();
+        com.homestock.modules.user.entity.User targetUser = com.homestock.modules.user.entity.User.builder()
+                .email("user@example.com")
+                .fullName("Family Member")
+                .build();
+        targetUser.setId(targetUserId);
+
+        com.homestock.modules.home.entity.HomeMember member = com.homestock.modules.home.entity.HomeMember.builder()
+                .home(home)
+                .user(targetUser)
+                .role(com.homestock.modules.home.entity.HomeRole.MEMBER)
+                .build();
+        UUID memberId = UUID.randomUUID();
+        member.setId(memberId);
+
+        when(homeRepository.findById(homeId)).thenReturn(Optional.of(home));
+        when(processedOperationRepository.existsByOperationId("op-role-1")).thenReturn(false);
+        when(homeMemberRepository.findByHomeIdAndUserId(homeId, targetUserId)).thenReturn(Optional.of(member));
+        when(homeMemberRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        SyncOperationDto op = SyncOperationDto.builder()
+                .operationId("op-role-1")
+                .operationType("CHANGE_ROLE")
+                .entityType("HOME_MEMBER")
+                .entityId(targetUserId.toString())
+                .payload(Map.of("role", "ADMIN"))
+                .build();
+
+        SyncRequest request = SyncRequest.builder()
+                .homeId(homeId)
+                .operations(List.of(op))
+                .build();
+
+        SyncPushResponse response = syncService.pushOperations(request);
+
+        assertNotNull(response);
+        assertEquals(1, response.getResults().size());
+        assertEquals("SYNCED", response.getResults().get(0).getStatus());
+        assertEquals(com.homestock.modules.home.entity.HomeRole.ADMIN, member.getRole());
+        verify(homeChangeLogService).recordChange(eq(home), eq("HOME_MEMBER"), eq(memberId), eq("UPDATE"), any(), eq("op-role-1"));
+        verify(notificationEngine).notifyHomeChanged(eq(home), any());
+    }
+
+    @Test
+    void pullChanges_withSinceVersionAndNoChanges_returnsEmptyImmediately() {
+        when(homeChangeLogService.getMaxVersion(homeId)).thenReturn(150L);
+        when(homeChangeLogService.getChangesSince(eq(homeId), eq(150L), anyInt())).thenReturn(Collections.emptyList());
+
+        SyncPullResponse response = syncService.pullChanges(homeId, null, 150L, 500);
+
+        assertNotNull(response);
+        assertEquals(150L, response.getServerVersion());
+        assertEquals(150L, response.getNextServerVersion());
+        assertFalse(response.getHasMore());
+        assertTrue(response.getInventoryItems().isEmpty());
+        assertTrue(response.getShoppingListItems().isEmpty());
+        assertTrue(response.getHomeMembers().isEmpty());
+
+        // Verify full repository scans were NOT performed
+        verify(inventoryItemRepository, never()).findByHomeIdAndUpdatedAtAfter(any(), any());
+        verify(shoppingListItemRepository, never()).findByHomeIdAndUpdatedAtAfter(any(), any());
     }
 }

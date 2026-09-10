@@ -6,6 +6,9 @@ import com.homestock.core.util.SecurityUtils;
 import com.homestock.modules.category.entity.Category;
 import com.homestock.modules.category.repository.CategoryRepository;
 import com.homestock.modules.home.entity.Home;
+import com.homestock.modules.home.entity.HomeMember;
+import com.homestock.modules.home.entity.HomeRole;
+import com.homestock.modules.home.repository.HomeMemberRepository;
 import com.homestock.modules.home.repository.HomeRepository;
 import com.homestock.modules.inventory.entity.*;
 import com.homestock.modules.inventory.repository.InventoryItemRepository;
@@ -55,6 +58,7 @@ public class SyncService {
     private final CategoryRepository categoryRepository;
     private final StoreRepository storeRepository;
     private final HomeRepository homeRepository;
+    private final HomeMemberRepository homeMemberRepository;
     private final UserRepository userRepository;
     private final ShoppingService shoppingService;
     private final ObjectMapper objectMapper;
@@ -86,6 +90,9 @@ public class SyncService {
                 results.add(result);
             }
         }
+
+        // Notify other family members that home data has changed
+        notificationEngine.notifyHomeChanged(home, currentUserId);
 
         return SyncPushResponse.builder().results(results).build();
     }
@@ -121,6 +128,10 @@ public class SyncService {
                 case "CREATE_CATEGORY" -> handleCreateCategory(op, home, payload);
                 case "CONFIRM_STATUS" -> handleConfirmStatus(op, home, payload);
                 case "CONFIRM_QUANTITY" -> handleConfirmQuantity(op, home, payload);
+                case "UPDATE_HOME_NAME", "UPDATE_HOME" -> handleUpdateHomeName(op, home, payload);
+                case "CHANGE_ROLE", "UPDATE_MEMBER_ROLE" -> handleChangeRole(op, home, currentUser, payload);
+                case "REMOVE_MEMBER" -> handleRemoveMember(op, home, currentUser, payload);
+                case "ADD_MEMBER" -> handleAddMember(op, home, currentUser, payload);
                 default -> log.warn("Unknown sync operation type: {}", opType);
             }
 
@@ -686,6 +697,109 @@ public class SyncService {
         homeChangeLogService.recordChange(home, "CATEGORY", effectiveCatId, "INSERT", serializePayload(payload), op.getOperationId());
     }
 
+    private void handleUpdateHomeName(SyncOperationDto op, Home home, Map<String, Object> payload) {
+        String name = payload.get("name") != null ? payload.get("name").toString().trim() : null;
+        if (name != null && !name.isEmpty()) {
+            home.setName(name);
+            homeRepository.save(home);
+            homeChangeLogService.recordChange(home, "HOME", home.getId(), "UPDATE", serializePayload(payload), op.getOperationId());
+        }
+    }
+
+    private void handleChangeRole(SyncOperationDto op, Home home, User currentUser, Map<String, Object> payload) {
+        UUID targetUserId = null;
+        if (op.getEntityId() != null) {
+            try {
+                targetUserId = UUID.fromString(op.getEntityId());
+            } catch (Exception ignored) {}
+        }
+        if (targetUserId == null && payload.get("userId") != null) {
+            try {
+                targetUserId = UUID.fromString(payload.get("userId").toString());
+            } catch (Exception ignored) {}
+        }
+        if (targetUserId == null) return;
+
+        String roleStr = payload.get("role") != null ? payload.get("role").toString() : null;
+        if (roleStr == null) return;
+
+        HomeRole newRole;
+        try {
+            newRole = HomeRole.valueOf(roleStr);
+        } catch (Exception e) {
+            return;
+        }
+
+        Optional<HomeMember> optMember = homeMemberRepository.findByHomeIdAndUserId(home.getId(), targetUserId);
+        if (optMember.isPresent()) {
+            HomeMember member = optMember.get();
+            member.setRole(newRole);
+            HomeMember saved = homeMemberRepository.save(member);
+            homeChangeLogService.recordChange(home, "HOME_MEMBER", saved.getId(), "UPDATE", serializePayload(payload), op.getOperationId());
+        }
+    }
+
+    private void handleRemoveMember(SyncOperationDto op, Home home, User currentUser, Map<String, Object> payload) {
+        UUID targetUserId = null;
+        if (op.getEntityId() != null) {
+            try {
+                targetUserId = UUID.fromString(op.getEntityId());
+            } catch (Exception ignored) {}
+        }
+        if (targetUserId == null && payload.get("userId") != null) {
+            try {
+                targetUserId = UUID.fromString(payload.get("userId").toString());
+            } catch (Exception ignored) {}
+        }
+        if (targetUserId == null) return;
+
+        Optional<HomeMember> optMember = homeMemberRepository.findByHomeIdAndUserId(home.getId(), targetUserId);
+        if (optMember.isPresent()) {
+            homeMemberRepository.delete(optMember.get());
+            homeChangeLogService.recordChange(home, "HOME_MEMBER", targetUserId, "DELETE", null, op.getOperationId());
+        }
+    }
+
+    private void handleAddMember(SyncOperationDto op, Home home, User currentUser, Map<String, Object> payload) {
+        UUID targetUserId = null;
+        if (op.getEntityId() != null) {
+            try {
+                targetUserId = UUID.fromString(op.getEntityId());
+            } catch (Exception ignored) {}
+        }
+        if (targetUserId == null && payload.get("userId") != null) {
+            try {
+                targetUserId = UUID.fromString(payload.get("userId").toString());
+            } catch (Exception ignored) {}
+        }
+        User targetUser = null;
+        if (targetUserId != null) {
+            targetUser = userRepository.findById(targetUserId).orElse(null);
+        } else if (payload.get("email") != null) {
+            targetUser = userRepository.findByEmail(payload.get("email").toString().trim().toLowerCase()).orElse(null);
+        }
+
+        if (targetUser == null) return;
+
+        if (homeMemberRepository.existsByHomeIdAndUserId(home.getId(), targetUser.getId())) {
+            return;
+        }
+
+        String roleStr = payload.getOrDefault("role", "MEMBER").toString();
+        HomeRole role = HomeRole.MEMBER;
+        try {
+            role = HomeRole.valueOf(roleStr);
+        } catch (Exception ignored) {}
+
+        HomeMember member = HomeMember.builder()
+                .home(home)
+                .user(targetUser)
+                .role(role)
+                .build();
+        HomeMember saved = homeMemberRepository.save(member);
+        homeChangeLogService.recordChange(home, "HOME_MEMBER", saved.getId(), "INSERT", serializePayload(payload), op.getOperationId());
+    }
+
     @Transactional(readOnly = true)
     public SyncPullResponse pullChanges(UUID homeId, Instant since) {
         return pullChanges(homeId, since, null, 500);
@@ -697,7 +811,8 @@ public class SyncService {
     }
 
     /**
-     * Pull incremental server changes since the given timestamp or version cursor.
+     * Pull incremental server changes since the given version cursor or timestamp.
+     * Guaranteed never to download the complete database when no new changes exist.
      */
     @Transactional(readOnly = true)
     public SyncPullResponse pullChanges(UUID homeId, Instant since, Long sinceVersion, Integer limit) {
@@ -708,161 +823,171 @@ public class SyncService {
         List<String> deletedInventoryItemIds = new ArrayList<>();
         List<String> deletedStoreIds = new ArrayList<>();
         List<String> deletedCategoryIds = new ArrayList<>();
+        List<String> deletedMemberUserIds = new ArrayList<>();
 
         int safeLimit = (limit != null && limit > 0) ? Math.min(limit, 1000) : 500;
-        Long nextServerVersion = currentServerVersion;
-        boolean hasMore = false;
 
-        Instant effectiveSince = since != null ? since : Instant.EPOCH;
-
+        // ──── Case 1: Incremental Pull by Version Cursor ────
         if (sinceVersion != null && sinceVersion > 0) {
             List<HomeChangeLog> changes = homeChangeLogService.getChangesSince(homeId, sinceVersion, safeLimit);
-            if (!changes.isEmpty()) {
-                long maxVerInBatch = changes.get(changes.size() - 1).getChangeVersion();
-                nextServerVersion = maxVerInBatch;
-                hasMore = maxVerInBatch < currentServerVersion;
 
-                // If since was not explicitly specified, use the earliest change's timestamp
-                if (since == null || since.equals(Instant.EPOCH)) {
-                    Instant firstCreated = changes.get(0).getCreatedAt();
-                    if (firstCreated != null) {
-                        effectiveSince = firstCreated.minusSeconds(1);
-                    }
-                }
-            } else {
-                nextServerVersion = currentServerVersion;
-                hasMore = false;
+            if (changes.isEmpty()) {
+                // Client is fully up to date: return empty payload immediately (no full DB read)
+                return SyncPullResponse.builder()
+                        .inventoryItems(Collections.emptyList())
+                        .stockTransactions(Collections.emptyList())
+                        .shoppingLists(Collections.emptyList())
+                        .shoppingListItems(Collections.emptyList())
+                        .purchases(Collections.emptyList())
+                        .categories(Collections.emptyList())
+                        .stores(Collections.emptyList())
+                        .homeMembers(Collections.emptyList())
+                        .homeDetails(null)
+                        .serverTimestamp(serverTimestamp.toString())
+                        .serverVersion(currentServerVersion)
+                        .nextServerVersion(currentServerVersion)
+                        .hasMore(false)
+                        .deletedShoppingItemIds(Collections.emptyList())
+                        .deletedInventoryItemIds(Collections.emptyList())
+                        .deletedStoreIds(Collections.emptyList())
+                        .deletedCategoryIds(Collections.emptyList())
+                        .deletedMemberUserIds(Collections.emptyList())
+                        .build();
             }
 
+            long maxVerInBatch = changes.get(changes.size() - 1).getChangeVersion();
+            Long nextServerVersion = maxVerInBatch;
+            boolean hasMore = maxVerInBatch < currentServerVersion;
+
+            Set<UUID> changedItemIds = new LinkedHashSet<>();
+            Set<UUID> changedTxIds = new LinkedHashSet<>();
+            Set<UUID> changedShoppingListIds = new LinkedHashSet<>();
+            Set<UUID> changedShoppingItemIds = new LinkedHashSet<>();
+            Set<UUID> changedPurchaseIds = new LinkedHashSet<>();
+            Set<UUID> changedCategoryIds = new LinkedHashSet<>();
+            Set<UUID> changedStoreIds = new LinkedHashSet<>();
+            Set<UUID> changedMemberIds = new LinkedHashSet<>();
+            boolean homeDetailsChanged = false;
+
             for (HomeChangeLog cl : changes) {
-                if ("DELETE".equalsIgnoreCase(cl.getOperationType())) {
-                    String idStr = cl.getEntityId() != null ? cl.getEntityId().toString() : "";
-                    if (!idStr.isEmpty()) {
-                        switch (cl.getEntityType()) {
-                            case "SHOPPING_LIST_ITEM" -> deletedShoppingItemIds.add(idStr);
-                            case "INVENTORY_ITEM" -> deletedInventoryItemIds.add(idStr);
-                            case "STORE" -> deletedStoreIds.add(idStr);
-                            case "CATEGORY" -> deletedCategoryIds.add(idStr);
+                String opType = cl.getOperationType();
+                String entityType = cl.getEntityType();
+                UUID eId = cl.getEntityId();
+
+                if ("DELETE".equalsIgnoreCase(opType)) {
+                    if (eId != null) {
+                        switch (entityType) {
+                            case "SHOPPING_LIST_ITEM" -> deletedShoppingItemIds.add(eId.toString());
+                            case "INVENTORY_ITEM" -> deletedInventoryItemIds.add(eId.toString());
+                            case "STORE" -> deletedStoreIds.add(eId.toString());
+                            case "CATEGORY" -> deletedCategoryIds.add(eId.toString());
+                            case "HOME_MEMBER" -> deletedMemberUserIds.add(eId.toString());
+                        }
+                    }
+                } else {
+                    if (eId != null) {
+                        switch (entityType) {
+                            case "INVENTORY_ITEM" -> changedItemIds.add(eId);
+                            case "STOCK_TRANSACTION" -> changedTxIds.add(eId);
+                            case "SHOPPING_LIST" -> changedShoppingListIds.add(eId);
+                            case "SHOPPING_LIST_ITEM" -> changedShoppingItemIds.add(eId);
+                            case "PURCHASE" -> changedPurchaseIds.add(eId);
+                            case "CATEGORY" -> changedCategoryIds.add(eId);
+                            case "STORE" -> changedStoreIds.add(eId);
+                            case "HOME_MEMBER" -> changedMemberIds.add(eId);
+                            case "HOME" -> homeDetailsChanged = true;
                         }
                     }
                 }
             }
+
+            List<Map<String, Object>> catMaps = changedCategoryIds.isEmpty()
+                    ? Collections.emptyList()
+                    : categoryRepository.findAllById(changedCategoryIds).stream().map(this::mapCategory).toList();
+
+            List<Map<String, Object>> itemMaps = changedItemIds.isEmpty()
+                    ? Collections.emptyList()
+                    : inventoryItemRepository.findAllById(changedItemIds).stream().map(this::mapInventoryItem).toList();
+
+            List<Map<String, Object>> txMaps = changedTxIds.isEmpty()
+                    ? Collections.emptyList()
+                    : stockTransactionRepository.findAllById(changedTxIds).stream().map(this::mapStockTransaction).toList();
+
+            List<Map<String, Object>> listMaps = changedShoppingListIds.isEmpty()
+                    ? Collections.emptyList()
+                    : shoppingListRepository.findAllById(changedShoppingListIds).stream().map(this::mapShoppingList).toList();
+
+            List<Map<String, Object>> shoppingItemMaps = changedShoppingItemIds.isEmpty()
+                    ? Collections.emptyList()
+                    : shoppingListItemRepository.findAllById(changedShoppingItemIds).stream().map(this::mapShoppingListItem).toList();
+
+            List<Map<String, Object>> purchaseMaps = changedPurchaseIds.isEmpty()
+                    ? Collections.emptyList()
+                    : purchaseRepository.findAllById(changedPurchaseIds).stream().map(this::mapPurchase).toList();
+
+            List<Map<String, Object>> storeMaps = changedStoreIds.isEmpty()
+                    ? Collections.emptyList()
+                    : storeRepository.findAllById(changedStoreIds).stream().map(this::mapStore).toList();
+
+            List<Map<String, Object>> memberMaps = changedMemberIds.isEmpty()
+                    ? Collections.emptyList()
+                    : homeMemberRepository.findAllById(changedMemberIds).stream().map(this::mapHomeMember).toList();
+
+            Map<String, Object> homeDetailsMap = null;
+            if (homeDetailsChanged) {
+                homeDetailsMap = homeRepository.findById(homeId).map(this::mapHomeDetails).orElse(null);
+            }
+
+            return SyncPullResponse.builder()
+                    .inventoryItems(itemMaps)
+                    .stockTransactions(txMaps)
+                    .shoppingLists(listMaps)
+                    .shoppingListItems(shoppingItemMaps)
+                    .purchases(purchaseMaps)
+                    .categories(catMaps)
+                    .stores(storeMaps)
+                    .homeMembers(memberMaps)
+                    .homeDetails(homeDetailsMap)
+                    .serverTimestamp(serverTimestamp.toString())
+                    .serverVersion(currentServerVersion)
+                    .nextServerVersion(nextServerVersion)
+                    .hasMore(hasMore)
+                    .deletedShoppingItemIds(deletedShoppingItemIds)
+                    .deletedInventoryItemIds(deletedInventoryItemIds)
+                    .deletedStoreIds(deletedStoreIds)
+                    .deletedCategoryIds(deletedCategoryIds)
+                    .deletedMemberUserIds(deletedMemberUserIds)
+                    .build();
         }
 
-        // 1. Categories
-        List<Category> categories = categoryRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
-        List<Map<String, Object>> catMaps = categories.stream().map(c -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", c.getId().toString());
-            map.put("name", c.getName());
-            map.put("icon", c.getIcon());
-            map.put("colorHex", c.getColorHex());
-            map.put("displayOrder", c.getDisplayOrder());
-            return map;
-        }).toList();
+        // ──── Case 2: Initial Full Pull (sinceVersion == null or 0) ────
+        Instant effectiveSince = since != null ? since : Instant.EPOCH;
 
-        // 2. Inventory items
-        List<InventoryItem> items = inventoryItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
-        List<Map<String, Object>> itemMaps = items.stream().map(i -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", i.getId().toString());
-            map.put("categoryId", i.getCategory() != null ? i.getCategory().getId().toString() : null);
-            map.put("categoryName", i.getCategory() != null ? i.getCategory().getName() : "General");
-            map.put("categoryIcon", i.getCategory() != null ? i.getCategory().getIcon() : "category");
-            map.put("categoryColor", i.getCategory() != null ? i.getCategory().getColorHex() : "#6366F1");
-            map.put("name", i.getName());
-            map.put("brand", i.getBrand());
-            map.put("quantity", i.getQuantity().doubleValue());
-            map.put("unit", i.getUnit());
-            map.put("minimumQuantity", i.getMinimumQuantity().doubleValue());
-            map.put("maximumQuantity", i.getMaximumQuantity() != null ? i.getMaximumQuantity().doubleValue() : null);
-            map.put("storageLocation", i.getStorageLocation());
-            map.put("purchasePrice", i.getPurchasePrice() != null ? i.getPurchasePrice().doubleValue() : null);
-            map.put("purchaseDate", i.getPurchaseDate() != null ? i.getPurchaseDate().toString() : null);
-            map.put("expiryDate", i.getExpiryDate() != null ? i.getExpiryDate().toString() : null);
-            map.put("imageUrl", i.getImageUrl());
-            map.put("notes", i.getNotes());
-            map.put("stockStatus", i.calculateStockStatus().name());
-            map.put("expiryStatus", i.calculateExpiryStatus().name());
-            map.put("daysUntilExpiry", i.getDaysUntilExpiry());
-            map.put("isDeleted", Boolean.TRUE.equals(i.getIsArchived()));
-            return map;
-        }).toList();
+        List<Map<String, Object>> catMaps = categoryRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince)
+                .stream().map(this::mapCategory).toList();
 
-        // 3. Stock transactions
-        List<StockTransaction> transactions = stockTransactionRepository.findByHomeIdAndCreatedAtAfter(homeId, effectiveSince);
-        List<Map<String, Object>> txMaps = transactions.stream().map(t -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", t.getId().toString());
-            map.put("itemId", t.getItem().getId().toString());
-            map.put("itemName", t.getItem().getName());
-            map.put("userName", t.getUser() != null ? t.getUser().getFullName() : "Member");
-            map.put("transactionType", t.getTransactionType().name());
-            map.put("quantityChange", t.getQuantityChange().doubleValue());
-            map.put("previousQuantity", t.getPreviousQuantity().doubleValue());
-            map.put("newQuantity", t.getNewQuantity().doubleValue());
-            map.put("unit", t.getUnit());
-            map.put("reason", t.getReason());
-            map.put("createdAt", t.getCreatedAt().toString());
-            return map;
-        }).toList();
+        List<Map<String, Object>> itemMaps = inventoryItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince)
+                .stream().map(this::mapInventoryItem).toList();
 
-        // 4. Shopping lists
-        List<ShoppingList> lists = shoppingListRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
-        List<Map<String, Object>> listMaps = lists.stream().map(l -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", l.getId().toString());
-            map.put("name", l.getName());
-            map.put("isDefault", Boolean.TRUE.equals(l.getIsDefault()));
-            return map;
-        }).toList();
+        List<Map<String, Object>> txMaps = stockTransactionRepository.findByHomeIdAndCreatedAtAfter(homeId, effectiveSince)
+                .stream().map(this::mapStockTransaction).toList();
 
-        // 5. Shopping list items
-        List<ShoppingListItem> shoppingItems = shoppingListItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
-        List<Map<String, Object>> shoppingItemMaps = shoppingItems.stream().map(s -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", s.getId().toString());
-            map.put("shoppingListId", s.getShoppingList().getId().toString());
-            map.put("inventoryItemId", s.getInventoryItem() != null ? s.getInventoryItem().getId().toString() : null);
-            map.put("itemName", s.getItemName());
-            map.put("categoryName", s.getInventoryItem() != null && s.getInventoryItem().getCategory() != null
-                    ? s.getInventoryItem().getCategory().getName() : null);
-            map.put("categoryIcon", s.getInventoryItem() != null && s.getInventoryItem().getCategory() != null
-                    ? s.getInventoryItem().getCategory().getIcon() : "category");
-            map.put("categoryColor", s.getInventoryItem() != null && s.getInventoryItem().getCategory() != null
-                    ? s.getInventoryItem().getCategory().getColorHex() : "#6366F1");
-            map.put("quantity", s.getQuantity().doubleValue());
-            map.put("unit", s.getUnit());
-            map.put("isCompleted", Boolean.TRUE.equals(s.getIsCompleted()));
-            map.put("isAutoGenerated", Boolean.TRUE.equals(s.getIsAutoGenerated()));
-            map.put("addedByName", s.getAddedBy() != null ? s.getAddedBy().getFullName() : "Member");
-            map.put("completedByName", s.getCompletedBy() != null ? s.getCompletedBy().getFullName() : null);
-            map.put("completedAt", s.getCompletedAt() != null ? s.getCompletedAt().toString() : null);
-            map.put("notes", s.getNotes());
-            return map;
-        }).toList();
+        List<Map<String, Object>> listMaps = shoppingListRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince)
+                .stream().map(this::mapShoppingList).toList();
 
-        // 6. Purchases
-        List<Purchase> purchases = purchaseRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
-        List<Map<String, Object>> purchaseMaps = purchases.stream().map(p -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", p.getId().toString());
-            map.put("storeName", p.getStore() != null ? p.getStore().getName() : "Direct");
-            map.put("totalAmount", p.getTotalAmount().doubleValue());
-            map.put("purchaseDate", p.getPurchaseDate().toString());
-            map.put("itemCount", p.getItems() != null ? p.getItems().size() : 0);
-            return map;
-        }).toList();
+        List<Map<String, Object>> shoppingItemMaps = shoppingListItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince)
+                .stream().map(this::mapShoppingListItem).toList();
 
-        // 7. Stores
-        List<Store> stores = storeRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
-        List<Map<String, Object>> storeMaps = stores.stream().map(s -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", s.getId().toString());
-            map.put("name", s.getName());
-            map.put("location", s.getLocation());
-            return map;
-        }).toList();
+        List<Map<String, Object>> purchaseMaps = purchaseRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince)
+                .stream().map(this::mapPurchase).toList();
+
+        List<Map<String, Object>> storeMaps = storeRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince)
+                .stream().map(this::mapStore).toList();
+
+        List<Map<String, Object>> memberMaps = homeMemberRepository.findAllByHomeId(homeId)
+                .stream().map(this::mapHomeMember).toList();
+
+        Map<String, Object> homeDetailsMap = homeRepository.findById(homeId).map(this::mapHomeDetails).orElse(null);
 
         return SyncPullResponse.builder()
                 .inventoryItems(itemMaps)
@@ -872,15 +997,141 @@ public class SyncService {
                 .purchases(purchaseMaps)
                 .categories(catMaps)
                 .stores(storeMaps)
+                .homeMembers(memberMaps)
+                .homeDetails(homeDetailsMap)
                 .serverTimestamp(serverTimestamp.toString())
                 .serverVersion(currentServerVersion)
-                .nextServerVersion(nextServerVersion)
-                .hasMore(hasMore)
+                .nextServerVersion(currentServerVersion)
+                .hasMore(false)
                 .deletedShoppingItemIds(deletedShoppingItemIds)
                 .deletedInventoryItemIds(deletedInventoryItemIds)
                 .deletedStoreIds(deletedStoreIds)
                 .deletedCategoryIds(deletedCategoryIds)
+                .deletedMemberUserIds(deletedMemberUserIds)
                 .build();
+    }
+
+    private Map<String, Object> mapCategory(Category c) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", c.getId().toString());
+        map.put("name", c.getName());
+        map.put("icon", c.getIcon());
+        map.put("colorHex", c.getColorHex());
+        map.put("displayOrder", c.getDisplayOrder());
+        return map;
+    }
+
+    private Map<String, Object> mapInventoryItem(InventoryItem i) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", i.getId().toString());
+        map.put("categoryId", i.getCategory() != null ? i.getCategory().getId().toString() : null);
+        map.put("categoryName", i.getCategory() != null ? i.getCategory().getName() : "General");
+        map.put("categoryIcon", i.getCategory() != null ? i.getCategory().getIcon() : "category");
+        map.put("categoryColor", i.getCategory() != null ? i.getCategory().getColorHex() : "#6366F1");
+        map.put("name", i.getName());
+        map.put("brand", i.getBrand());
+        map.put("quantity", i.getQuantity().doubleValue());
+        map.put("unit", i.getUnit());
+        map.put("minimumQuantity", i.getMinimumQuantity().doubleValue());
+        map.put("maximumQuantity", i.getMaximumQuantity() != null ? i.getMaximumQuantity().doubleValue() : null);
+        map.put("storageLocation", i.getStorageLocation());
+        map.put("purchasePrice", i.getPurchasePrice() != null ? i.getPurchasePrice().doubleValue() : null);
+        map.put("purchaseDate", i.getPurchaseDate() != null ? i.getPurchaseDate().toString() : null);
+        map.put("expiryDate", i.getExpiryDate() != null ? i.getExpiryDate().toString() : null);
+        map.put("imageUrl", i.getImageUrl());
+        map.put("notes", i.getNotes());
+        map.put("stockStatus", i.calculateStockStatus().name());
+        map.put("expiryStatus", i.calculateExpiryStatus().name());
+        map.put("daysUntilExpiry", i.getDaysUntilExpiry());
+        map.put("isDeleted", Boolean.TRUE.equals(i.getIsArchived()));
+        return map;
+    }
+
+    private Map<String, Object> mapStockTransaction(StockTransaction t) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", t.getId().toString());
+        map.put("itemId", t.getItem().getId().toString());
+        map.put("itemName", t.getItem().getName());
+        map.put("userName", t.getUser() != null ? t.getUser().getFullName() : "Member");
+        map.put("transactionType", t.getTransactionType().name());
+        map.put("quantityChange", t.getQuantityChange().doubleValue());
+        map.put("previousQuantity", t.getPreviousQuantity().doubleValue());
+        map.put("newQuantity", t.getNewQuantity().doubleValue());
+        map.put("unit", t.getUnit());
+        map.put("reason", t.getReason());
+        map.put("createdAt", t.getCreatedAt().toString());
+        return map;
+    }
+
+    private Map<String, Object> mapShoppingList(ShoppingList l) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", l.getId().toString());
+        map.put("name", l.getName());
+        map.put("isDefault", Boolean.TRUE.equals(l.getIsDefault()));
+        return map;
+    }
+
+    private Map<String, Object> mapShoppingListItem(ShoppingListItem s) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", s.getId().toString());
+        map.put("shoppingListId", s.getShoppingList().getId().toString());
+        map.put("inventoryItemId", s.getInventoryItem() != null ? s.getInventoryItem().getId().toString() : null);
+        map.put("itemName", s.getItemName());
+        map.put("categoryName", s.getInventoryItem() != null && s.getInventoryItem().getCategory() != null
+                ? s.getInventoryItem().getCategory().getName() : null);
+        map.put("categoryIcon", s.getInventoryItem() != null && s.getInventoryItem().getCategory() != null
+                ? s.getInventoryItem().getCategory().getIcon() : "category");
+        map.put("categoryColor", s.getInventoryItem() != null && s.getInventoryItem().getCategory() != null
+                ? s.getInventoryItem().getCategory().getColorHex() : "#6366F1");
+        map.put("quantity", s.getQuantity().doubleValue());
+        map.put("unit", s.getUnit());
+        map.put("isCompleted", Boolean.TRUE.equals(s.getIsCompleted()));
+        map.put("isAutoGenerated", Boolean.TRUE.equals(s.getIsAutoGenerated()));
+        map.put("addedByName", s.getAddedBy() != null ? s.getAddedBy().getFullName() : "Member");
+        map.put("completedByName", s.getCompletedBy() != null ? s.getCompletedBy().getFullName() : null);
+        map.put("completedAt", s.getCompletedAt() != null ? s.getCompletedAt().toString() : null);
+        map.put("notes", s.getNotes());
+        return map;
+    }
+
+    private Map<String, Object> mapPurchase(Purchase p) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", p.getId().toString());
+        map.put("storeName", p.getStore() != null ? p.getStore().getName() : "Direct");
+        map.put("totalAmount", p.getTotalAmount().doubleValue());
+        map.put("purchaseDate", p.getPurchaseDate().toString());
+        map.put("itemCount", p.getItems() != null ? p.getItems().size() : 0);
+        return map;
+    }
+
+    private Map<String, Object> mapStore(Store s) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", s.getId().toString());
+        map.put("name", s.getName());
+        map.put("location", s.getLocation());
+        return map;
+    }
+
+    private Map<String, Object> mapHomeMember(HomeMember m) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", m.getId().toString());
+        map.put("homeId", m.getHome().getId().toString());
+        map.put("userId", m.getUser().getId().toString());
+        map.put("fullName", m.getUser().getFullName());
+        map.put("email", m.getUser().getEmail());
+        map.put("avatarUrl", m.getUser().getAvatarUrl());
+        map.put("role", m.getRole().name());
+        map.put("joinedAt", m.getJoinedAt() != null ? m.getJoinedAt().toString() : "");
+        return map;
+    }
+
+    private Map<String, Object> mapHomeDetails(Home h) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", h.getId().toString());
+        map.put("name", h.getName());
+        map.put("inviteCode", h.getInviteCode());
+        map.put("createdBy", h.getCreatedBy() != null ? h.getCreatedBy().getId().toString() : null);
+        return map;
     }
 
     private String serializePayload(Map<String, Object> payload) {

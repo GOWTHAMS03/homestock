@@ -8602,6 +8602,29 @@ class $SyncQueueEntriesTable extends SyncQueueEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _lastAttemptAtMeta = const VerificationMeta(
+    'lastAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastAttemptAt =
+      GeneratedColumn<DateTime>(
+        'last_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _serverAcknowledgedAtMeta =
+      const VerificationMeta('serverAcknowledgedAt');
+  @override
+  late final GeneratedColumn<DateTime> serverAcknowledgedAt =
+      GeneratedColumn<DateTime>(
+        'server_acknowledged_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -8615,6 +8638,8 @@ class $SyncQueueEntriesTable extends SyncQueueEntries
     status,
     lastError,
     homeId,
+    lastAttemptAt,
+    serverAcknowledgedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -8711,6 +8736,24 @@ class $SyncQueueEntriesTable extends SyncQueueEntries
     } else if (isInserting) {
       context.missing(_homeIdMeta);
     }
+    if (data.containsKey('last_attempt_at')) {
+      context.handle(
+        _lastAttemptAtMeta,
+        lastAttemptAt.isAcceptableOrUnknown(
+          data['last_attempt_at']!,
+          _lastAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('server_acknowledged_at')) {
+      context.handle(
+        _serverAcknowledgedAtMeta,
+        serverAcknowledgedAt.isAcceptableOrUnknown(
+          data['server_acknowledged_at']!,
+          _serverAcknowledgedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -8764,6 +8807,14 @@ class $SyncQueueEntriesTable extends SyncQueueEntries
         DriftSqlType.string,
         data['${effectivePrefix}home_id'],
       )!,
+      lastAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_attempt_at'],
+      ),
+      serverAcknowledgedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}server_acknowledged_at'],
+      ),
     );
   }
 
@@ -8785,6 +8836,8 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
   final String status;
   final String? lastError;
   final String homeId;
+  final DateTime? lastAttemptAt;
+  final DateTime? serverAcknowledgedAt;
   const SyncQueueEntry({
     required this.id,
     required this.operationId,
@@ -8797,6 +8850,8 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     required this.status,
     this.lastError,
     required this.homeId,
+    this.lastAttemptAt,
+    this.serverAcknowledgedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -8814,6 +8869,12 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       map['last_error'] = Variable<String>(lastError);
     }
     map['home_id'] = Variable<String>(homeId);
+    if (!nullToAbsent || lastAttemptAt != null) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
+    }
+    if (!nullToAbsent || serverAcknowledgedAt != null) {
+      map['server_acknowledged_at'] = Variable<DateTime>(serverAcknowledgedAt);
+    }
     return map;
   }
 
@@ -8832,6 +8893,12 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
           ? const Value.absent()
           : Value(lastError),
       homeId: Value(homeId),
+      lastAttemptAt: lastAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAttemptAt),
+      serverAcknowledgedAt: serverAcknowledgedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverAcknowledgedAt),
     );
   }
 
@@ -8852,6 +8919,10 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       status: serializer.fromJson<String>(json['status']),
       lastError: serializer.fromJson<String?>(json['lastError']),
       homeId: serializer.fromJson<String>(json['homeId']),
+      lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
+      serverAcknowledgedAt: serializer.fromJson<DateTime?>(
+        json['serverAcknowledgedAt'],
+      ),
     );
   }
   @override
@@ -8869,6 +8940,10 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       'status': serializer.toJson<String>(status),
       'lastError': serializer.toJson<String?>(lastError),
       'homeId': serializer.toJson<String>(homeId),
+      'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
+      'serverAcknowledgedAt': serializer.toJson<DateTime?>(
+        serverAcknowledgedAt,
+      ),
     };
   }
 
@@ -8884,6 +8959,8 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     String? status,
     Value<String?> lastError = const Value.absent(),
     String? homeId,
+    Value<DateTime?> lastAttemptAt = const Value.absent(),
+    Value<DateTime?> serverAcknowledgedAt = const Value.absent(),
   }) => SyncQueueEntry(
     id: id ?? this.id,
     operationId: operationId ?? this.operationId,
@@ -8896,6 +8973,12 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     status: status ?? this.status,
     lastError: lastError.present ? lastError.value : this.lastError,
     homeId: homeId ?? this.homeId,
+    lastAttemptAt: lastAttemptAt.present
+        ? lastAttemptAt.value
+        : this.lastAttemptAt,
+    serverAcknowledgedAt: serverAcknowledgedAt.present
+        ? serverAcknowledgedAt.value
+        : this.serverAcknowledgedAt,
   );
   SyncQueueEntry copyWithCompanion(SyncQueueEntriesCompanion data) {
     return SyncQueueEntry(
@@ -8918,6 +9001,12 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
       status: data.status.present ? data.status.value : this.status,
       lastError: data.lastError.present ? data.lastError.value : this.lastError,
       homeId: data.homeId.present ? data.homeId.value : this.homeId,
+      lastAttemptAt: data.lastAttemptAt.present
+          ? data.lastAttemptAt.value
+          : this.lastAttemptAt,
+      serverAcknowledgedAt: data.serverAcknowledgedAt.present
+          ? data.serverAcknowledgedAt.value
+          : this.serverAcknowledgedAt,
     );
   }
 
@@ -8934,7 +9023,9 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
           ..write('retryCount: $retryCount, ')
           ..write('status: $status, ')
           ..write('lastError: $lastError, ')
-          ..write('homeId: $homeId')
+          ..write('homeId: $homeId, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('serverAcknowledgedAt: $serverAcknowledgedAt')
           ..write(')'))
         .toString();
   }
@@ -8952,6 +9043,8 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
     status,
     lastError,
     homeId,
+    lastAttemptAt,
+    serverAcknowledgedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -8967,7 +9060,9 @@ class SyncQueueEntry extends DataClass implements Insertable<SyncQueueEntry> {
           other.retryCount == this.retryCount &&
           other.status == this.status &&
           other.lastError == this.lastError &&
-          other.homeId == this.homeId);
+          other.homeId == this.homeId &&
+          other.lastAttemptAt == this.lastAttemptAt &&
+          other.serverAcknowledgedAt == this.serverAcknowledgedAt);
 }
 
 class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
@@ -8982,6 +9077,8 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
   final Value<String> status;
   final Value<String?> lastError;
   final Value<String> homeId;
+  final Value<DateTime?> lastAttemptAt;
+  final Value<DateTime?> serverAcknowledgedAt;
   const SyncQueueEntriesCompanion({
     this.id = const Value.absent(),
     this.operationId = const Value.absent(),
@@ -8994,6 +9091,8 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
     this.status = const Value.absent(),
     this.lastError = const Value.absent(),
     this.homeId = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
+    this.serverAcknowledgedAt = const Value.absent(),
   });
   SyncQueueEntriesCompanion.insert({
     this.id = const Value.absent(),
@@ -9007,6 +9106,8 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
     this.status = const Value.absent(),
     this.lastError = const Value.absent(),
     required String homeId,
+    this.lastAttemptAt = const Value.absent(),
+    this.serverAcknowledgedAt = const Value.absent(),
   }) : operationId = Value(operationId),
        operationType = Value(operationType),
        entityType = Value(entityType),
@@ -9026,6 +9127,8 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
     Expression<String>? status,
     Expression<String>? lastError,
     Expression<String>? homeId,
+    Expression<DateTime>? lastAttemptAt,
+    Expression<DateTime>? serverAcknowledgedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -9039,6 +9142,9 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
       if (status != null) 'status': status,
       if (lastError != null) 'last_error': lastError,
       if (homeId != null) 'home_id': homeId,
+      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
+      if (serverAcknowledgedAt != null)
+        'server_acknowledged_at': serverAcknowledgedAt,
     });
   }
 
@@ -9054,6 +9160,8 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
     Value<String>? status,
     Value<String?>? lastError,
     Value<String>? homeId,
+    Value<DateTime?>? lastAttemptAt,
+    Value<DateTime?>? serverAcknowledgedAt,
   }) {
     return SyncQueueEntriesCompanion(
       id: id ?? this.id,
@@ -9067,6 +9175,8 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
       status: status ?? this.status,
       lastError: lastError ?? this.lastError,
       homeId: homeId ?? this.homeId,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      serverAcknowledgedAt: serverAcknowledgedAt ?? this.serverAcknowledgedAt,
     );
   }
 
@@ -9106,6 +9216,14 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
     if (homeId.present) {
       map['home_id'] = Variable<String>(homeId.value);
     }
+    if (lastAttemptAt.present) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
+    }
+    if (serverAcknowledgedAt.present) {
+      map['server_acknowledged_at'] = Variable<DateTime>(
+        serverAcknowledgedAt.value,
+      );
+    }
     return map;
   }
 
@@ -9122,7 +9240,9 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
           ..write('retryCount: $retryCount, ')
           ..write('status: $status, ')
           ..write('lastError: $lastError, ')
-          ..write('homeId: $homeId')
+          ..write('homeId: $homeId, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('serverAcknowledgedAt: $serverAcknowledgedAt')
           ..write(')'))
         .toString();
   }
@@ -16145,6 +16265,8 @@ typedef $$SyncQueueEntriesTableCreateCompanionBuilder =
       Value<String> status,
       Value<String?> lastError,
       required String homeId,
+      Value<DateTime?> lastAttemptAt,
+      Value<DateTime?> serverAcknowledgedAt,
     });
 typedef $$SyncQueueEntriesTableUpdateCompanionBuilder =
     SyncQueueEntriesCompanion Function({
@@ -16159,6 +16281,8 @@ typedef $$SyncQueueEntriesTableUpdateCompanionBuilder =
       Value<String> status,
       Value<String?> lastError,
       Value<String> homeId,
+      Value<DateTime?> lastAttemptAt,
+      Value<DateTime?> serverAcknowledgedAt,
     });
 
 class $$SyncQueueEntriesTableFilterComposer
@@ -16222,6 +16346,16 @@ class $$SyncQueueEntriesTableFilterComposer
 
   ColumnFilters<String> get homeId => $composableBuilder(
     column: $table.homeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get serverAcknowledgedAt => $composableBuilder(
+    column: $table.serverAcknowledgedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -16289,6 +16423,16 @@ class $$SyncQueueEntriesTableOrderingComposer
     column: $table.homeId,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get serverAcknowledgedAt => $composableBuilder(
+    column: $table.serverAcknowledgedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SyncQueueEntriesTableAnnotationComposer
@@ -16340,6 +16484,16 @@ class $$SyncQueueEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get homeId =>
       $composableBuilder(column: $table.homeId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get serverAcknowledgedAt => $composableBuilder(
+    column: $table.serverAcknowledgedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$SyncQueueEntriesTableTableManager
@@ -16390,6 +16544,8 @@ class $$SyncQueueEntriesTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 Value<String> homeId = const Value.absent(),
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<DateTime?> serverAcknowledgedAt = const Value.absent(),
               }) => SyncQueueEntriesCompanion(
                 id: id,
                 operationId: operationId,
@@ -16402,6 +16558,8 @@ class $$SyncQueueEntriesTableTableManager
                 status: status,
                 lastError: lastError,
                 homeId: homeId,
+                lastAttemptAt: lastAttemptAt,
+                serverAcknowledgedAt: serverAcknowledgedAt,
               ),
           createCompanionCallback:
               ({
@@ -16416,6 +16574,8 @@ class $$SyncQueueEntriesTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 required String homeId,
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<DateTime?> serverAcknowledgedAt = const Value.absent(),
               }) => SyncQueueEntriesCompanion.insert(
                 id: id,
                 operationId: operationId,
@@ -16428,6 +16588,8 @@ class $$SyncQueueEntriesTableTableManager
                 status: status,
                 lastError: lastError,
                 homeId: homeId,
+                lastAttemptAt: lastAttemptAt,
+                serverAcknowledgedAt: serverAcknowledgedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

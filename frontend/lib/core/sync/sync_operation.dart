@@ -68,6 +68,12 @@ class SyncOperationType {
 
   // Categories
   static const String createCategory = 'CREATE_CATEGORY';
+
+  // Family & Home
+  static const String updateHomeName = 'UPDATE_HOME_NAME';
+  static const String changeMemberRole = 'CHANGE_MEMBER_ROLE';
+  static const String removeMember = 'REMOVE_MEMBER';
+  static const String addMember = 'ADD_MEMBER';
 }
 
 /// Entity types for sync queue
@@ -81,6 +87,8 @@ class SyncEntityType {
   static const String purchase = 'PURCHASE';
   static const String store = 'STORE';
   static const String category = 'CATEGORY';
+  static const String home = 'HOME';
+  static const String homeMember = 'HOME_MEMBER';
 }
 
 /// Result status for each sync operation from the server
@@ -147,6 +155,8 @@ class SyncPullResponse {
   final List<Map<String, dynamic>> purchaseItems;
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> stores;
+  final List<Map<String, dynamic>> homeMembers;
+  final Map<String, dynamic>? homeDetails;
   final int? serverVersion;
   final int? nextServerVersion;
   final bool hasMore;
@@ -154,6 +164,7 @@ class SyncPullResponse {
   final List<String> deletedInventoryItemIds;
   final List<String> deletedStoreIds;
   final List<String> deletedCategoryIds;
+  final List<String> deletedMemberUserIds;
   final String serverTimestamp;
 
   const SyncPullResponse({
@@ -165,6 +176,8 @@ class SyncPullResponse {
     this.purchaseItems = const [],
     this.categories = const [],
     this.stores = const [],
+    this.homeMembers = const [],
+    this.homeDetails,
     this.serverVersion,
     this.nextServerVersion,
     this.hasMore = false,
@@ -172,6 +185,7 @@ class SyncPullResponse {
     this.deletedInventoryItemIds = const [],
     this.deletedStoreIds = const [],
     this.deletedCategoryIds = const [],
+    this.deletedMemberUserIds = const [],
     required this.serverTimestamp,
   });
 
@@ -185,6 +199,8 @@ class SyncPullResponse {
       purchaseItems: _toMapList(json['purchaseItems']),
       categories: _toMapList(json['categories']),
       stores: _toMapList(json['stores']),
+      homeMembers: _toMapList(json['homeMembers']),
+      homeDetails: json['homeDetails'] as Map<String, dynamic>?,
       serverVersion: (json['serverVersion'] as num?)?.toInt(),
       nextServerVersion: (json['nextServerVersion'] as num?)?.toInt(),
       hasMore: json['hasMore'] == true,
@@ -192,6 +208,7 @@ class SyncPullResponse {
       deletedInventoryItemIds: _toStringList(json['deletedInventoryItemIds']),
       deletedStoreIds: _toStringList(json['deletedStoreIds']),
       deletedCategoryIds: _toStringList(json['deletedCategoryIds']),
+      deletedMemberUserIds: _toStringList(json['deletedMemberUserIds']),
       serverTimestamp: json['serverTimestamp'] as String? ??
           DateTime.now().toUtc().toIso8601String(),
     );
@@ -216,8 +233,11 @@ class SyncPullResponse {
       purchaseItems.isEmpty &&
       categories.isEmpty &&
       stores.isEmpty &&
+      homeMembers.isEmpty &&
+      homeDetails == null &&
       deletedShoppingItemIds.isEmpty &&
       deletedInventoryItemIds.isEmpty &&
       deletedStoreIds.isEmpty &&
-      deletedCategoryIds.isEmpty;
+      deletedCategoryIds.isEmpty &&
+      deletedMemberUserIds.isEmpty;
 }

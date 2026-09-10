@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/database/app_database.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage_service.dart';
+import '../../core/sync/sync_operation.dart';
 import 'home_model.dart';
+
+const _uuid = Uuid();
 
 class HomeRepository {
   final ApiClient apiClient;
@@ -111,13 +116,54 @@ class HomeRepository {
   }
 
   Future<HomeModel> updateHome(String homeId, String newName) async {
-    final response = await apiClient.dio.put(
-      ApiEndpoints.homeById(homeId),
-      data: {'name': newName.trim()},
+    final now = DateTime.now();
+    final opId = _uuid.v4();
+
+    if (database != null) {
+      await database!.transaction(() async {
+        await (database!.update(database!.localHomes)..where((t) => t.id.equals(homeId)))
+            .write(LocalHomesCompanion(
+              name: Value(newName.trim()),
+              updatedAt: Value(now),
+            ));
+
+        await database!.into(database!.syncQueueEntries).insert(SyncQueueEntriesCompanion(
+          operationId: Value(opId),
+          operationType: const Value(SyncOperationType.updateHomeName),
+          entityType: const Value(SyncEntityType.home),
+          entityId: Value(homeId),
+          payload: Value(jsonEncode({'name': newName.trim()})),
+          createdAt: Value(now),
+          homeId: Value(homeId),
+        ));
+      });
+    }
+
+    final isOnline = apiClient.connectivityMonitor?.isOnline ?? false;
+    if (isOnline) {
+      try {
+        final response = await apiClient.dio.put(
+          ApiEndpoints.homeById(homeId),
+          data: {'name': newName.trim()},
+        );
+        final model = HomeModel.fromJson(response.data['data']);
+        await _cacheHomesLocally([model]);
+        if (database != null) {
+          await (database!.update(database!.syncQueueEntries)
+                ..where((t) => t.operationId.equals(opId)))
+              .write(const SyncQueueEntriesCompanion(status: Value('SYNCED')));
+        }
+        return model;
+      } catch (_) {}
+    }
+
+    return HomeModel(
+      id: homeId,
+      name: newName.trim(),
+      inviteCode: '',
+      currentUserRole: 'ADMIN',
+      memberCount: 1,
     );
-    final model = HomeModel.fromJson(response.data['data']);
-    await _cacheHomesLocally([model]);
-    return model;
   }
 
   Future<List<HomeMemberModel>> getMembers(String homeId) async {
@@ -172,26 +218,78 @@ class HomeRepository {
   }
 
   Future<void> removeMember(String homeId, String userId) async {
-    await apiClient.dio.delete(ApiEndpoints.removeMember(homeId, userId));
+    final now = DateTime.now();
+    final opId = _uuid.v4();
+
     if (database != null) {
-      await (database!.delete(database!.localHomeMembers)
-            ..where((t) => t.homeId.equals(homeId) & t.userId.equals(userId)))
-          .go();
+      await database!.transaction(() async {
+        await (database!.delete(database!.localHomeMembers)
+              ..where((t) => t.homeId.equals(homeId) & t.userId.equals(userId)))
+            .go();
+
+        await database!.into(database!.syncQueueEntries).insert(SyncQueueEntriesCompanion(
+          operationId: Value(opId),
+          operationType: const Value(SyncOperationType.removeMember),
+          entityType: const Value(SyncEntityType.homeMember),
+          entityId: Value(userId),
+          payload: Value(jsonEncode({'userId': userId})),
+          createdAt: Value(now),
+          homeId: Value(homeId),
+        ));
+      });
+    }
+
+    final isOnline = apiClient.connectivityMonitor?.isOnline ?? false;
+    if (isOnline) {
+      try {
+        await apiClient.dio.delete(ApiEndpoints.removeMember(homeId, userId));
+        if (database != null) {
+          await (database!.update(database!.syncQueueEntries)
+                ..where((t) => t.operationId.equals(opId)))
+              .write(const SyncQueueEntriesCompanion(status: Value('SYNCED')));
+        }
+      } catch (_) {}
     }
   }
 
   Future<void> updateMemberRole(String homeId, String userId, String role) async {
-    await apiClient.dio.put(
-      ApiEndpoints.memberRole(homeId, userId),
-      data: {'role': role},
-    );
+    final now = DateTime.now();
+    final opId = _uuid.v4();
+
     if (database != null) {
-      await (database!.update(database!.localHomeMembers)
-            ..where((t) => t.homeId.equals(homeId) & t.userId.equals(userId)))
-          .write(LocalHomeMembersCompanion(
-            role: Value(role),
-            updatedAt: Value(DateTime.now()),
-          ));
+      await database!.transaction(() async {
+        await (database!.update(database!.localHomeMembers)
+              ..where((t) => t.homeId.equals(homeId) & t.userId.equals(userId)))
+            .write(LocalHomeMembersCompanion(
+              role: Value(role),
+              updatedAt: Value(now),
+            ));
+
+        await database!.into(database!.syncQueueEntries).insert(SyncQueueEntriesCompanion(
+          operationId: Value(opId),
+          operationType: const Value(SyncOperationType.changeMemberRole),
+          entityType: const Value(SyncEntityType.homeMember),
+          entityId: Value(userId),
+          payload: Value(jsonEncode({'userId': userId, 'role': role})),
+          createdAt: Value(now),
+          homeId: Value(homeId),
+        ));
+      });
+    }
+
+    final isOnline = apiClient.connectivityMonitor?.isOnline ?? false;
+    if (isOnline) {
+      try {
+        await apiClient.dio.put(
+          ApiEndpoints.memberRole(homeId, userId),
+          data: {'role': role},
+        );
+        if (database != null) {
+          await (database!.update(database!.syncQueueEntries)
+                ..where((t) => t.operationId.equals(opId)))
+              .write(const SyncQueueEntriesCompanion(status: Value('SYNCED')));
+        }
+      } catch (_) {}
     }
   }
 }

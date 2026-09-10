@@ -18,6 +18,8 @@ public class SyncPullResponse {
     private List<Map<String, Object>> purchases;
     private List<Map<String, Object>> categories;
     private List<Map<String, Object>> stores;
+    private List<Map<String, Object>> homeMembers;
+    private Map<String, Object> homeDetails;
     private String serverTimestamp;
 
     // Incremental cursor and deletion synchronization
@@ -28,4 +30,5 @@ public class SyncPullResponse {
     private List<String> deletedInventoryItemIds;
     private List<String> deletedStoreIds;
     private List<String> deletedCategoryIds;
+    private List<String> deletedMemberUserIds;
 }

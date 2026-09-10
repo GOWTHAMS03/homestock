@@ -15,6 +15,7 @@ final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
     syncEngine: ref.watch(syncEngineProvider),
     connectivity: ref.watch(connectivityMonitorProvider),
     inventoryDao: ref.watch(inventoryDaoProvider),
+    database: ref.watch(databaseProvider),
   );
 });
 

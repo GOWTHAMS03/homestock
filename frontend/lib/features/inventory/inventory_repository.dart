@@ -35,6 +35,7 @@ class InventoryRepository {
   final ApiClient _apiClient;
   final ConnectivityMonitor _connectivity;
   final SyncEngine _syncEngine;
+  final AppDatabase? _db;
 
   InventoryRepository({
     required InventoryDao inventoryDao,
@@ -42,11 +43,20 @@ class InventoryRepository {
     required ApiClient apiClient,
     required ConnectivityMonitor connectivity,
     required SyncEngine syncEngine,
+    AppDatabase? database,
   })  : _inventoryDao = inventoryDao,
         _syncDao = syncDao,
         _apiClient = apiClient,
         _connectivity = connectivity,
-        _syncEngine = syncEngine;
+        _syncEngine = syncEngine,
+        _db = database;
+
+  Future<T> _runInTransaction<T>(Future<T> Function() action) async {
+    if (_db != null) {
+      return _db.transaction(action);
+    }
+    return action();
+  }
 
   bool get isOnline => _connectivity.isOnline;
 
@@ -191,22 +201,24 @@ class InventoryRepository {
       updatedAt: Value(now),
     );
 
-    await _inventoryDao.upsertCategories([companion]);
+    await _runInTransaction(() async {
+      await _inventoryDao.upsertCategories([companion]);
 
-    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
-      operationId: Value(operationId),
-      operationType: const Value(SyncOperationType.createCategory),
-      entityType: const Value(SyncEntityType.category),
-      entityId: Value(catId),
-      payload: Value(jsonEncode({
-        'name': name.trim(),
-        'icon': icon,
-        'colorHex': colorHex,
-        'displayOrder': displayOrder,
-      })),
-      createdAt: Value(now),
-      homeId: Value(homeId),
-    ));
+      await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+        operationId: Value(operationId),
+        operationType: const Value(SyncOperationType.createCategory),
+        entityType: const Value(SyncEntityType.category),
+        entityId: Value(catId),
+        payload: Value(jsonEncode({
+          'name': name.trim(),
+          'icon': icon,
+          'colorHex': colorHex,
+          'displayOrder': displayOrder,
+        })),
+        createdAt: Value(now),
+        homeId: Value(homeId),
+      ));
+    });
 
     _syncEngine.trySyncImmediate();
 
@@ -267,18 +279,20 @@ class InventoryRepository {
       updatedAt: Value(now),
     );
 
-    await _inventoryDao.upsertItem(companion);
+    await _runInTransaction(() async {
+      await _inventoryDao.upsertItem(companion);
 
-    // 2. Enqueue sync operation
-    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
-      operationId: Value(operationId),
-      operationType: const Value(SyncOperationType.createItem),
-      entityType: const Value(SyncEntityType.inventoryItem),
-      entityId: Value(itemId),
-      payload: Value(jsonEncode(data)),
-      createdAt: Value(now),
-      homeId: Value(homeId),
-    ));
+      // 2. Enqueue sync operation
+      await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+        operationId: Value(operationId),
+        operationType: const Value(SyncOperationType.createItem),
+        entityType: const Value(SyncEntityType.inventoryItem),
+        entityId: Value(itemId),
+        payload: Value(jsonEncode(data)),
+        createdAt: Value(now),
+        homeId: Value(homeId),
+      ));
+    });
 
     // 3. Trigger background sync if online
     _syncEngine.trySyncImmediate();
@@ -358,18 +372,20 @@ class InventoryRepository {
       updatedAt: Value(now),
     );
 
-    await _inventoryDao.upsertItem(companion);
+    await _runInTransaction(() async {
+      await _inventoryDao.upsertItem(companion);
 
-    // 2. Enqueue sync operation
-    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
-      operationId: Value(operationId),
-      operationType: const Value(SyncOperationType.updateItem),
-      entityType: const Value(SyncEntityType.inventoryItem),
-      entityId: Value(itemId),
-      payload: Value(jsonEncode(data)),
-      createdAt: Value(now),
-      homeId: Value(homeId),
-    ));
+      // 2. Enqueue sync operation
+      await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+        operationId: Value(operationId),
+        operationType: const Value(SyncOperationType.updateItem),
+        entityType: const Value(SyncEntityType.inventoryItem),
+        entityId: Value(itemId),
+        payload: Value(jsonEncode(data)),
+        createdAt: Value(now),
+        homeId: Value(homeId),
+      ));
+    });
 
     // 3. Background sync
     _syncEngine.trySyncImmediate();
@@ -421,39 +437,41 @@ class InventoryRepository {
 
     final stockStatus = _computeStockStatus(newQty, current.minimumQuantity);
 
-    // 1. Update item quantity locally
-    await _inventoryDao.updateLocalStock(itemId, newQty, stockStatus);
+    await _runInTransaction(() async {
+      // 1. Update item quantity locally
+      await _inventoryDao.updateLocalStock(itemId, newQty, stockStatus);
 
-    // 2. Insert local stock transaction
-    await _inventoryDao.insertTransaction(LocalStockTransactionsCompanion(
-      id: Value(txId),
-      inventoryItemId: Value(itemId),
-      itemName: Value(current.name),
-      userName: const Value('You'),
-      transactionType: Value(transactionType),
-      quantityChange: Value(quantityChange),
-      previousQuantity: Value(previousQty),
-      newQuantity: Value(newQty),
-      unit: Value(current.unit),
-      reason: Value(reason),
-      createdAt: Value(now.toIso8601String()),
-      isLocalOnly: const Value(true),
-    ));
+      // 2. Insert local stock transaction
+      await _inventoryDao.insertTransaction(LocalStockTransactionsCompanion(
+        id: Value(txId),
+        inventoryItemId: Value(itemId),
+        itemName: Value(current.name),
+        userName: const Value('You'),
+        transactionType: Value(transactionType),
+        quantityChange: Value(quantityChange),
+        previousQuantity: Value(previousQty),
+        newQuantity: Value(newQty),
+        unit: Value(current.unit),
+        reason: Value(reason),
+        createdAt: Value(now.toIso8601String()),
+        isLocalOnly: const Value(true),
+      ));
 
-    // 3. Enqueue sync operation — sends the OPERATION, not the absolute quantity
-    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
-      operationId: Value(operationId),
-      operationType: Value(transactionType),
-      entityType: const Value(SyncEntityType.inventoryItem),
-      entityId: Value(itemId),
-      payload: Value(jsonEncode({
-        'transactionType': transactionType,
-        'quantityChange': quantityChange,
-        'reason': reason,
-      })),
-      createdAt: Value(now),
-      homeId: Value(homeId),
-    ));
+      // 3. Enqueue sync operation — sends the OPERATION, not the absolute quantity
+      await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+        operationId: Value(operationId),
+        operationType: Value(transactionType),
+        entityType: const Value(SyncEntityType.inventoryItem),
+        entityId: Value(itemId),
+        payload: Value(jsonEncode({
+          'transactionType': transactionType,
+          'quantityChange': quantityChange,
+          'reason': reason,
+        })),
+        createdAt: Value(now),
+        homeId: Value(homeId),
+      ));
+    });
 
     // 4. Background sync
     _syncEngine.trySyncImmediate();
@@ -468,17 +486,19 @@ class InventoryRepository {
     final operationId = _uuid.v4();
     final now = DateTime.now();
 
-    await _inventoryDao.softDeleteItem(itemId);
+    await _runInTransaction(() async {
+      await _inventoryDao.softDeleteItem(itemId);
 
-    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
-      operationId: Value(operationId),
-      operationType: const Value(SyncOperationType.deleteItem),
-      entityType: const Value(SyncEntityType.inventoryItem),
-      entityId: Value(itemId),
-      payload: const Value('{}'),
-      createdAt: Value(now),
-      homeId: Value(homeId),
-    ));
+      await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+        operationId: Value(operationId),
+        operationType: const Value(SyncOperationType.deleteItem),
+        entityType: const Value(SyncEntityType.inventoryItem),
+        entityId: Value(itemId),
+        payload: const Value('{}'),
+        createdAt: Value(now),
+        homeId: Value(homeId),
+      ));
+    });
 
     _syncEngine.trySyncImmediate();
   }

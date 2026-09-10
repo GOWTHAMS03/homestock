@@ -250,6 +250,8 @@ class SyncQueueEntries extends Table {
   TextColumn get status => text().withDefault(const Constant('PENDING'))(); // PENDING, SYNCING, SYNCED, FAILED, CONFLICT
   TextColumn get lastError => text().nullable()();
   TextColumn get homeId => text()();
+  DateTimeColumn get lastAttemptAt => dateTime().nullable()();
+  DateTimeColumn get serverAcknowledgedAt => dateTime().nullable()();
 }
 
 /// Sync metadata — tracks last sync timestamp per home
@@ -355,7 +357,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -390,6 +392,10 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(localNotifications, localNotifications.entityId);
           await m.addColumn(localNotifications, localNotifications.entityType);
           await m.addColumn(localNotifications, localNotifications.action);
+        }
+        if (from < 6) {
+          await m.addColumn(syncQueueEntries, syncQueueEntries.lastAttemptAt);
+          await m.addColumn(syncQueueEntries, syncQueueEntries.serverAcknowledgedAt);
         }
       },
     );

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/sync/sync_engine.dart';
 import '../../core/sync/sync_providers.dart';
 import '../../core/storage/secure_storage_service.dart';
 import '../auth/auth_controller.dart';
@@ -43,14 +44,16 @@ class HomeState {
 final homeControllerProvider = StateNotifierProvider<HomeController, HomeState>((ref) {
   final repo = ref.watch(homeRepositoryProvider);
   final storage = ref.watch(secureStorageProvider);
-  return HomeController(repo, storage);
+  final syncEngine = ref.watch(syncEngineProvider);
+  return HomeController(repo, storage, syncEngine);
 });
 
 class HomeController extends StateNotifier<HomeState> {
   final HomeRepository _repo;
   final SecureStorageService _storage;
+  final SyncEngine? _syncEngine;
 
-  HomeController(this._repo, this._storage) : super(_computeInitialState(_storage));
+  HomeController(this._repo, this._storage, [this._syncEngine]) : super(_computeInitialState(_storage));
 
   static HomeState _computeInitialState(SecureStorageService storage) {
     final cached = storage.getCachedHomesSync();
@@ -97,6 +100,7 @@ class HomeController extends StateNotifier<HomeState> {
   Future<void> switchHome(HomeModel home) async {
     await _storage.saveActiveHomeId(home.id);
     state = state.copyWith(activeHome: home);
+    _syncEngine?.syncHome(home.id);
   }
 
   /// Switch active home by ID string (for notification deep linking).

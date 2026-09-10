@@ -2,12 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../database/app_database.dart';
 import '../database/daos/inventory_dao.dart';
-import '../database/daos/purchase_dao.dart';
 import '../database/daos/shopping_dao.dart';
 import '../database/daos/sync_dao.dart';
 import '../network/api_client.dart';
@@ -21,10 +22,11 @@ import 'sync_status.dart';
 /// Responsibilities:
 /// - Push pending local operations to server (batch POST /api/v1/sync)
 /// - Pull server changes since last sync (GET /api/v1/sync?homeId=&since=)
-/// - Auto-sync on connectivity restoration
+/// - Auto-sync on connectivity restoration and app resume
 /// - Exponential backoff retry for failed operations
 /// - Idempotency via operationId
-class SyncEngine {
+/// - 8-state strict lifecycle pipeline
+class SyncEngine with WidgetsBindingObserver {
   final AppDatabase _db;
   final ApiClient _apiClient;
   final ConnectivityMonitor _connectivity;
@@ -32,16 +34,17 @@ class SyncEngine {
   late final SyncDao _syncDao;
   late final InventoryDao _inventoryDao;
   late final ShoppingDao _shoppingDao;
-  late final PurchaseDao _purchaseDao;
 
   final StreamController<SyncState> _stateController =
       StreamController<SyncState>.broadcast();
 
   SyncState _currentState = const SyncState();
   bool _isSyncing = false;
+  bool _hasQueuedSyncRequest = false;
   Timer? _retryTimer;
   Completer<void>? _activeSyncAllCompleter;
   final Set<String> _activeHomeSyncs = {};
+  bool _isAutoSyncStarted = false;
 
   SyncEngine({
     required AppDatabase database,
@@ -53,7 +56,6 @@ class SyncEngine {
     _syncDao = SyncDao(_db);
     _inventoryDao = InventoryDao(_db);
     _shoppingDao = ShoppingDao(_db);
-    _purchaseDao = PurchaseDao(_db);
   }
 
   /// Stream of sync state changes for UI consumption.
@@ -65,9 +67,17 @@ class SyncEngine {
   /// Start automatic synchronization.
   /// Listens for connectivity changes and triggers sync on restoration.
   void startAutoSync() {
+    if (_isAutoSyncStarted) return;
+    _isAutoSyncStarted = true;
+
+    try {
+      WidgetsBinding.instance.addObserver(this);
+    } catch (_) {}
+
     _connectivity.start();
     _connectivity.onConnectivityRestored = () {
       if (kDebugMode) print('[SyncEngine] Connectivity restored — starting sync');
+      _updateState(_currentState.copyWith(syncStatus: SyncStatus.networkAvailable));
       syncAll();
     };
 
@@ -79,16 +89,36 @@ class SyncEngine {
     // Update status based on connectivity
     _connectivity.statusStream.listen((status) {
       if (status == NetworkStatus.online && !_isSyncing) {
-        _updateState(_currentState.copyWith(status: NetworkStatus.online));
+        _updateState(_currentState.copyWith(
+          syncStatus: _currentState.syncStatus == SyncStatus.offline
+              ? SyncStatus.networkAvailable
+              : _currentState.syncStatus,
+        ));
       } else if (status == NetworkStatus.offline) {
-        _updateState(_currentState.copyWith(status: NetworkStatus.offline));
+        _updateState(_currentState.copyWith(syncStatus: SyncStatus.offline));
       }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (kDebugMode) print('[SyncEngine] App resumed — triggering syncAll');
+      syncAll();
+    }
+  }
+
+  bool _isAuthError(dynamic e) {
+    if (e is DioException) {
+      return e.response?.statusCode == 401;
+    }
+    return false;
   }
 
   /// Full sync cycle for all homes the user belongs to.
   Future<void> syncAll() async {
     if (_isSyncing) {
+      _hasQueuedSyncRequest = true;
       if (_activeSyncAllCompleter != null) {
         return _activeSyncAllCompleter!.future;
       }
@@ -96,19 +126,26 @@ class SyncEngine {
     }
     if (!_connectivity.isOnline) {
       if (kDebugMode) print('[SyncEngine] Skipping syncAll - device is offline');
+      _updateState(_currentState.copyWith(syncStatus: SyncStatus.offline));
       return;
     }
     _activeSyncAllCompleter = Completer<void>();
     _isSyncing = true;
     _connectivity.setSyncing();
     _updateState(_currentState.copyWith(
-      status: NetworkStatus.syncing,
+      syncStatus: SyncStatus.syncingPush,
       isSyncInProgress: true,
+      lastError: null,
     ));
 
     try {
-      // Push all pending operations
+      // 1. Push pending local operations first
       await _pushPendingOperations();
+
+      // 2. Transition to pulling remote changes
+      _updateState(_currentState.copyWith(
+        syncStatus: SyncStatus.syncingPull,
+      ));
 
       // Pull changes for each home: localHomes, pending operations, and sync metadata
       final homes = await (_db.select(_db.localHomes)).get();
@@ -129,30 +166,39 @@ class SyncEngine {
       }
 
       _updateState(_currentState.copyWith(
-        status: NetworkStatus.online,
+        syncStatus: SyncStatus.synced,
         lastSyncedAt: DateTime.now(),
         isSyncInProgress: false,
         lastError: null,
       ));
 
-      // Cleanup synced operations
-      await _syncDao.cleanupSyncedOperations();
+      // Cleanup synced operations older than 24 hours
+      await _syncDao.cleanupOldSyncedOperations();
     } catch (e) {
       if (kDebugMode) print('[SyncEngine] Sync failed: $e');
+      final isAuth = _isAuthError(e);
       _updateState(_currentState.copyWith(
-        status: _connectivity.isOnline
-            ? NetworkStatus.online
-            : NetworkStatus.offline,
+        syncStatus: isAuth
+            ? SyncStatus.authRequired
+            : (_connectivity.isOnline ? SyncStatus.error : SyncStatus.offline),
         isSyncInProgress: false,
-        lastError: e.toString(),
+        lastError: isAuth
+            ? 'Authentication required. Please sign in again.'
+            : e.toString(),
       ));
-      // Schedule retry
-      _scheduleRetry();
+      if (!isAuth) {
+        // Schedule retry
+        _scheduleRetry();
+      }
     } finally {
       _isSyncing = false;
       _connectivity.setSyncComplete();
       _activeSyncAllCompleter?.complete();
       _activeSyncAllCompleter = null;
+      if (_hasQueuedSyncRequest) {
+        _hasQueuedSyncRequest = false;
+        Future.microtask(() => syncAll());
+      }
     }
   }
 
@@ -164,30 +210,39 @@ class SyncEngine {
     _activeHomeSyncs.add(homeId);
     _connectivity.setSyncing();
     _updateState(_currentState.copyWith(
-      status: NetworkStatus.syncing,
+      syncStatus: SyncStatus.syncingPush,
       isSyncInProgress: true,
+      lastError: null,
     ));
 
     try {
       await _pushPendingOperationsForHome(homeId);
+
+      _updateState(_currentState.copyWith(
+        syncStatus: SyncStatus.syncingPull,
+      ));
+
       await _pullServerChanges(homeId);
 
       _updateState(_currentState.copyWith(
-        status: NetworkStatus.online,
+        syncStatus: SyncStatus.synced,
         lastSyncedAt: DateTime.now(),
         isSyncInProgress: false,
         lastError: null,
       ));
 
-      await _syncDao.cleanupSyncedOperations();
+      await _syncDao.cleanupOldSyncedOperations();
     } catch (e) {
       if (kDebugMode) print('[SyncEngine] Home sync failed: $e');
+      final isAuth = _isAuthError(e);
       _updateState(_currentState.copyWith(
-        status: _connectivity.isOnline
-            ? NetworkStatus.online
-            : NetworkStatus.offline,
+        syncStatus: isAuth
+            ? SyncStatus.authRequired
+            : (_connectivity.isOnline ? SyncStatus.error : SyncStatus.offline),
         isSyncInProgress: false,
-        lastError: e.toString(),
+        lastError: isAuth
+            ? 'Authentication required. Please sign in again.'
+            : e.toString(),
       ));
     } finally {
       _activeHomeSyncs.remove(homeId);
@@ -359,6 +414,11 @@ class SyncEngine {
 
         final pullResponse = SyncPullResponse.fromJson(data);
 
+        // Transition to reconciling before applying to local DB
+        _updateState(_currentState.copyWith(
+          syncStatus: SyncStatus.reconciling,
+        ));
+
         // Apply changes atomically to local database within a single SQLite transaction
         await _applyPullResponse(homeId, pullResponse);
 
@@ -523,6 +583,38 @@ class SyncEngine {
       );
     }).toList();
 
+    // Build home members
+    final homeMembers = pullResponse.homeMembers.map((json) {
+      return LocalHomeMembersCompanion(
+        id: Value(json['id'] as String? ?? json['userId'] as String? ?? ''),
+        homeId: Value(homeId),
+        userId: Value(json['userId'] as String? ?? ''),
+        fullName: Value(json['fullName'] as String? ?? ''),
+        email: Value(json['email'] as String? ?? ''),
+        avatarUrl: Value(json['avatarUrl'] as String?),
+        role: Value(json['role'] as String? ?? 'MEMBER'),
+        joinedAt: Value(json['joinedAt'] as String?),
+        updatedAt: Value(DateTime.now()),
+      );
+    }).toList();
+
+    // Build home details
+    LocalHomesCompanion? homeDetails;
+    if (pullResponse.homeDetails != null) {
+      final h = pullResponse.homeDetails!;
+      homeDetails = LocalHomesCompanion(
+        id: Value(h['id'] as String? ?? homeId),
+        name: Value(h['name'] as String? ?? ''),
+        inviteCode: Value(h['inviteCode'] as String? ?? ''),
+        currentUserRole: Value(h['currentUserRole'] as String? ?? 'MEMBER'),
+        memberCount: Value((h['memberCount'] as num?)?.toInt() ?? 1),
+        createdAt: Value(h['createdAt'] != null
+            ? DateTime.tryParse(h['createdAt'] as String)
+            : null),
+        updatedAt: Value(DateTime.now()),
+      );
+    }
+
     // Apply entire payload atomically within single transaction
     await _syncDao.applyPullChangesInTransaction(
       homeId: homeId,
@@ -534,10 +626,13 @@ class SyncEngine {
       purchases: purchases,
       purchaseItems: purchaseItems,
       stores: stores,
+      homeMembers: homeMembers,
+      homeDetails: homeDetails,
       deletedShoppingItemIds: pullResponse.deletedShoppingItemIds,
       deletedInventoryItemIds: pullResponse.deletedInventoryItemIds,
       deletedStoreIds: pullResponse.deletedStoreIds,
       deletedCategoryIds: pullResponse.deletedCategoryIds,
+      deletedMemberUserIds: pullResponse.deletedMemberUserIds,
       serverTimestamp: DateTime.tryParse(pullResponse.serverTimestamp) ?? DateTime.now(),
       nextServerVersion: pullResponse.nextServerVersion ?? pullResponse.serverVersion,
     );
@@ -596,6 +691,11 @@ class SyncEngine {
 
   /// Dispose all resources.
   void dispose() {
+    if (_isAutoSyncStarted) {
+      try {
+        WidgetsBinding.instance.removeObserver(this);
+      } catch (_) {}
+    }
     _retryTimer?.cancel();
     _stateController.close();
   }

@@ -36,12 +36,24 @@ class NotificationRouter {
               '[NotificationRouter] User not a member of home $homeId — aborting navigation');
           return;
         }
-        // Trigger sync for the newly active home
-        _ref.read(syncEngineProvider).syncHome(homeId);
+        // Await sync for the newly active home so remote items are present locally
+        await _ref.read(syncEngineProvider).syncHome(homeId);
       }
     }
 
-    // 2. Determine route based on entity type / action / notification type
+    // 2. If navigating to an inventory item, ensure it exists in local Drift DB; if not, sync first!
+    final effectiveHomeId = homeId ?? _ref.read(homeControllerProvider).activeHome?.id;
+    if (entityId != null && entityId.isNotEmpty && effectiveHomeId != null) {
+      final invDao = _ref.read(inventoryDaoProvider);
+      final localItem = await invDao.getItemById(entityId);
+      if (localItem == null) {
+        debugPrint(
+            '[NotificationRouter] Item $entityId not yet in local DB — pulling incremental updates for home $effectiveHomeId');
+        await _ref.read(syncEngineProvider).syncHome(effectiveHomeId);
+      }
+    }
+
+    // 3. Determine route based on entity type / action / notification type
     final route = _resolveRoute(
       entityId: entityId,
       entityType: entityType,

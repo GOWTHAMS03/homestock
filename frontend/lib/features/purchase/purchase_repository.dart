@@ -29,6 +29,7 @@ class PurchaseRepository {
   final ApiClient _apiClient;
   final SyncEngine _syncEngine;
   final ConnectivityMonitor? _connectivity;
+  final AppDatabase? _db;
 
   PurchaseRepository({
     required PurchaseDao purchaseDao,
@@ -37,12 +38,21 @@ class PurchaseRepository {
     required ApiClient apiClient,
     required SyncEngine syncEngine,
     ConnectivityMonitor? connectivity,
+    AppDatabase? database,
   })  : _purchaseDao = purchaseDao,
         _inventoryDao = inventoryDao,
         _syncDao = syncDao,
         _apiClient = apiClient,
         _syncEngine = syncEngine,
-        _connectivity = connectivity;
+        _connectivity = connectivity,
+        _db = database;
+
+  Future<T> _runInTransaction<T>(Future<T> Function() action) async {
+    if (_db != null) {
+      return _db.transaction(action);
+    }
+    return action();
+  }
 
   bool get isOnline => _connectivity?.isOnline ?? true;
 
@@ -133,106 +143,108 @@ class PurchaseRepository {
       ));
     }
 
-    // 1. Insert purchase + items locally (atomic)
-    await _purchaseDao.insertPurchaseWithItems(
-      purchase: purchaseCompanion,
-      items: itemCompanions,
-    );
+    await _runInTransaction(() async {
+      // 1. Insert purchase + items locally (atomic)
+      await _purchaseDao.insertPurchaseWithItems(
+        purchase: purchaseCompanion,
+        items: itemCompanions,
+      );
 
-    // 2. Create STOCK_IN transactions for linked inventory items (or find by name)
-    for (final rawItem in rawItems) {
-      String? invItemId = rawItem['inventoryItemId'] as String?;
-      final rawName = rawItem['itemName'] as String? ?? '';
-      LocalInventoryItem? current;
+      // 2. Create STOCK_IN transactions for linked inventory items (or find by name)
+      for (final rawItem in rawItems) {
+        String? invItemId = rawItem['inventoryItemId'] as String?;
+        final rawName = rawItem['itemName'] as String? ?? '';
+        LocalInventoryItem? current;
 
-      if (invItemId != null && invItemId.isNotEmpty) {
-        current = await _inventoryDao.getItemById(invItemId);
-      }
-      if (current == null && rawName.isNotEmpty) {
-        current = await _inventoryDao.findItemByName(homeId, rawName);
-        if (current != null) {
-          invItemId = current.id;
+        if (invItemId != null && invItemId.isNotEmpty) {
+          current = await _inventoryDao.getItemById(invItemId);
+        }
+        if (current == null && rawName.isNotEmpty) {
+          current = await _inventoryDao.findItemByName(homeId, rawName);
+          if (current != null) {
+            invItemId = current.id;
+          }
+        }
+
+        final rawQty = (rawItem['quantity'] as num?)?.toDouble() ?? 0.0;
+        if (rawQty > 0) {
+          if (current != null) {
+            final effectiveQty = _convertQuantity(
+              fromQty: rawQty,
+              fromUnit: rawItem['unit'] as String? ?? current.unit,
+              toUnit: current.unit,
+            );
+            final newQty = current.quantity + effectiveQty;
+            final stockStatus = newQty <= 0
+                ? 'OUT_OF_STOCK'
+                : newQty <= current.minimumQuantity
+                    ? 'LOW_STOCK'
+                    : 'IN_STOCK';
+            await _inventoryDao.updateLocalStock(
+                current.id, newQty, stockStatus);
+
+            // Record stock transaction
+            await _inventoryDao
+                .insertTransaction(LocalStockTransactionsCompanion(
+              id: Value(_uuid.v4()),
+              inventoryItemId: Value(current.id),
+              itemName: Value(current.name),
+              userName: const Value('You'),
+              transactionType: const Value('STOCK_IN'),
+              quantityChange: Value(effectiveQty),
+              previousQuantity: Value(current.quantity),
+              newQuantity: Value(newQty),
+              unit: Value(current.unit),
+              reason: const Value('Purchase restock'),
+              createdAt: Value(now.toIso8601String()),
+              isLocalOnly: const Value(true),
+            ));
+          } else if (rawName.isNotEmpty) {
+            // Auto-create inventory staple if user bought it and it's not yet in pantry
+            final newInvId = _uuid.v4();
+            await _inventoryDao.upsertItem(LocalInventoryItemsCompanion(
+              id: Value(newInvId),
+              homeId: Value(homeId),
+              name: Value(rawName),
+              categoryName: Value(rawItem['categoryName'] as String? ?? 'Other'),
+              quantity: Value(rawQty),
+              unit: Value(rawItem['unit'] as String? ?? 'pcs'),
+              minimumQuantity: const Value(1.0),
+              stockStatus: const Value('IN_STOCK'),
+              isLocalOnly: const Value(true),
+              isDeleted: const Value(false),
+              updatedAt: Value(now),
+            ));
+
+            await _inventoryDao.insertTransaction(LocalStockTransactionsCompanion(
+              id: Value(_uuid.v4()),
+              inventoryItemId: Value(newInvId),
+              itemName: Value(rawName),
+              userName: const Value('You'),
+              transactionType: const Value('STOCK_IN'),
+              quantityChange: Value(rawQty),
+              previousQuantity: const Value(0.0),
+              newQuantity: Value(rawQty),
+              unit: Value(rawItem['unit'] as String? ?? 'pcs'),
+              reason: const Value('Purchase restock (new item)'),
+              createdAt: Value(now.toIso8601String()),
+              isLocalOnly: const Value(true),
+            ));
+          }
         }
       }
 
-      final rawQty = (rawItem['quantity'] as num?)?.toDouble() ?? 0.0;
-      if (rawQty > 0) {
-        if (current != null) {
-          final effectiveQty = _convertQuantity(
-            fromQty: rawQty,
-            fromUnit: rawItem['unit'] as String? ?? current.unit,
-            toUnit: current.unit,
-          );
-          final newQty = current.quantity + effectiveQty;
-          final stockStatus = newQty <= 0
-              ? 'OUT_OF_STOCK'
-              : newQty <= current.minimumQuantity
-                  ? 'LOW_STOCK'
-                  : 'IN_STOCK';
-          await _inventoryDao.updateLocalStock(
-              current.id, newQty, stockStatus);
-
-          // Record stock transaction
-          await _inventoryDao
-              .insertTransaction(LocalStockTransactionsCompanion(
-            id: Value(_uuid.v4()),
-            inventoryItemId: Value(current.id),
-            itemName: Value(current.name),
-            userName: const Value('You'),
-            transactionType: const Value('STOCK_IN'),
-            quantityChange: Value(effectiveQty),
-            previousQuantity: Value(current.quantity),
-            newQuantity: Value(newQty),
-            unit: Value(current.unit),
-            reason: const Value('Purchase restock'),
-            createdAt: Value(now.toIso8601String()),
-            isLocalOnly: const Value(true),
-          ));
-        } else if (rawName.isNotEmpty) {
-          // Auto-create inventory staple if user bought it and it's not yet in pantry
-          final newInvId = _uuid.v4();
-          await _inventoryDao.upsertItem(LocalInventoryItemsCompanion(
-            id: Value(newInvId),
-            homeId: Value(homeId),
-            name: Value(rawName),
-            categoryName: Value(rawItem['categoryName'] as String? ?? 'Other'),
-            quantity: Value(rawQty),
-            unit: Value(rawItem['unit'] as String? ?? 'pcs'),
-            minimumQuantity: const Value(1.0),
-            stockStatus: const Value('IN_STOCK'),
-            isLocalOnly: const Value(true),
-            isDeleted: const Value(false),
-            updatedAt: Value(now),
-          ));
-
-          await _inventoryDao.insertTransaction(LocalStockTransactionsCompanion(
-            id: Value(_uuid.v4()),
-            inventoryItemId: Value(newInvId),
-            itemName: Value(rawName),
-            userName: const Value('You'),
-            transactionType: const Value('STOCK_IN'),
-            quantityChange: Value(rawQty),
-            previousQuantity: const Value(0.0),
-            newQuantity: Value(rawQty),
-            unit: Value(rawItem['unit'] as String? ?? 'pcs'),
-            reason: const Value('Purchase restock (new item)'),
-            createdAt: Value(now.toIso8601String()),
-            isLocalOnly: const Value(true),
-          ));
-        }
-      }
-    }
-
-    // 3. Enqueue single sync operation for the whole purchase (idempotent)
-    await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
-      operationId: Value(operationId),
-      operationType: const Value(SyncOperationType.recordPurchase),
-      entityType: const Value(SyncEntityType.purchase),
-      entityId: Value(purchaseId),
-      payload: Value(jsonEncode(data)),
-      createdAt: Value(now),
-      homeId: Value(homeId),
-    ));
+      // 3. Enqueue single sync operation for the whole purchase (idempotent)
+      await _syncDao.addToSyncQueue(SyncQueueEntriesCompanion(
+        operationId: Value(operationId),
+        operationType: const Value(SyncOperationType.recordPurchase),
+        entityType: const Value(SyncEntityType.purchase),
+        entityId: Value(purchaseId),
+        payload: Value(jsonEncode(data)),
+        createdAt: Value(now),
+        homeId: Value(homeId),
+      ));
+    });
 
     // 4. Background sync
     _syncEngine.trySyncImmediate();
