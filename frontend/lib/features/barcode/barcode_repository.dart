@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/household_staples.dart';
 import '../../core/database/app_database.dart';
 import '../../core/network/api_client.dart';
@@ -169,7 +170,7 @@ class BarcodeRepository {
     if (_connectivity.isOnline) {
       try {
         final response = await _apiClient.dio.get(
-          '/api/v1/products/barcode/$normalized',
+          ApiEndpoints.productBarcode(normalized),
           queryParameters: {'homeId': homeId},
         );
 
@@ -235,7 +236,7 @@ class BarcodeRepository {
     if (_connectivity.isOnline) {
       try {
         await _apiClient.dio.post(
-          '/api/v1/products',
+          ApiEndpoints.products,
           data: product.toJson(),
         );
       } catch (_) {}

@@ -10,13 +10,13 @@ import '../sync/sync_providers.dart';
 
 /// Shows an interactive server configuration dialog for switching between
 /// USB Cable (ADB reverse), Local Wi-Fi, and Emulator with 1-tap Auto-Detect.
-void showServerConfigDialog(BuildContext context, WidgetRef ref) {
+Future<void> showServerConfigDialog(BuildContext context, WidgetRef ref) {
   final controller = TextEditingController(text: ApiEndpoints.baseUrl);
   bool isTesting = false;
   String? testResult;
   bool? testSuccess;
 
-  showDialog(
+  return showDialog(
     context: context,
     builder: (dialogCtx) => StatefulBuilder(
       builder: (context, setDialogState) {

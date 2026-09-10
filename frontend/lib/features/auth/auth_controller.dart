@@ -1,7 +1,13 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/api_exceptions.dart';
 import '../../core/storage/cache_service.dart';
 import '../../core/storage/secure_storage_service.dart';
+import '../../core/sync/sync_providers.dart' show connectivityMonitorProvider;
+import '../../core/notifications/notification_service.dart';
+import '../../core/notifications/notification_providers.dart';
 import '../home_switcher/home_controller.dart';
 import 'auth_repository.dart';
 import 'auth_state.dart';
@@ -13,7 +19,8 @@ final secureStorageProvider = Provider<SecureStorageService>((ref) {
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(secureStorageProvider);
-  return ApiClient(secureStorage: storage);
+  final monitor = ref.watch(connectivityMonitorProvider);
+  return ApiClient(secureStorage: storage, connectivityMonitor: monitor);
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -107,9 +114,10 @@ class AuthController extends StateNotifier<AuthState> {
       final user = await _repo.login(email, password);
       state = state.copyWith(isLoading: false, isAuthenticated: true, user: user);
       _ref.read(homeControllerProvider.notifier).loadHomes();
+      _registerFcmToken();
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: _formatError(e));
       return false;
     }
   }
@@ -130,9 +138,10 @@ class AuthController extends StateNotifier<AuthState> {
       );
       state = state.copyWith(isLoading: false, isAuthenticated: true, user: user);
       _ref.read(homeControllerProvider.notifier).loadHomes();
+      _registerFcmToken();
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: _formatError(e));
       return false;
     }
   }
@@ -149,17 +158,58 @@ class AuthController extends StateNotifier<AuthState> {
       );
       state = state.copyWith(isLoading: false, isAuthenticated: true, user: user);
       await _ref.read(homeControllerProvider.notifier).loadHomes();
+      _registerFcmToken();
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: _formatError(e));
       return false;
     }
   }
 
+  String _formatError(dynamic e) {
+    if (e is DioException) {
+      if (e.error is ApiException) {
+        return (e.error as ApiException).message;
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        return 'Cannot reach server at ${ApiEndpoints.baseUrl}. Check Wi-Fi or tap Server Settings below.';
+      }
+      if (e.response?.data is Map && e.response?.data['message'] != null) {
+        return e.response!.data['message'].toString();
+      }
+    }
+    final str = e.toString();
+    if (str.startsWith('Exception: ')) {
+      return str.substring(11);
+    }
+    return str;
+  }
+
   Future<void> logout() async {
+    final token = NotificationService.instance.fcmToken;
+    if (token != null) {
+      try {
+        await _ref.read(notificationRepositoryProvider).deactivateDeviceToken(token);
+      } catch (_) {}
+    }
     await _repo.logout();
     _ref.read(homeControllerProvider.notifier).reset();
     state = const AuthState(isAuthenticated: false);
+  }
+
+  Future<void> _registerFcmToken() async {
+    final token = NotificationService.instance.fcmToken;
+    if (token != null) {
+      try {
+        await _ref.read(notificationRepositoryProvider).registerDeviceToken(
+          token: token,
+          platform: 'ANDROID',
+        );
+      } catch (_) {}
+    }
   }
 }
 

@@ -16,6 +16,7 @@ import com.homestock.modules.inventory.entity.TransactionType;
 import com.homestock.modules.inventory.repository.InventoryItemRepository;
 import com.homestock.modules.inventory.repository.StockTransactionRepository;
 import com.homestock.modules.shopping.service.ShoppingService;
+import com.homestock.modules.notification.service.NotificationEngine;
 import com.homestock.modules.user.entity.User;
 import com.homestock.modules.user.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -45,6 +46,7 @@ public class InventoryService {
     private final UserRepository userRepository;
     private final ShoppingService shoppingService;
     private final StorageService storageService;
+    private final NotificationEngine notificationEngine;
 
     @Transactional(readOnly = true)
     public PagedResponse<InventoryItemDto> getItems(
@@ -219,6 +221,7 @@ public class InventoryService {
                 .reason(request.getReason())
                 .build();
         stockTransactionRepository.save(tx);
+        notificationEngine.notifyStockUpdated(item.getHome(), currentUser, savedItem, change, item.getUnit());
 
         // Trigger automatic low stock evaluation
         if (newQty.compareTo(item.getMinimumQuantity()) <= 0) {

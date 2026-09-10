@@ -54,6 +54,18 @@ app:
       max-audio-duration-seconds: ${VOICE_MAX_AUDIO_DURATION_SECONDS:60}
     matching:
       confidence-threshold: ${VOICE_CONFIDENCE_THRESHOLD:0.80}
+  notifications:
+    firebase:
+      credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+    retention-days: ${NOTIFICATION_RETENTION_DAYS:90}
+    cooldown:
+      stock-hours: ${NOTIFICATION_STOCK_COOLDOWN_HOURS:24}
+      expiry-hours: ${NOTIFICATION_EXPIRY_COOLDOWN_HOURS:24}
+      smart-restock-hours: ${NOTIFICATION_RESTOCK_COOLDOWN_HOURS:72}
+    quiet-hours:
+      default-enabled: ${QUIET_HOURS_ENABLED:true}
+      default-start: ${QUIET_HOURS_START:22:00}
+      default-end: ${QUIET_HOURS_END:07:00}
 
 springdoc:
   api-docs:

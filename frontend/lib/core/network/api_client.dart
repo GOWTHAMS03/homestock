@@ -26,13 +26,13 @@ class ApiClient {
     _setupInterceptors();
     connectivityMonitor?.onServerUrlDiscovered = (discoveredUrl) {
       updateBaseUrl(discoveredUrl);
-      secureStorage.saveBaseUrl(discoveredUrl);
     };
   }
 
   void updateBaseUrl(String newBaseUrl) {
     dio.options.baseUrl = newBaseUrl;
     ApiEndpoints.setBaseUrl(newBaseUrl);
+    secureStorage.saveBaseUrl(newBaseUrl);
   }
 
   Future<Response<T>> get<T>(

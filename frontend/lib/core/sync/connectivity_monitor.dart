@@ -92,22 +92,21 @@ class ConnectivityMonitor {
 
       final port = uri.port > 0 ? uri.port : (uri.scheme == 'https' ? 443 : 80);
 
-      // Method 1: Ultra-fast TCP socket connect (typically <20ms on LAN/localhost)
+      // Method 1: Fast HTTP GET probe to /auth/ping to verify active Spring Boot API
       bool reachable = false;
       try {
-        final socket = await Socket.connect(uri.host, port, timeout: timeout);
-        socket.destroy();
-        reachable = true;
+        final client = HttpClient()..connectionTimeout = timeout;
+        final pingUri = Uri.parse('${ApiEndpoints.baseUrl}${ApiEndpoints.ping}');
+        final request = await client.getUrl(pingUri).timeout(timeout);
+        final response = await request.close().timeout(timeout);
+        reachable = response.statusCode == 200 || response.statusCode == 401;
+        client.close();
       } catch (_) {
-        // Socket failed, try HTTP GET fallback with remaining timeout
+        // Method 2: Fast TCP socket connect fallback
         try {
-          final client = HttpClient()..connectionTimeout = timeout;
-          final request = await client.getUrl(
-            Uri.parse('${ApiEndpoints.baseUrl}${ApiEndpoints.ping}'),
-          );
-          final response = await request.close().timeout(timeout);
-          reachable = response.statusCode == 200 || response.statusCode == 401;
-          client.close();
+          final socket = await Socket.connect(uri.host, port, timeout: timeout);
+          socket.destroy();
+          reachable = true;
         } catch (_) {
           reachable = false;
         }

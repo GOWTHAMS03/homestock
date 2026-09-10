@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/theme/theme_provider.dart' show isOnlineProvider;
 import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/server_config_dialog.dart';
@@ -86,6 +87,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
+    final isOnline = ref.watch(isOnlineProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
@@ -486,22 +488,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(50),
-                            border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+                            border: Border.all(
+                              color: isOnline
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                                  : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.dns_outlined, size: 14, color: AppColors.textMuted),
-                              const SizedBox(width: 6),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isOnline ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  'Server: ${ApiEndpoints.baseUrl}',
-                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                                  isOnline
+                                      ? 'Connected: ${ApiEndpoints.baseUrl}'
+                                      : 'Connecting / Offline: ${ApiEndpoints.baseUrl}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isOnline ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Icon(Icons.edit, size: 11, color: AppColors.textMuted),
+                              const Icon(Icons.settings_outlined, size: 12, color: AppColors.textMuted),
                             ],
                           ),
                         ),
@@ -517,7 +536,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  void _showServerConfigDialog() {
-    showServerConfigDialog(context, ref);
+  Future<void> _showServerConfigDialog() async {
+    await showServerConfigDialog(context, ref);
+    if (mounted) {
+      setState(() {});
+    }
   }
 }

@@ -91,42 +91,69 @@ public class LanDiscoveryService {
 
     /**
      * Dynamically determines the active local IPv4 address across any network interface
-     * (Home Wi-Fi, Office Wi-Fi, Mobile Hotspot, or Ethernet).
+     * (Home Wi-Fi, Office Wi-Fi, Mobile Hotspot, or Ethernet), explicitly filtering out
+     * virtual adapters like Hyper-V, WSL, and Docker.
      */
     public String getLocalIpAddress() {
         try {
-            // Method 1: Connected UDP socket query (inspects OS routing table for outgoing interface without sending data)
+            // Method 1: Connected UDP socket query (inspects OS routing table for outgoing interface)
             try (DatagramSocket s = new DatagramSocket()) {
                 s.connect(InetAddress.getByName("8.8.8.8"), 10002);
                 String ip = s.getLocalAddress().getHostAddress();
-                if (ip != null && !ip.equals("0.0.0.0") && !ip.equals("127.0.0.1")) {
+                if (ip != null && !ip.equals("0.0.0.0") && !ip.equals("127.0.0.1") && !isVirtualIp(ip)) {
                     return ip;
                 }
             } catch (Exception ignored) {
                 // Offline or route lookup failed, fall through to interface enumeration
             }
 
-            // Method 2: Scan all active network interfaces for private LAN IPv4 addresses
+            // Method 2: Scan all active physical network interfaces for private LAN IPv4 addresses
+            String preferredIp = null;
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             while (interfaces.hasMoreElements()) {
                 NetworkInterface iface = interfaces.nextElement();
-                if (iface.isLoopback() || !iface.isUp()) continue;
+                if (iface.isLoopback() || !iface.isUp() || isVirtualInterface(iface)) continue;
 
                 Enumeration<InetAddress> addresses = iface.getInetAddresses();
                 while (addresses.hasMoreElements()) {
                     InetAddress addr = addresses.nextElement();
                     if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
                         String host = addr.getHostAddress();
-                        if (host.startsWith("192.168.") || host.startsWith("172.") || host.startsWith("10.")) {
-                            return host;
+                        if (host.startsWith("192.168.")) {
+                            return host; // Highest priority for standard home Wi-Fi
+                        } else if ((host.startsWith("10.") || host.startsWith("172.")) && !isVirtualIp(host)) {
+                            if (preferredIp == null) {
+                                preferredIp = host;
+                            }
                         }
                     }
                 }
+            }
+            if (preferredIp != null) {
+                return preferredIp;
             }
         } catch (Exception e) {
             log.warn("[LanDiscoveryService] Error inspecting local IP addresses: {}", e.getMessage());
         }
         return "127.0.0.1";
+    }
+
+    private boolean isVirtualInterface(NetworkInterface iface) {
+        String name = (iface.getName() + " " + iface.getDisplayName()).toLowerCase();
+        return name.contains("virtual") ||
+               name.contains("hyper-v") ||
+               name.contains("vethernet") ||
+               name.contains("wsl") ||
+               name.contains("docker") ||
+               name.contains("vmware") ||
+               name.contains("host-only") ||
+               name.contains("teredo") ||
+               name.contains("pseudo");
+    }
+
+    private boolean isVirtualIp(String ip) {
+        // Exclude default Docker (172.17.x, 172.18.x) and typical WSL/Hyper-V subnets if identifiable
+        return ip.startsWith("169.254.");
     }
 
     @PreDestroy

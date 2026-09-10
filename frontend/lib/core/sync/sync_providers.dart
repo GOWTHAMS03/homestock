@@ -5,6 +5,7 @@ import '../database/daos/inventory_dao.dart';
 import '../database/daos/purchase_dao.dart';
 import '../database/daos/shopping_dao.dart';
 import '../database/daos/sync_dao.dart';
+import '../database/daos/notification_dao.dart';
 import 'connectivity_monitor.dart';
 import 'sync_engine.dart';
 import 'sync_status.dart';
@@ -48,6 +49,10 @@ final purchaseDaoProvider = Provider<PurchaseDao>((ref) {
 
 final syncDaoProvider = Provider<SyncDao>((ref) {
   return SyncDao(ref.watch(databaseProvider));
+});
+
+final notificationDaoProvider = Provider<NotificationDao>((ref) {
+  return NotificationDao(ref.watch(databaseProvider));
 });
 
 // ──── Sync State Providers ────

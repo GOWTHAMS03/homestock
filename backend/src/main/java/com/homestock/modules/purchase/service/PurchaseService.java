@@ -12,6 +12,7 @@ import com.homestock.modules.inventory.entity.StockTransaction;
 import com.homestock.modules.inventory.entity.TransactionType;
 import com.homestock.modules.inventory.repository.InventoryItemRepository;
 import com.homestock.modules.inventory.repository.StockTransactionRepository;
+import com.homestock.modules.notification.service.NotificationEngine;
 import com.homestock.modules.purchase.dto.CreatePurchaseItemRequest;
 import com.homestock.modules.purchase.dto.CreatePurchaseRequest;
 import com.homestock.modules.purchase.dto.PurchaseDto;
@@ -61,6 +62,7 @@ public class PurchaseService {
     private final ShoppingListRepository shoppingListRepository;
     private final ShoppingListItemRepository shoppingListItemRepository;
     private final com.homestock.modules.consumption.service.ConsumptionService consumptionService;
+    private final NotificationEngine notificationEngine;
 
     @Transactional
     public PurchaseDto recordPurchase(UUID homeId, CreatePurchaseRequest request) {
@@ -164,6 +166,8 @@ public class PurchaseService {
         savedPurchase.getItems().addAll(purchaseItems);
         log.info("Purchase of {} items recorded successfully for home '{}' by user '{}'",
                 purchaseItems.size(), home.getName(), currentUser.getFullName());
+
+        notificationEngine.notifyPurchaseRecorded(home, currentUser, savedPurchase);
 
         return PurchaseDto.fromEntity(savedPurchase);
     }

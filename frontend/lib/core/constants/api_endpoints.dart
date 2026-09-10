@@ -68,14 +68,27 @@ class ApiEndpoints {
   // Dashboard & Smart Recommendations
   static String dashboard(String homeId) => '/homes/$homeId/dashboard';
   static String whatDoINeed(String homeId) => '/homes/$homeId/dashboard/what-do-i-need';
+  static String homeInsights(String homeId) => '/homes/$homeId/insights';
+  static String returnSummary(String homeId) => '/homes/$homeId/return-summary';
+
+  // Products & Barcode
+  static String productBarcode(String barcode) => '/products/barcode/$barcode';
+  static const String products = '/products';
+  static String productById(String id) => '/products/$id';
+  static const String searchProducts = '/products/search';
+  static String productFromBarcode(String homeId) => '/homes/$homeId/inventory/from-barcode';
 
   // Analytics
   static String analytics(String homeId) => '/homes/$homeId/analytics';
 
   // Notifications
   static const String notifications = '/notifications';
+  static const String notificationUnreadCount = '/notifications/unread-count';
   static String readNotification(String id) => '/notifications/$id/read';
   static const String readAllNotifications = '/notifications/read-all';
+  static String deleteNotification(String id) => '/notifications/$id';
+  static const String notificationPreferences = '/notifications/preferences';
+  static const String notificationDeviceToken = '/notifications/device-tokens';
 
   // Smart Shopping — Price Comparison
   static String itemOffers(String homeId, String itemId) =>

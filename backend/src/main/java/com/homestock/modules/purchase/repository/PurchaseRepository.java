@@ -28,5 +28,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, UUID> {
             "GROUP BY p.store.name ORDER BY total DESC")
     List<Object[]> getSpendingByStore(@Param("homeId") UUID homeId);
 
+    @Query("SELECT COUNT(p) FROM Purchase p WHERE p.home.id = :homeId AND p.purchaseDate >= :startDate")
+    int countPurchasesSince(@Param("homeId") UUID homeId, @Param("startDate") LocalDate startDate);
+
     List<Purchase> findByHomeIdAndUpdatedAtAfter(UUID homeId, java.time.Instant since);
 }

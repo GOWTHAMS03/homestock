@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class ProductIconMapper {
   static const Map<String, IconData> _keyToIcon = {
     'rice': Icons.grain_rounded,
+    'grain': Icons.grain_rounded,
     'grains': Icons.grain_rounded,
     'dal': Icons.circle,
     'oil': Icons.opacity_rounded,
@@ -11,6 +12,8 @@ class ProductIconMapper {
     'spice': Icons.soup_kitchen_rounded,
     'condiment': Icons.dinner_dining_rounded,
     'fresh_produce': Icons.eco_rounded,
+    'fruit': Icons.eco_rounded,
+    'vegetable': Icons.eco_rounded,
     'dairy': Icons.egg_rounded,
     'beverage': Icons.local_cafe_rounded,
     'snacks': Icons.bakery_dining_rounded,
@@ -26,6 +29,7 @@ class ProductIconMapper {
 
   static const Map<String, String> _keyToEmoji = {
     'rice': '🌾',
+    'grain': '🌾',
     'grains': '🌾',
     'dal': '🥣',
     'oil': '🫒',
@@ -33,6 +37,8 @@ class ProductIconMapper {
     'spice': '🌶️',
     'condiment': '🥫',
     'fresh_produce': '🥬',
+    'fruit': '🍎',
+    'vegetable': '🥦',
     'dairy': '🥛',
     'beverage': '☕',
     'snacks': '🍪',

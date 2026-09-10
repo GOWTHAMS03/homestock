@@ -16,8 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
-@Component
-@RequiredArgsConstructor
+/**
+ * @deprecated Superceded by {@link com.homestock.modules.notification.scheduler.NotificationScheduler}
+ */
+@Deprecated
 public class ExpiryAlertScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ExpiryAlertScheduler.class);
@@ -26,9 +28,12 @@ public class ExpiryAlertScheduler {
     private final InventoryItemRepository inventoryItemRepository;
     private final NotificationService notificationService;
 
-    // Run every day at 8:00 AM (server time)
-    @Scheduled(cron = "${app.scheduler.expiry-cron:0 0 8 * * *}")
-    @Transactional
+    public ExpiryAlertScheduler(HomeRepository homeRepository, InventoryItemRepository inventoryItemRepository, NotificationService notificationService) {
+        this.homeRepository = homeRepository;
+        this.inventoryItemRepository = inventoryItemRepository;
+        this.notificationService = notificationService;
+    }
+
     public void checkExpiringItemsAndNotify() {
         log.info("Starting daily household expiry check...");
         LocalDate today = LocalDate.now();

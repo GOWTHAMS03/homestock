@@ -11,12 +11,14 @@ import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/inventory/inventory_screen.dart';
 import '../../features/inventory/item_detail_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
+import '../../features/notifications/notification_preferences_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/shopping/shopping_screen.dart';
 import '../widgets/splash_screen.dart';
 import 'main_scaffold.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+GlobalKey<NavigatorState> get rootNavigatorKey => _rootNavigatorKey;
 final _dashboardNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'dashboard');
 final _inventoryNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'inventory');
 final _shoppingNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shopping');
@@ -84,6 +86,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/notifications',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NotificationPreferencesScreen(),
       ),
       GoRoute(
         path: '/profile',

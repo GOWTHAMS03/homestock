@@ -10,7 +10,12 @@ import 'core/sync/connectivity_monitor.dart';
 import 'core/sync/sync_engine.dart';
 import 'core/sync/sync_providers.dart';
 import 'core/theme/theme_provider.dart';
+import 'features/auth/auth_controller.dart' show apiClientProvider, secureStorageProvider;
 import 'features/home_switcher/home_controller.dart';
+import 'core/notifications/notification_service.dart';
+import 'core/notifications/notification_providers.dart';
+import 'features/notifications/notification_controller.dart';
+import 'package:go_router/go_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,12 +60,25 @@ void main() async {
   // 7. Start auto-sync (listens to connectivity changes & retry queues)
   syncEngine.startAutoSync();
 
+  // 8. Initialize NotificationService
+  try {
+    await NotificationService.instance.initialize(
+      navigateCallback: (route) {
+        rootNavigatorKey.currentContext?.push(route);
+      },
+    );
+  } catch (e) {
+    debugPrint('[Main] NotificationService initialization warning: $e');
+  }
+
   runApp(
     ProviderScope(
       overrides: [
         cacheServiceProvider.overrideWithValue(cacheService),
+        secureStorageProvider.overrideWithValue(secureStorage),
         databaseProvider.overrideWithValue(database),
         connectivityMonitorProvider.overrideWithValue(connectivityMonitor),
+        apiClientProvider.overrideWithValue(apiClient),
         syncEngineProvider.overrideWithValue(syncEngine),
       ],
       child: const HomeStockApp(),
@@ -79,8 +97,15 @@ class _HomeStockAppState extends ConsumerState<HomeStockApp> {
   @override
   void initState() {
     super.initState();
-    // Pre-load homes on app boot
-    Future.microtask(() => ref.read(homeControllerProvider.notifier).loadHomes());
+    // Pre-load homes on app boot & run offline notification checks
+    Future.microtask(() async {
+      await ref.read(homeControllerProvider.notifier).loadHomes();
+      final activeHome = ref.read(homeControllerProvider).activeHome;
+      if (activeHome != null) {
+        await ref.read(localNotificationEngineProvider).scanInventory(activeHome.id);
+      }
+      ref.read(notificationControllerProvider.notifier).loadNotifications();
+    });
   }
 
   @override

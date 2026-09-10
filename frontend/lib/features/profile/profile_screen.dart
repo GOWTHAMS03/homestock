@@ -351,6 +351,13 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                   _buildDottedDivider(),
                   _buildListRow(
+                    icon: Icons.tune_rounded,
+                    title: 'Notification Preferences',
+                    subtitle: 'Quiet hours, alert types & permissions',
+                    onTap: () => context.push('/settings/notifications'),
+                  ),
+                  _buildDottedDivider(),
+                  _buildListRow(
                     icon: Icons.dns_outlined,
                     title: 'Server & Connection Settings',
                     subtitle: 'Switch between USB tunnel (127.0.0.1) & Wi-Fi',

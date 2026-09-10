@@ -254,7 +254,7 @@ class DashboardRepository {
   Future<HomeInsightModel?> getHomeInsights(String homeId) async {
     if (!_connectivity.isOnline) return null;
     try {
-      final response = await _apiClient.dio.get('/api/v1/homes/$homeId/insights');
+      final response = await _apiClient.dio.get(ApiEndpoints.homeInsights(homeId));
       if (response.data['data'] != null) {
         return HomeInsightModel.fromJson(response.data['data']);
       }
@@ -267,7 +267,10 @@ class DashboardRepository {
   Future<ReturnSummaryModel?> getReturnSummary(String homeId, {int daysAway = 7}) async {
     if (!_connectivity.isOnline) return null;
     try {
-      final response = await _apiClient.dio.get('/api/v1/homes/$homeId/return-summary', queryParameters: {'daysAway': daysAway});
+      final response = await _apiClient.dio.get(
+        ApiEndpoints.returnSummary(homeId),
+        queryParameters: {'daysAway': daysAway},
+      );
       if (response.data['data'] != null) {
         return ReturnSummaryModel.fromJson(response.data['data']);
       }

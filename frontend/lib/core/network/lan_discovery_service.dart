@@ -20,20 +20,16 @@ class LanDiscoveryService {
   static Future<String?> discoverServer({
     Duration timeout = const Duration(milliseconds: 2000),
   }) async {
-    // 1. Check USB ADB tunnel first (fastest, takes <50ms)
-    final usbResult = await _probeUrl(ApiEndpoints.usbAdbUrl, const Duration(milliseconds: 150));
-    if (usbResult != null) {
-      if (kDebugMode) print('[LanDiscovery] Connected via USB ADB reverse tunnel: $usbResult');
-      return usbResult;
+    // 1. Check all candidate URLs in priority order (baseUrl, USB ADB, current Wi-Fi, emulator, localhost)
+    for (final candidate in ApiEndpoints.candidateUrls) {
+      final verified = await _probeUrl(candidate, const Duration(milliseconds: 300));
+      if (verified != null) {
+        if (kDebugMode) print('[LanDiscovery] Connected to candidate URL: $verified');
+        return verified;
+      }
     }
 
-    // 2. Check current configured baseUrl
-    final currentConfigured = await _probeUrl(ApiEndpoints.baseUrl, const Duration(milliseconds: 300));
-    if (currentConfigured != null) {
-      return currentConfigured;
-    }
-
-    // 3. UDP Broadcast Discovery (receives backend's self-announced IP on this network)
+    // 2. UDP Broadcast Discovery (receives backend's self-announced IP on this network)
     final udpResult = await _discoverViaUdp(timeout: const Duration(milliseconds: 1000));
     if (udpResult != null) {
       final verified = await _probeUrl(udpResult, const Duration(milliseconds: 600));
@@ -43,17 +39,11 @@ class LanDiscoveryService {
       }
     }
 
-    // 4. Subnet Probing based on Phone's active Wi-Fi IP
+    // 3. Subnet Probing based on Phone's active Wi-Fi IP
     final subnetResult = await _probeLocalSubnet();
     if (subnetResult != null) {
       if (kDebugMode) print('[LanDiscovery] Found backend via Subnet scan: $subnetResult');
       return subnetResult;
-    }
-
-    // 5. Android Emulator loopback check
-    final emuResult = await _probeUrl(ApiEndpoints.emulatorUrl, const Duration(milliseconds: 200));
-    if (emuResult != null) {
-      return emuResult;
     }
 
     return null;
@@ -177,17 +167,37 @@ class LanDiscoveryService {
   }
 
   /// Probes whether a specific URL has port 8080 open and accepts TCP connections
+  /// Probes whether a specific URL has the HomeStock Spring Boot API active and responsive
   static Future<String?> _probeUrl(String url, Duration timeout) async {
     try {
       final uri = Uri.tryParse(url);
       if (uri == null || uri.host.isEmpty) return null;
       final port = uri.port > 0 ? uri.port : 8080;
 
-      final socket = await Socket.connect(uri.host, port, timeout: timeout);
-      socket.destroy();
-      return url;
-    } catch (_) {
-      return null;
-    }
+      // Fast TCP check first (sub-50ms fail-fast)
+      try {
+        final socket = await Socket.connect(uri.host, port, timeout: timeout);
+        socket.destroy();
+      } catch (_) {
+        return null;
+      }
+
+      // Verify HTTP /auth/ping to ensure it is genuinely the HomeStock backend
+      final cleanBase = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+      final probeEndpoint = cleanBase.endsWith('/api/v1')
+          ? '$cleanBase/auth/ping'
+          : '$cleanBase/api/v1/auth/ping';
+
+      final client = HttpClient()..connectionTimeout = timeout;
+      final req = await client.getUrl(Uri.parse(probeEndpoint)).timeout(timeout);
+      final resp = await req.close().timeout(timeout);
+      final isHealthy = resp.statusCode == 200 || resp.statusCode == 401;
+      client.close();
+
+      if (isHealthy) {
+        return cleanBase.endsWith('/api/v1') ? cleanBase : '$cleanBase/api/v1';
+      }
+    } catch (_) {}
+    return null;
   }
 }
