@@ -21,6 +21,9 @@ public interface ShoppingListItemRepository extends JpaRepository<ShoppingListIt
 
     long countByShoppingListIdAndIsCompletedFalse(UUID shoppingListId);
 
+    @Query("SELECT s FROM ShoppingListItem s WHERE s.shoppingList.id = :listId AND s.isCompleted = true")
+    List<ShoppingListItem> findAllCompletedByShoppingListId(@Param("listId") UUID listId);
+
     @Modifying
     @Query("DELETE FROM ShoppingListItem s WHERE s.shoppingList.id = :listId AND s.isCompleted = true")
     void deleteAllCompletedByShoppingListId(@Param("listId") UUID listId);

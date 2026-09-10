@@ -15,10 +15,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+
 @Repository
 public interface InventoryItemRepository extends JpaRepository<InventoryItem, UUID>, JpaSpecificationExecutor<InventoryItem> {
 
     Optional<InventoryItem> findByIdAndHomeId(UUID id, UUID homeId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM InventoryItem i WHERE i.id = :id AND i.home.id = :homeId")
+    Optional<InventoryItem> findWithLockByIdAndHomeId(@Param("id") UUID id, @Param("homeId") UUID homeId);
 
     List<InventoryItem> findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(UUID homeId);
 

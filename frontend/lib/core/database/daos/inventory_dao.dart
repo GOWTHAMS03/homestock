@@ -69,6 +69,16 @@ class InventoryDao {
         .getSingleOrNull();
   }
 
+  /// Get a single item by ID strictly within a home.
+  Future<LocalInventoryItem?> getItemByIdAndHome(String homeId, String id) {
+    return (_db.select(_db.localInventoryItems)
+          ..where((t) =>
+              t.id.equals(id) &
+              t.homeId.equals(homeId) &
+              t.isDeleted.equals(false)))
+        .getSingleOrNull();
+  }
+
   /// Get item by barcode for a home.
   Future<LocalInventoryItem?> getItemByBarcode(String homeId, String barcode) {
     return (_db.select(_db.localInventoryItems)
@@ -349,5 +359,12 @@ class InventoryDao {
     }).toList();
 
     await upsertCategories(companions);
+  }
+
+  /// Delete a category by ID (for remote deletions).
+  Future<void> deleteCategory(String categoryId) {
+    return (_db.delete(_db.localCategories)
+          ..where((t) => t.id.equals(categoryId)))
+        .go();
   }
 }

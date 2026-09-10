@@ -63,6 +63,7 @@ public class PurchaseService {
     private final ShoppingListItemRepository shoppingListItemRepository;
     private final com.homestock.modules.consumption.service.ConsumptionService consumptionService;
     private final NotificationEngine notificationEngine;
+    private final com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
 
     @Transactional
     public PurchaseDto recordPurchase(UUID homeId, CreatePurchaseRequest request) {
@@ -129,7 +130,8 @@ public class PurchaseService {
                     inventoryItem.setPurchasePrice(itemReq.getUnitPrice());
                 }
                 inventoryItem.setPurchaseDate(purchase.getPurchaseDate());
-                inventoryItemRepository.save(inventoryItem);
+                InventoryItem savedInv = inventoryItemRepository.save(inventoryItem);
+                homeChangeLogService.recordChange(home, "INVENTORY_ITEM", savedInv.getId(), "UPDATE", null, null);
 
                 String storeName = store != null ? store.getName() : "Purchase";
                 StockTransaction tx = StockTransaction.builder()
@@ -143,7 +145,8 @@ public class PurchaseService {
                         .unit(itemReq.getUnit())
                         .reason("Restocked via purchase at " + storeName)
                         .build();
-                stockTransactionRepository.save(tx);
+                StockTransaction savedTx = stockTransactionRepository.save(tx);
+                homeChangeLogService.recordChange(home, "STOCK_TRANSACTION", savedTx.getId(), "INSERT", null, null);
 
                 // 2. Mark related shopping list item as completed if it was on the list
                 if (defaultShoppingListOpt.isPresent()) {
@@ -152,7 +155,8 @@ public class PurchaseService {
                                 shoppingItem.setIsCompleted(true);
                                 shoppingItem.setCompletedBy(currentUser);
                                 shoppingItem.setCompletedAt(Instant.now());
-                                shoppingListItemRepository.save(shoppingItem);
+                                ShoppingListItem savedShop = shoppingListItemRepository.save(shoppingItem);
+                                homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", savedShop.getId(), "UPDATE", null, null);
                                 log.info("Auto-completed shopping item '{}' after purchase", shoppingItem.getItemName());
                             });
                 }
@@ -167,7 +171,9 @@ public class PurchaseService {
         log.info("Purchase of {} items recorded successfully for home '{}' by user '{}'",
                 purchaseItems.size(), home.getName(), currentUser.getFullName());
 
+        homeChangeLogService.recordChange(home, "PURCHASE", savedPurchase.getId(), "INSERT", null, null);
         notificationEngine.notifyPurchaseRecorded(home, currentUser, savedPurchase);
+        notificationEngine.notifyHomeChanged(home, currentUserId);
 
         return PurchaseDto.fromEntity(savedPurchase);
     }

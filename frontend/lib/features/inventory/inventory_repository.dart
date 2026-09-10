@@ -71,8 +71,18 @@ class InventoryRepository {
 
   /// Get a single item by ID (accepts itemId or (homeId, itemId) for compatibility).
   Future<InventoryItemModel?> getItemById(String first, [String? second]) async {
-    final itemId = second ?? first;
-    final row = await _inventoryDao.getItemById(itemId);
+    final String itemId;
+    final String? homeId;
+    if (second != null) {
+      homeId = first;
+      itemId = second;
+    } else {
+      homeId = null;
+      itemId = first;
+    }
+    final row = (homeId != null && homeId.isNotEmpty)
+        ? await _inventoryDao.getItemByIdAndHome(homeId, itemId)
+        : await _inventoryDao.getItemById(itemId);
     return row != null ? _toModel(row) : null;
   }
 

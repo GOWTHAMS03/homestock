@@ -99,6 +99,38 @@ class HomeController extends StateNotifier<HomeState> {
     state = state.copyWith(activeHome: home);
   }
 
+  /// Switch active home by ID string (for notification deep linking).
+  /// Returns the matched [HomeModel] if found, or null if not a member.
+  Future<HomeModel?> switchHomeById(String homeId) async {
+    // Already active
+    if (state.activeHome?.id == homeId) return state.activeHome;
+
+    // Find among known homes
+    final match = state.homes.cast<HomeModel?>().firstWhere(
+          (h) => h?.id == homeId,
+          orElse: () => null,
+        );
+    if (match != null) {
+      await switchHome(match);
+      return match;
+    }
+
+    // Home not in local cache — try refreshing from server
+    try {
+      await loadHomes();
+      final refreshed = state.homes.cast<HomeModel?>().firstWhere(
+            (h) => h?.id == homeId,
+            orElse: () => null,
+          );
+      if (refreshed != null) {
+        await switchHome(refreshed);
+        return refreshed;
+      }
+    } catch (_) {}
+
+    return null; // User is not a member of this home
+  }
+
   Future<bool> createHome(String name) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {

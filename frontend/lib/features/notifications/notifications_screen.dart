@@ -7,6 +7,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
+import '../../core/router/notification_router.dart';
 import '../home_switcher/home_controller.dart';
 import 'notification_controller.dart';
 import 'notification_model.dart';
@@ -413,15 +414,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   void _handleNotificationTap(NotificationModel notif) {
-    if (notif.targetItemId != null && notif.targetItemId!.isNotEmpty) {
-      context.push('/inventory/detail/${notif.targetItemId}');
-    } else if (notif.targetScreen == 'shopping' || notif.type == 'SHOPPING_LIST_UPDATE') {
-      context.push('/shopping');
-    } else if (notif.targetScreen == 'analytics' ||
-        notif.type == 'WEEKLY_INSIGHT' ||
-        notif.type == 'MONTHLY_REPORT') {
-      context.push('/analytics');
-    }
+    NotificationRouter(ref).routeNotificationModel(
+      context: context,
+      notif: notif,
+    );
   }
 
   _NotificationStyling _getNotificationStyling(String type) {

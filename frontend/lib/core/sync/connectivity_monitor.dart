@@ -199,8 +199,8 @@ class ConnectivityMonitor {
       final isCurrentlyOffline = _currentStatus == NetworkStatus.offline;
       await checkRealReachability(
         timeout: isCurrentlyOffline
-            ? const Duration(milliseconds: 500)
-            : const Duration(milliseconds: 1500),
+            ? const Duration(milliseconds: 2500)
+            : const Duration(milliseconds: 2500),
         allowDiscovery: !isCurrentlyOffline,
       );
     });

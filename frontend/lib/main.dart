@@ -66,6 +66,26 @@ void main() async {
       navigateCallback: (route) {
         rootNavigatorKey.currentContext?.push(route);
       },
+      silentSyncCallback: (homeId) {
+        syncEngine.syncHome(homeId);
+      },
+      payloadTapCallback: (payload) {
+        // Payload-based navigation will be handled by NotificationRouter
+        // at tap time within the widget tree (requires WidgetRef).
+        // This fallback uses the legacy route-string approach.
+        final entityId = payload['entityId']?.toString() ?? payload['itemId']?.toString();
+        final type = (payload['type']?.toString() ?? '').toUpperCase();
+        String route = '/notifications';
+        if (entityId != null && entityId.isNotEmpty &&
+            (type.contains('STOCK') || type.contains('EXPIR') || type == 'SMART_RESTOCK_SUGGESTION')) {
+          route = '/inventory/detail/$entityId';
+        } else if (type == 'SHOPPING_LIST_UPDATE') {
+          route = '/shopping';
+        } else if (type == 'WEEKLY_INSIGHT' || type == 'MONTHLY_REPORT') {
+          route = '/analytics';
+        }
+        rootNavigatorKey.currentContext?.push(route);
+      },
     );
   } catch (e) {
     debugPrint('[Main] NotificationService initialization warning: $e');

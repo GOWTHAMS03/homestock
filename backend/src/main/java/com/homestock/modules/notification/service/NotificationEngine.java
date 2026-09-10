@@ -75,7 +75,8 @@ public class NotificationEngine {
                 Duration effectiveCooldown = cooldown != null ? cooldown : Duration.ofHours(24);
 
                 boolean withinCooldown = dedup.getLastSentAt().plus(effectiveCooldown).isAfter(now);
-                boolean statusChanged = currentStatus != null && !currentStatus.equalsIgnoreCase(dedup.getLastStatus());
+                boolean statusChanged = currentStatus != null && dedup.getLastStatus() != null &&
+                        !currentStatus.equalsIgnoreCase(dedup.getLastStatus());
                 boolean qtyChangedSignificantly = currentQuantity != null && dedup.getLastQuantity() != null &&
                         currentQuantity.compareTo(dedup.getLastQuantity()) != 0;
 
@@ -432,6 +433,39 @@ public class NotificationEngine {
                 home, null, NotificationType.MONTHLY_REPORT, title, body, dedupKey,
                 Duration.ofDays(25), null, null, data
         );
+    }
+
+    /**
+     * Broadcast a lightweight realtime event to all other members of the home
+     * so their devices trigger an incremental sync.
+     */
+    public void notifyHomeChanged(Home home, UUID actorUserId) {
+        if (home == null) return;
+        List<HomeMember> members = homeMemberRepository.findAllByHomeId(home.getId());
+        List<UUID> recipientIds = new ArrayList<>();
+        for (HomeMember member : members) {
+            User u = member.getUser();
+            if (u != null && (actorUserId == null || !u.getId().equals(actorUserId))) {
+                recipientIds.add(u.getId());
+            }
+        }
+        if (!recipientIds.isEmpty()) {
+            List<DeviceToken> activeTokens = deviceTokenService.getActiveTokensForUsers(recipientIds);
+            if (!activeTokens.isEmpty()) {
+                Map<String, String> data = Map.of(
+                        "type", "HOME_CHANGED",
+                        "homeId", home.getId().toString()
+                );
+                firebaseNotificationProvider.sendPushNotification(
+                        activeTokens,
+                        NotificationType.SYSTEM,
+                        NotificationPriority.LOW,
+                        null,
+                        null,
+                        data
+                );
+            }
+        }
     }
 }
 

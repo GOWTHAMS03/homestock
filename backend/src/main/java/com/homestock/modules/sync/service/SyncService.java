@@ -10,6 +10,7 @@ import com.homestock.modules.home.repository.HomeRepository;
 import com.homestock.modules.inventory.entity.*;
 import com.homestock.modules.inventory.repository.InventoryItemRepository;
 import com.homestock.modules.inventory.repository.StockTransactionRepository;
+import com.homestock.modules.notification.service.NotificationEngine;
 import com.homestock.modules.purchase.entity.Purchase;
 import com.homestock.modules.purchase.entity.PurchaseItem;
 import com.homestock.modules.purchase.repository.PurchaseItemRepository;
@@ -22,6 +23,7 @@ import com.homestock.modules.shopping.service.ShoppingService;
 import com.homestock.modules.store.entity.Store;
 import com.homestock.modules.store.repository.StoreRepository;
 import com.homestock.modules.sync.dto.*;
+import com.homestock.modules.sync.entity.HomeChangeLog;
 import com.homestock.modules.sync.entity.ProcessedOperation;
 import com.homestock.modules.sync.repository.ProcessedOperationRepository;
 import com.homestock.modules.user.entity.User;
@@ -57,6 +59,8 @@ public class SyncService {
     private final ShoppingService shoppingService;
     private final ObjectMapper objectMapper;
     private final com.homestock.modules.consumption.service.ConsumptionService consumptionService;
+    private final HomeChangeLogService homeChangeLogService;
+    private final NotificationEngine notificationEngine;
 
     /**
      * Process batch of offline operations idempotently.
@@ -108,6 +112,7 @@ public class SyncService {
                         handleStockUpdate(op, home, currentUser, payload);
                 case "DELETE_ITEM" -> handleDeleteItem(op, home);
                 case "ADD_SHOPPING_ITEM" -> handleAddShoppingItem(op, home, currentUser, payload);
+                case "UPDATE_SHOPPING_ITEM" -> handleUpdateShoppingItem(op, currentUser, payload);
                 case "TOGGLE_SHOPPING_ITEM" -> handleToggleShoppingItem(op, currentUser, payload);
                 case "DELETE_SHOPPING_ITEM" -> handleDeleteShoppingItem(op);
                 case "RECORD_PURCHASE" -> handleRecordPurchase(op, home, currentUser, payload);
@@ -214,21 +219,27 @@ public class SyncService {
         }
 
         InventoryItem savedItem = inventoryItemRepository.save(item);
+        UUID effectiveItemId = savedItem != null && savedItem.getId() != null ? savedItem.getId() : (itemId != null ? itemId : UUID.randomUUID());
+
+        // Record change log
+        homeChangeLogService.recordChange(home, "INVENTORY_ITEM", effectiveItemId, "INSERT", serializePayload(payload), op.getOperationId());
 
         // Record initial stock transaction
         if (qty.compareTo(BigDecimal.ZERO) > 0) {
             StockTransaction tx = StockTransaction.builder()
                     .home(home)
-                    .item(savedItem)
+                    .item(savedItem != null ? savedItem : item)
                     .user(user)
                     .transactionType(TransactionType.STOCK_IN)
                     .quantityChange(qty)
                     .previousQuantity(BigDecimal.ZERO)
                     .newQuantity(qty)
-                    .unit(savedItem.getUnit())
+                    .unit(item.getUnit())
                     .reason("Initial offline stock addition")
                     .build();
-            stockTransactionRepository.save(tx);
+            StockTransaction savedTx = stockTransactionRepository.save(tx);
+            UUID effectiveTxId = savedTx != null && savedTx.getId() != null ? savedTx.getId() : UUID.randomUUID();
+            homeChangeLogService.recordChange(home, "STOCK_TRANSACTION", effectiveTxId, "INSERT", null, op.getOperationId());
         }
     }
 
@@ -284,17 +295,26 @@ public class SyncService {
             item.setCategory(category);
         }
 
-        inventoryItemRepository.save(item);
+        InventoryItem saved = inventoryItemRepository.save(item);
+        UUID effectiveId = saved != null && saved.getId() != null ? saved.getId() : item.getId();
+        homeChangeLogService.recordChange(home, "INVENTORY_ITEM", effectiveId, "UPDATE", serializePayload(payload), op.getOperationId());
     }
 
     /**
      * Delta-based stock update: applies the transaction delta (STOCK_IN, STOCK_OUT, etc.)
      * rather than absolute quantity overwrite!
+     * Concurrency-safe delta stock update using pessimistic write locking:
+     * Applies delta (STOCK_IN, STOCK_OUT) rather than absolute quantity overwrite!
      */
     private void handleStockUpdate(SyncOperationDto op, Home home, User user, Map<String, Object> payload) {
         if (op.getEntityId() == null) return;
         UUID itemId = UUID.fromString(op.getEntityId());
-        Optional<InventoryItem> optItem = inventoryItemRepository.findByIdAndHomeId(itemId, home.getId());
+
+        // Use pessimistic lock to serialize concurrent stock deltas safely
+        Optional<InventoryItem> optItem = inventoryItemRepository.findWithLockByIdAndHomeId(itemId, home.getId());
+        if (optItem.isEmpty()) {
+            optItem = inventoryItemRepository.findByIdAndHomeId(itemId, home.getId());
+        }
         if (optItem.isEmpty()) return;
 
         InventoryItem item = optItem.get();
@@ -329,10 +349,23 @@ public class SyncService {
                 .unit(item.getUnit())
                 .reason(payload.get("reason") != null ? payload.get("reason").toString() : "Offline sync update")
                 .build();
-        stockTransactionRepository.save(tx);
+        StockTransaction savedTx = stockTransactionRepository.save(tx);
+        UUID effectiveTxId = savedTx != null && savedTx.getId() != null ? savedTx.getId() : UUID.randomUUID();
+
+        // Record change log entries
+        homeChangeLogService.recordChange(home, "INVENTORY_ITEM", item.getId(), "UPDATE", serializePayload(payload), op.getOperationId());
+        homeChangeLogService.recordChange(home, "STOCK_TRANSACTION", effectiveTxId, "INSERT", null, op.getOperationId());
 
         // Recalculate consumption profile for the affected item
         consumptionService.recalculateForItem(home, item.getId());
+
+        // Family notification dispatch
+        notificationEngine.notifyStockUpdated(home, user, item, change, item.getUnit());
+        if (newQty.compareTo(BigDecimal.ZERO) == 0) {
+            notificationEngine.notifyOutOfStock(home, item, user);
+        } else if (newQty.compareTo(item.getMinimumQuantity()) <= 0) {
+            notificationEngine.notifyLowStock(home, item, user);
+        }
     }
 
     private void handleDeleteItem(SyncOperationDto op, Home home) {
@@ -341,6 +374,7 @@ public class SyncService {
         inventoryItemRepository.findByIdAndHomeId(itemId, home.getId()).ifPresent(item -> {
             item.setIsArchived(true);
             inventoryItemRepository.save(item);
+            homeChangeLogService.recordChange(home, "INVENTORY_ITEM", itemId, "DELETE", null, op.getOperationId());
         });
     }
 
@@ -382,7 +416,33 @@ public class SyncService {
             item.setId(itemId);
         }
 
-        shoppingListItemRepository.save(item);
+        ShoppingListItem saved = shoppingListItemRepository.save(item);
+        homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", saved.getId(), "INSERT", serializePayload(payload), op.getOperationId());
+
+        // Notify other family members
+        notificationEngine.notifyShoppingListUpdate(home, user, List.of(saved.getItemName()));
+    }
+
+    private void handleUpdateShoppingItem(SyncOperationDto op, User user, Map<String, Object> payload) {
+        if (op.getEntityId() == null) return;
+        UUID itemId = UUID.fromString(op.getEntityId());
+        shoppingListItemRepository.findById(itemId).ifPresent(item -> {
+            if (payload.containsKey("itemName") && payload.get("itemName") != null) {
+                item.setItemName(payload.get("itemName").toString().trim());
+            }
+            if (payload.containsKey("quantity") && payload.get("quantity") != null) {
+                item.setQuantity(toBigDecimal(payload.get("quantity"), item.getQuantity()));
+            }
+            if (payload.containsKey("unit") && payload.get("unit") != null) {
+                item.setUnit(payload.get("unit").toString().trim());
+            }
+            if (payload.containsKey("notes")) {
+                item.setNotes(payload.get("notes") != null ? payload.get("notes").toString() : null);
+            }
+            ShoppingListItem saved = shoppingListItemRepository.save(item);
+            Home home = saved.getShoppingList().getHome();
+            homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", saved.getId(), "UPDATE", serializePayload(payload), op.getOperationId());
+        });
     }
 
     private void handleToggleShoppingItem(SyncOperationDto op, User user, Map<String, Object> payload) {
@@ -395,14 +455,20 @@ public class SyncService {
             item.setIsCompleted(completed);
             item.setCompletedBy(completed ? user : null);
             item.setCompletedAt(completed ? Instant.now() : null);
-            shoppingListItemRepository.save(item);
+            ShoppingListItem saved = shoppingListItemRepository.save(item);
+            Home home = saved.getShoppingList().getHome();
+            homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", saved.getId(), "UPDATE", serializePayload(payload), op.getOperationId());
         });
     }
 
     private void handleDeleteShoppingItem(SyncOperationDto op) {
         if (op.getEntityId() == null) return;
         UUID itemId = UUID.fromString(op.getEntityId());
-        shoppingListItemRepository.deleteById(itemId);
+        shoppingListItemRepository.findById(itemId).ifPresent(item -> {
+            Home home = item.getShoppingList().getHome();
+            shoppingListItemRepository.delete(item);
+            homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", itemId, "DELETE", null, op.getOperationId());
+        });
     }
 
     private void handleRecordPurchase(SyncOperationDto op, Home home, User user, Map<String, Object> payload) {
@@ -440,6 +506,7 @@ public class SyncService {
         }
 
         Purchase savedPurchase = purchaseRepository.save(purchase);
+        homeChangeLogService.recordChange(home, "PURCHASE", savedPurchase.getId(), "INSERT", serializePayload(payload), op.getOperationId());
 
         // Process purchase items
         Object itemsRaw = payload.get("items");
@@ -490,7 +557,10 @@ public class SyncService {
                                 .unit(linkedItem.getUnit())
                                 .reason("Purchase restock")
                                 .build();
-                        stockTransactionRepository.save(tx);
+                        StockTransaction savedTx = stockTransactionRepository.save(tx);
+
+                        homeChangeLogService.recordChange(home, "INVENTORY_ITEM", linkedItem.getId(), "UPDATE", null, op.getOperationId());
+                        homeChangeLogService.recordChange(home, "STOCK_TRANSACTION", savedTx.getId(), "INSERT", null, op.getOperationId());
 
                         // Trigger consumption learning for the restocked item
                         consumptionService.onPurchaseRecorded(home, linkedItem, qty, savedPurchase.getPurchaseDate());
@@ -498,6 +568,9 @@ public class SyncService {
                 }
             }
         }
+
+        // Notify family members
+        notificationEngine.notifyPurchaseRecorded(home, user, savedPurchase);
     }
 
     private void handleConfirmStatus(SyncOperationDto op, Home home, Map<String, Object> payload) {
@@ -517,6 +590,7 @@ public class SyncService {
                     .action(actionStr)
                     .build();
             consumptionService.confirmStatus(itemId, req);
+            homeChangeLogService.recordChange(home, "INVENTORY_ITEM", itemId, "UPDATE", serializePayload(payload), op.getOperationId());
         } catch (Exception e) {
             log.warn("Failed to process CONFIRM_STATUS sync operation: {}", e.getMessage());
         }
@@ -533,6 +607,7 @@ public class SyncService {
                     .unit(unit)
                     .build();
             consumptionService.confirmQuantity(itemId, req);
+            homeChangeLogService.recordChange(home, "INVENTORY_ITEM", itemId, "UPDATE", serializePayload(payload), op.getOperationId());
         } catch (Exception e) {
             log.warn("Failed to process CONFIRM_QUANTITY sync operation: {}", e.getMessage());
         }
@@ -563,11 +638,17 @@ public class SyncService {
             store.setId(storeId);
         }
 
-        storeRepository.save(store);
+        Store savedStore = storeRepository.save(store);
+        UUID effectiveStoreId = savedStore != null && savedStore.getId() != null ? savedStore.getId() : (storeId != null ? storeId : UUID.randomUUID());
+        homeChangeLogService.recordChange(home, "STORE", effectiveStoreId, "INSERT", serializePayload(payload), op.getOperationId());
     }
 
     private void handleClearCompletedShopping(Home home) {
         ShoppingList list = shoppingService.getOrCreateDefaultListEntity(home);
+        List<ShoppingListItem> completed = shoppingListItemRepository.findAllCompletedByShoppingListId(list.getId());
+        for (ShoppingListItem item : completed) {
+            homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", item.getId(), "DELETE", null, null);
+        }
         shoppingListItemRepository.deleteAllCompletedByShoppingListId(list.getId());
     }
 
@@ -600,18 +681,76 @@ public class SyncService {
             category.setId(categoryId);
         }
 
-        categoryRepository.save(category);
+        Category saved = categoryRepository.save(category);
+        UUID effectiveCatId = saved != null && saved.getId() != null ? saved.getId() : (categoryId != null ? categoryId : UUID.randomUUID());
+        homeChangeLogService.recordChange(home, "CATEGORY", effectiveCatId, "INSERT", serializePayload(payload), op.getOperationId());
+    }
+
+    @Transactional(readOnly = true)
+    public SyncPullResponse pullChanges(UUID homeId, Instant since) {
+        return pullChanges(homeId, since, null, 500);
+    }
+
+    @Transactional(readOnly = true)
+    public SyncPullResponse pullChanges(UUID homeId, Instant since, Long sinceVersion) {
+        return pullChanges(homeId, since, sinceVersion, 500);
     }
 
     /**
-     * Pull incremental server changes since the given timestamp.
+     * Pull incremental server changes since the given timestamp or version cursor.
      */
     @Transactional(readOnly = true)
-    public SyncPullResponse pullChanges(UUID homeId, Instant since) {
+    public SyncPullResponse pullChanges(UUID homeId, Instant since, Long sinceVersion, Integer limit) {
         Instant serverTimestamp = Instant.now();
+        Long currentServerVersion = homeChangeLogService.getMaxVersion(homeId);
+
+        List<String> deletedShoppingItemIds = new ArrayList<>();
+        List<String> deletedInventoryItemIds = new ArrayList<>();
+        List<String> deletedStoreIds = new ArrayList<>();
+        List<String> deletedCategoryIds = new ArrayList<>();
+
+        int safeLimit = (limit != null && limit > 0) ? Math.min(limit, 1000) : 500;
+        Long nextServerVersion = currentServerVersion;
+        boolean hasMore = false;
+
+        Instant effectiveSince = since != null ? since : Instant.EPOCH;
+
+        if (sinceVersion != null && sinceVersion > 0) {
+            List<HomeChangeLog> changes = homeChangeLogService.getChangesSince(homeId, sinceVersion, safeLimit);
+            if (!changes.isEmpty()) {
+                long maxVerInBatch = changes.get(changes.size() - 1).getChangeVersion();
+                nextServerVersion = maxVerInBatch;
+                hasMore = maxVerInBatch < currentServerVersion;
+
+                // If since was not explicitly specified, use the earliest change's timestamp
+                if (since == null || since.equals(Instant.EPOCH)) {
+                    Instant firstCreated = changes.get(0).getCreatedAt();
+                    if (firstCreated != null) {
+                        effectiveSince = firstCreated.minusSeconds(1);
+                    }
+                }
+            } else {
+                nextServerVersion = currentServerVersion;
+                hasMore = false;
+            }
+
+            for (HomeChangeLog cl : changes) {
+                if ("DELETE".equalsIgnoreCase(cl.getOperationType())) {
+                    String idStr = cl.getEntityId() != null ? cl.getEntityId().toString() : "";
+                    if (!idStr.isEmpty()) {
+                        switch (cl.getEntityType()) {
+                            case "SHOPPING_LIST_ITEM" -> deletedShoppingItemIds.add(idStr);
+                            case "INVENTORY_ITEM" -> deletedInventoryItemIds.add(idStr);
+                            case "STORE" -> deletedStoreIds.add(idStr);
+                            case "CATEGORY" -> deletedCategoryIds.add(idStr);
+                        }
+                    }
+                }
+            }
+        }
 
         // 1. Categories
-        List<Category> categories = categoryRepository.findByHomeIdAndUpdatedAtAfter(homeId, since);
+        List<Category> categories = categoryRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
         List<Map<String, Object>> catMaps = categories.stream().map(c -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", c.getId().toString());
@@ -623,7 +762,7 @@ public class SyncService {
         }).toList();
 
         // 2. Inventory items
-        List<InventoryItem> items = inventoryItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, since);
+        List<InventoryItem> items = inventoryItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
         List<Map<String, Object>> itemMaps = items.stream().map(i -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", i.getId().toString());
@@ -651,7 +790,7 @@ public class SyncService {
         }).toList();
 
         // 3. Stock transactions
-        List<StockTransaction> transactions = stockTransactionRepository.findByHomeIdAndCreatedAtAfter(homeId, since);
+        List<StockTransaction> transactions = stockTransactionRepository.findByHomeIdAndCreatedAtAfter(homeId, effectiveSince);
         List<Map<String, Object>> txMaps = transactions.stream().map(t -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", t.getId().toString());
@@ -669,7 +808,7 @@ public class SyncService {
         }).toList();
 
         // 4. Shopping lists
-        List<ShoppingList> lists = shoppingListRepository.findByHomeIdAndUpdatedAtAfter(homeId, since);
+        List<ShoppingList> lists = shoppingListRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
         List<Map<String, Object>> listMaps = lists.stream().map(l -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", l.getId().toString());
@@ -679,7 +818,7 @@ public class SyncService {
         }).toList();
 
         // 5. Shopping list items
-        List<ShoppingListItem> shoppingItems = shoppingListItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, since);
+        List<ShoppingListItem> shoppingItems = shoppingListItemRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
         List<Map<String, Object>> shoppingItemMaps = shoppingItems.stream().map(s -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", s.getId().toString());
@@ -704,7 +843,7 @@ public class SyncService {
         }).toList();
 
         // 6. Purchases
-        List<Purchase> purchases = purchaseRepository.findByHomeIdAndUpdatedAtAfter(homeId, since);
+        List<Purchase> purchases = purchaseRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
         List<Map<String, Object>> purchaseMaps = purchases.stream().map(p -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", p.getId().toString());
@@ -716,7 +855,7 @@ public class SyncService {
         }).toList();
 
         // 7. Stores
-        List<Store> stores = storeRepository.findByHomeIdAndUpdatedAtAfter(homeId, since);
+        List<Store> stores = storeRepository.findByHomeIdAndUpdatedAtAfter(homeId, effectiveSince);
         List<Map<String, Object>> storeMaps = stores.stream().map(s -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", s.getId().toString());
@@ -734,7 +873,23 @@ public class SyncService {
                 .categories(catMaps)
                 .stores(storeMaps)
                 .serverTimestamp(serverTimestamp.toString())
+                .serverVersion(currentServerVersion)
+                .nextServerVersion(nextServerVersion)
+                .hasMore(hasMore)
+                .deletedShoppingItemIds(deletedShoppingItemIds)
+                .deletedInventoryItemIds(deletedInventoryItemIds)
+                .deletedStoreIds(deletedStoreIds)
+                .deletedCategoryIds(deletedCategoryIds)
                 .build();
+    }
+
+    private String serializePayload(Map<String, Object> payload) {
+        if (payload == null || payload.isEmpty()) return null;
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private BigDecimal toBigDecimal(Object value, BigDecimal defaultValue) {

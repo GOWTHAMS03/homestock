@@ -5,12 +5,13 @@ public enum PlatformType {
     IOS,
     WEB;
 
-    public static PlatformType fromString(String type) {
-        if (type == null) return ANDROID;
+    public static PlatformType fromString(String value) {
+        if (value == null) return ANDROID;
         try {
-            return PlatformType.valueOf(type.toUpperCase().trim());
-        } catch (Exception e) {
+            return PlatformType.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
             return ANDROID;
         }
     }
 }
+

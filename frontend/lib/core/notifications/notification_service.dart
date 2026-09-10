@@ -25,6 +25,14 @@ class NotificationService {
   Function(String route)? onNavigate;
   Function(String token)? onTokenRegistered;
 
+  /// Called when a HOME_CHANGED silent data push arrives.
+  /// The callback receives the homeId to sync.
+  Function(String homeId)? onSilentSyncTriggered;
+
+  /// Called when a notification is tapped (foreground, background, terminated).
+  /// Receives the raw payload map for the NotificationRouter to handle.
+  Function(Map<String, dynamic> payload)? onPayloadTapped;
+
   // Android Notification Channels
   static const String channelImportant = 'home_stock_important';
   static const String channelGeneral = 'home_stock_general';
@@ -62,11 +70,15 @@ class NotificationService {
   Future<void> initialize({
     Function(String route)? navigateCallback,
     Function(String token)? tokenCallback,
+    Function(String homeId)? silentSyncCallback,
+    Function(Map<String, dynamic> payload)? payloadTapCallback,
   }) async {
     if (_isInitialized) return;
 
     onNavigate = navigateCallback;
     onTokenRegistered = tokenCallback;
+    onSilentSyncTriggered = silentSyncCallback;
+    onPayloadTapped = payloadTapCallback;
 
     try {
       tz.initializeTimeZones();
@@ -318,9 +330,20 @@ class NotificationService {
 
   void _showForegroundFcmNotification(RemoteMessage message) {
     final notification = message.notification;
+    final type = message.data['type']?.toString().toUpperCase() ?? 'SYSTEM';
+
+    // Handle silent HOME_CHANGED push — trigger sync, don't show notification
+    if (type == 'HOME_CHANGED' || type == 'SILENT_SYNC') {
+      final homeId = message.data['homeId']?.toString();
+      if (homeId != null && homeId.isNotEmpty) {
+        debugPrint('[NotificationService] Silent sync trigger for home: $homeId');
+        onSilentSyncTriggered?.call(homeId);
+      }
+      return;
+    }
+
     final title = notification?.title ?? message.data['title'] ?? 'HomeStock';
     final body = notification?.body ?? message.data['body'] ?? '';
-    final type = message.data['type']?.toString().toUpperCase() ?? 'SYSTEM';
 
     String channel = channelGeneral;
     if (type.contains('STOCK') || type.contains('EXPIR')) {
@@ -342,6 +365,23 @@ class NotificationService {
   }
 
   void _handleFcmData(Map<String, dynamic> data) {
+    // Handle silent sync data-only messages
+    final type = data['type']?.toString().toUpperCase() ?? '';
+    if (type == 'HOME_CHANGED' || type == 'SILENT_SYNC') {
+      final homeId = data['homeId']?.toString();
+      if (homeId != null && homeId.isNotEmpty) {
+        onSilentSyncTriggered?.call(homeId);
+      }
+      return;
+    }
+
+    // Prefer structured payload routing via NotificationRouter
+    if (onPayloadTapped != null) {
+      onPayloadTapped!(data);
+      return;
+    }
+
+    // Legacy fallback
     final payload = jsonEncode(data);
     _handlePayload(payload);
   }
@@ -354,7 +394,15 @@ class NotificationService {
 
     try {
       final map = jsonDecode(payload) as Map<String, dynamic>;
-      final itemId = map['itemId']?.toString();
+
+      // Prefer structured payload routing
+      if (onPayloadTapped != null) {
+        onPayloadTapped!(map);
+        return;
+      }
+
+      // Legacy route-string fallback
+      final itemId = map['entityId']?.toString() ?? map['itemId']?.toString();
       final screen = map['screen']?.toString();
 
       if (itemId != null && itemId.isNotEmpty) {

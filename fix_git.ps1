@@ -42,3 +42,4 @@ Write-Host ""
 Write-Host "========================================================" -ForegroundColor Green
 Write-Host "  Git repository is healthy and ready!" -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Green
+

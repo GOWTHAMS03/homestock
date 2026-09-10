@@ -147,8 +147,6 @@ class NotificationEngineTest {
         NotificationDeduplication activeCooldown = NotificationDeduplication.builder()
                 .dedupKey("OUT_OF_STOCK:" + testHome.getId() + ":" + testItem.getId())
                 .lastSentAt(Instant.now().minusSeconds(60)) // 1 minute ago
-                .lastStatus("OUT_OF_STOCK")
-                .lastQuantity(BigDecimal.ZERO)
                 .build();
 
         when(deduplicationRepository.findByDedupKey(anyString()))
@@ -177,3 +175,4 @@ class NotificationEngineTest {
         assertThat(notifCaptor.getValue().getUser().getId()).isEqualTo(user2.getId());
     }
 }
+

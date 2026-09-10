@@ -27,9 +27,17 @@ class MockNotificationService implements NotificationService {
   Function(String p1)? onTokenRegistered;
 
   @override
+  Function(String homeId)? onSilentSyncTriggered;
+
+  @override
+  Function(Map<String, dynamic> payload)? onPayloadTapped;
+
+  @override
   Future<void> initialize({
     Function(String route)? navigateCallback,
     Function(String token)? tokenCallback,
+    Function(String homeId)? silentSyncCallback,
+    Function(Map<String, dynamic> payload)? payloadTapCallback,
   }) async {}
 
   @override

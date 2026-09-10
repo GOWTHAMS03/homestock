@@ -153,8 +153,11 @@ class LocalNotificationEngine {
     final payloadMap = {
       'id': notifId,
       'itemId': itemId,
+      'entityId': itemId,
       'homeId': homeId,
       'type': type,
+      'entityType': 'INVENTORY_ITEM',
+      'action': type,
       'screen': 'inventory_detail',
     };
     final payloadString = jsonEncode(payloadMap);
@@ -165,6 +168,10 @@ class LocalNotificationEngine {
         LocalNotificationsCompanion(
           id: drift.Value(notifId),
           userId: drift.Value(userId),
+          homeId: drift.Value(homeId),
+          entityId: drift.Value(itemId),
+          entityType: const drift.Value('INVENTORY_ITEM'),
+          action: drift.Value(type),
           title: drift.Value(title),
           message: drift.Value(body),
           type: drift.Value(type),

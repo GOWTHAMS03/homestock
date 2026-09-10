@@ -59,6 +59,9 @@ class NotificationModel {
   final String title;
   final String body;
   final String? payloadJson;
+  final String? entityId;
+  final String? entityType;
+  final String? action;
   final bool isRead;
   final String createdAt;
   final String? readAt;
@@ -71,6 +74,9 @@ class NotificationModel {
     required this.title,
     required this.body,
     this.payloadJson,
+    this.entityId,
+    this.entityType,
+    this.action,
     required this.isRead,
     required this.createdAt,
     this.readAt,
@@ -88,19 +94,35 @@ class NotificationModel {
     }
   }
 
-  String? get targetItemId => payload['itemId']?.toString();
+  String? get targetItemId =>
+      entityId ?? payload['entityId']?.toString() ?? payload['itemId']?.toString();
   String? get targetShoppingListId => payload['shoppingListId']?.toString();
-  String? get targetScreen => payload['screen']?.toString();
+  String? get targetScreen => action ?? payload['action']?.toString() ?? payload['screen']?.toString();
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    final payloadObj = json['payload'] ?? json['data'];
+    String? payloadStr = json['payloadJson']?.toString();
+    if (payloadStr == null && payloadObj != null) {
+      if (payloadObj is String) {
+        payloadStr = payloadObj;
+      } else {
+        try {
+          payloadStr = jsonEncode(payloadObj);
+        } catch (_) {}
+      }
+    }
+
     return NotificationModel(
       id: json['id']?.toString() ?? '',
       homeId: json['homeId']?.toString() ?? '',
       type: json['type']?.toString() ?? 'SYSTEM',
       priority: json['priority']?.toString() ?? 'MEDIUM',
       title: json['title']?.toString() ?? '',
-      body: json['body']?.toString() ?? '',
-      payloadJson: json['payloadJson']?.toString(),
+      body: json['body']?.toString() ?? json['message']?.toString() ?? '',
+      payloadJson: payloadStr,
+      entityId: json['entityId']?.toString(),
+      entityType: json['entityType']?.toString(),
+      action: json['action']?.toString(),
       isRead: json['isRead'] == true,
       createdAt: json['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
       readAt: json['readAt']?.toString(),
@@ -116,6 +138,9 @@ class NotificationModel {
       'title': title,
       'body': body,
       'payloadJson': payloadJson,
+      'entityId': entityId,
+      'entityType': entityType,
+      'action': action,
       'isRead': isRead,
       'createdAt': createdAt,
       'readAt': readAt,
@@ -126,11 +151,14 @@ class NotificationModel {
   factory NotificationModel.fromLocal(LocalNotification row) {
     return NotificationModel(
       id: row.id,
-      homeId: '',
+      homeId: row.homeId,
       type: row.type ?? 'SYSTEM',
       priority: 'MEDIUM',
       title: row.title,
       body: row.message,
+      entityId: row.entityId,
+      entityType: row.entityType,
+      action: row.action,
       isRead: row.isRead,
       createdAt: row.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
     );
@@ -141,9 +169,13 @@ class NotificationModel {
     return LocalNotificationsCompanion(
       id: drift.Value(id),
       userId: drift.Value(userId),
+      homeId: drift.Value(homeId),
       title: drift.Value(title),
       message: drift.Value(body),
       type: drift.Value(type),
+      entityId: drift.Value(entityId ?? targetItemId),
+      entityType: drift.Value(entityType ?? payload['entityType']?.toString()),
+      action: drift.Value(action ?? targetScreen),
       isRead: drift.Value(isRead),
       createdAt: drift.Value(DateTime.tryParse(createdAt) ?? DateTime.now()),
     );
@@ -157,6 +189,9 @@ class NotificationModel {
     String? title,
     String? body,
     String? payloadJson,
+    String? entityId,
+    String? entityType,
+    String? action,
     bool? isRead,
     String? createdAt,
     String? readAt,
@@ -169,6 +204,9 @@ class NotificationModel {
       title: title ?? this.title,
       body: body ?? this.body,
       payloadJson: payloadJson ?? this.payloadJson,
+      entityId: entityId ?? this.entityId,
+      entityType: entityType ?? this.entityType,
+      action: action ?? this.action,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       readAt: readAt ?? this.readAt,

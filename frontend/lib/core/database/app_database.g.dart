@@ -4999,6 +4999,16 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _homeIdMeta = const VerificationMeta('homeId');
+  @override
+  late final GeneratedColumn<String> homeId = GeneratedColumn<String>(
+    'home_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _inventoryItemIdMeta = const VerificationMeta(
     'inventoryItemId',
   );
@@ -5218,6 +5228,7 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
   List<GeneratedColumn> get $columns => [
     id,
     shoppingListId,
+    homeId,
     inventoryItemId,
     itemName,
     categoryName,
@@ -5264,6 +5275,12 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
       );
     } else if (isInserting) {
       context.missing(_shoppingListIdMeta);
+    }
+    if (data.containsKey('home_id')) {
+      context.handle(
+        _homeIdMeta,
+        homeId.isAcceptableOrUnknown(data['home_id']!, _homeIdMeta),
+      );
     }
     if (data.containsKey('inventory_item_id')) {
       context.handle(
@@ -5422,6 +5439,10 @@ class $LocalShoppingListItemsTable extends LocalShoppingListItems
         DriftSqlType.string,
         data['${effectivePrefix}shopping_list_id'],
       )!,
+      homeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}home_id'],
+      )!,
       inventoryItemId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}inventory_item_id'],
@@ -5507,6 +5528,7 @@ class LocalShoppingListItem extends DataClass
     implements Insertable<LocalShoppingListItem> {
   final String id;
   final String shoppingListId;
+  final String homeId;
   final String? inventoryItemId;
   final String itemName;
   final String? categoryName;
@@ -5528,6 +5550,7 @@ class LocalShoppingListItem extends DataClass
   const LocalShoppingListItem({
     required this.id,
     required this.shoppingListId,
+    required this.homeId,
     this.inventoryItemId,
     required this.itemName,
     this.categoryName,
@@ -5552,6 +5575,7 @@ class LocalShoppingListItem extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['shopping_list_id'] = Variable<String>(shoppingListId);
+    map['home_id'] = Variable<String>(homeId);
     if (!nullToAbsent || inventoryItemId != null) {
       map['inventory_item_id'] = Variable<String>(inventoryItemId);
     }
@@ -5593,6 +5617,7 @@ class LocalShoppingListItem extends DataClass
     return LocalShoppingListItemsCompanion(
       id: Value(id),
       shoppingListId: Value(shoppingListId),
+      homeId: Value(homeId),
       inventoryItemId: inventoryItemId == null && nullToAbsent
           ? const Value.absent()
           : Value(inventoryItemId),
@@ -5638,6 +5663,7 @@ class LocalShoppingListItem extends DataClass
     return LocalShoppingListItem(
       id: serializer.fromJson<String>(json['id']),
       shoppingListId: serializer.fromJson<String>(json['shoppingListId']),
+      homeId: serializer.fromJson<String>(json['homeId']),
       inventoryItemId: serializer.fromJson<String?>(json['inventoryItemId']),
       itemName: serializer.fromJson<String>(json['itemName']),
       categoryName: serializer.fromJson<String?>(json['categoryName']),
@@ -5664,6 +5690,7 @@ class LocalShoppingListItem extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'shoppingListId': serializer.toJson<String>(shoppingListId),
+      'homeId': serializer.toJson<String>(homeId),
       'inventoryItemId': serializer.toJson<String?>(inventoryItemId),
       'itemName': serializer.toJson<String>(itemName),
       'categoryName': serializer.toJson<String?>(categoryName),
@@ -5688,6 +5715,7 @@ class LocalShoppingListItem extends DataClass
   LocalShoppingListItem copyWith({
     String? id,
     String? shoppingListId,
+    String? homeId,
     Value<String?> inventoryItemId = const Value.absent(),
     String? itemName,
     Value<String?> categoryName = const Value.absent(),
@@ -5709,6 +5737,7 @@ class LocalShoppingListItem extends DataClass
   }) => LocalShoppingListItem(
     id: id ?? this.id,
     shoppingListId: shoppingListId ?? this.shoppingListId,
+    homeId: homeId ?? this.homeId,
     inventoryItemId: inventoryItemId.present
         ? inventoryItemId.value
         : this.inventoryItemId,
@@ -5740,6 +5769,7 @@ class LocalShoppingListItem extends DataClass
       shoppingListId: data.shoppingListId.present
           ? data.shoppingListId.value
           : this.shoppingListId,
+      homeId: data.homeId.present ? data.homeId.value : this.homeId,
       inventoryItemId: data.inventoryItemId.present
           ? data.inventoryItemId.value
           : this.inventoryItemId,
@@ -5786,6 +5816,7 @@ class LocalShoppingListItem extends DataClass
     return (StringBuffer('LocalShoppingListItem(')
           ..write('id: $id, ')
           ..write('shoppingListId: $shoppingListId, ')
+          ..write('homeId: $homeId, ')
           ..write('inventoryItemId: $inventoryItemId, ')
           ..write('itemName: $itemName, ')
           ..write('categoryName: $categoryName, ')
@@ -5809,9 +5840,10 @@ class LocalShoppingListItem extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     shoppingListId,
+    homeId,
     inventoryItemId,
     itemName,
     categoryName,
@@ -5830,13 +5862,14 @@ class LocalShoppingListItem extends DataClass
     isLocalOnly,
     isDeleted,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LocalShoppingListItem &&
           other.id == this.id &&
           other.shoppingListId == this.shoppingListId &&
+          other.homeId == this.homeId &&
           other.inventoryItemId == this.inventoryItemId &&
           other.itemName == this.itemName &&
           other.categoryName == this.categoryName &&
@@ -5861,6 +5894,7 @@ class LocalShoppingListItemsCompanion
     extends UpdateCompanion<LocalShoppingListItem> {
   final Value<String> id;
   final Value<String> shoppingListId;
+  final Value<String> homeId;
   final Value<String?> inventoryItemId;
   final Value<String> itemName;
   final Value<String?> categoryName;
@@ -5883,6 +5917,7 @@ class LocalShoppingListItemsCompanion
   const LocalShoppingListItemsCompanion({
     this.id = const Value.absent(),
     this.shoppingListId = const Value.absent(),
+    this.homeId = const Value.absent(),
     this.inventoryItemId = const Value.absent(),
     this.itemName = const Value.absent(),
     this.categoryName = const Value.absent(),
@@ -5906,6 +5941,7 @@ class LocalShoppingListItemsCompanion
   LocalShoppingListItemsCompanion.insert({
     required String id,
     required String shoppingListId,
+    this.homeId = const Value.absent(),
     this.inventoryItemId = const Value.absent(),
     required String itemName,
     this.categoryName = const Value.absent(),
@@ -5931,6 +5967,7 @@ class LocalShoppingListItemsCompanion
   static Insertable<LocalShoppingListItem> custom({
     Expression<String>? id,
     Expression<String>? shoppingListId,
+    Expression<String>? homeId,
     Expression<String>? inventoryItemId,
     Expression<String>? itemName,
     Expression<String>? categoryName,
@@ -5954,6 +5991,7 @@ class LocalShoppingListItemsCompanion
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (shoppingListId != null) 'shopping_list_id': shoppingListId,
+      if (homeId != null) 'home_id': homeId,
       if (inventoryItemId != null) 'inventory_item_id': inventoryItemId,
       if (itemName != null) 'item_name': itemName,
       if (categoryName != null) 'category_name': categoryName,
@@ -5979,6 +6017,7 @@ class LocalShoppingListItemsCompanion
   LocalShoppingListItemsCompanion copyWith({
     Value<String>? id,
     Value<String>? shoppingListId,
+    Value<String>? homeId,
     Value<String?>? inventoryItemId,
     Value<String>? itemName,
     Value<String?>? categoryName,
@@ -6002,6 +6041,7 @@ class LocalShoppingListItemsCompanion
     return LocalShoppingListItemsCompanion(
       id: id ?? this.id,
       shoppingListId: shoppingListId ?? this.shoppingListId,
+      homeId: homeId ?? this.homeId,
       inventoryItemId: inventoryItemId ?? this.inventoryItemId,
       itemName: itemName ?? this.itemName,
       categoryName: categoryName ?? this.categoryName,
@@ -6032,6 +6072,9 @@ class LocalShoppingListItemsCompanion
     }
     if (shoppingListId.present) {
       map['shopping_list_id'] = Variable<String>(shoppingListId.value);
+    }
+    if (homeId.present) {
+      map['home_id'] = Variable<String>(homeId.value);
     }
     if (inventoryItemId.present) {
       map['inventory_item_id'] = Variable<String>(inventoryItemId.value);
@@ -6098,6 +6141,7 @@ class LocalShoppingListItemsCompanion
     return (StringBuffer('LocalShoppingListItemsCompanion(')
           ..write('id: $id, ')
           ..write('shoppingListId: $shoppingListId, ')
+          ..write('homeId: $homeId, ')
           ..write('inventoryItemId: $inventoryItemId, ')
           ..write('itemName: $itemName, ')
           ..write('categoryName: $categoryName, ')
@@ -7806,6 +7850,16 @@ class $LocalNotificationsTable extends LocalNotifications
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _homeIdMeta = const VerificationMeta('homeId');
+  @override
+  late final GeneratedColumn<String> homeId = GeneratedColumn<String>(
+    'home_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
   late final GeneratedColumn<String> title = GeneratedColumn<String>(
@@ -7830,6 +7884,37 @@ class $LocalNotificationsTable extends LocalNotifications
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
     'type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _entityIdMeta = const VerificationMeta(
+    'entityId',
+  );
+  @override
+  late final GeneratedColumn<String> entityId = GeneratedColumn<String>(
+    'entity_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _entityTypeMeta = const VerificationMeta(
+    'entityType',
+  );
+  @override
+  late final GeneratedColumn<String> entityType = GeneratedColumn<String>(
+    'entity_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _actionMeta = const VerificationMeta('action');
+  @override
+  late final GeneratedColumn<String> action = GeneratedColumn<String>(
+    'action',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -7863,9 +7948,13 @@ class $LocalNotificationsTable extends LocalNotifications
   List<GeneratedColumn> get $columns => [
     id,
     userId,
+    homeId,
     title,
     message,
     type,
+    entityId,
+    entityType,
+    action,
     isRead,
     createdAt,
   ];
@@ -7894,6 +7983,12 @@ class $LocalNotificationsTable extends LocalNotifications
     } else if (isInserting) {
       context.missing(_userIdMeta);
     }
+    if (data.containsKey('home_id')) {
+      context.handle(
+        _homeIdMeta,
+        homeId.isAcceptableOrUnknown(data['home_id']!, _homeIdMeta),
+      );
+    }
     if (data.containsKey('title')) {
       context.handle(
         _titleMeta,
@@ -7914,6 +8009,24 @@ class $LocalNotificationsTable extends LocalNotifications
       context.handle(
         _typeMeta,
         type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    }
+    if (data.containsKey('entity_id')) {
+      context.handle(
+        _entityIdMeta,
+        entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta),
+      );
+    }
+    if (data.containsKey('entity_type')) {
+      context.handle(
+        _entityTypeMeta,
+        entityType.isAcceptableOrUnknown(data['entity_type']!, _entityTypeMeta),
+      );
+    }
+    if (data.containsKey('action')) {
+      context.handle(
+        _actionMeta,
+        action.isAcceptableOrUnknown(data['action']!, _actionMeta),
       );
     }
     if (data.containsKey('is_read')) {
@@ -7945,6 +8058,10 @@ class $LocalNotificationsTable extends LocalNotifications
         DriftSqlType.string,
         data['${effectivePrefix}user_id'],
       )!,
+      homeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}home_id'],
+      )!,
       title: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}title'],
@@ -7956,6 +8073,18 @@ class $LocalNotificationsTable extends LocalNotifications
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}type'],
+      ),
+      entityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_id'],
+      ),
+      entityType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_type'],
+      ),
+      action: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}action'],
       ),
       isRead: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
@@ -7978,17 +8107,25 @@ class LocalNotification extends DataClass
     implements Insertable<LocalNotification> {
   final String id;
   final String userId;
+  final String homeId;
   final String title;
   final String message;
   final String? type;
+  final String? entityId;
+  final String? entityType;
+  final String? action;
   final bool isRead;
   final DateTime? createdAt;
   const LocalNotification({
     required this.id,
     required this.userId,
+    required this.homeId,
     required this.title,
     required this.message,
     this.type,
+    this.entityId,
+    this.entityType,
+    this.action,
     required this.isRead,
     this.createdAt,
   });
@@ -7997,10 +8134,20 @@ class LocalNotification extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['user_id'] = Variable<String>(userId);
+    map['home_id'] = Variable<String>(homeId);
     map['title'] = Variable<String>(title);
     map['message'] = Variable<String>(message);
     if (!nullToAbsent || type != null) {
       map['type'] = Variable<String>(type);
+    }
+    if (!nullToAbsent || entityId != null) {
+      map['entity_id'] = Variable<String>(entityId);
+    }
+    if (!nullToAbsent || entityType != null) {
+      map['entity_type'] = Variable<String>(entityType);
+    }
+    if (!nullToAbsent || action != null) {
+      map['action'] = Variable<String>(action);
     }
     map['is_read'] = Variable<bool>(isRead);
     if (!nullToAbsent || createdAt != null) {
@@ -8013,9 +8160,19 @@ class LocalNotification extends DataClass
     return LocalNotificationsCompanion(
       id: Value(id),
       userId: Value(userId),
+      homeId: Value(homeId),
       title: Value(title),
       message: Value(message),
       type: type == null && nullToAbsent ? const Value.absent() : Value(type),
+      entityId: entityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entityId),
+      entityType: entityType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entityType),
+      action: action == null && nullToAbsent
+          ? const Value.absent()
+          : Value(action),
       isRead: Value(isRead),
       createdAt: createdAt == null && nullToAbsent
           ? const Value.absent()
@@ -8031,9 +8188,13 @@ class LocalNotification extends DataClass
     return LocalNotification(
       id: serializer.fromJson<String>(json['id']),
       userId: serializer.fromJson<String>(json['userId']),
+      homeId: serializer.fromJson<String>(json['homeId']),
       title: serializer.fromJson<String>(json['title']),
       message: serializer.fromJson<String>(json['message']),
       type: serializer.fromJson<String?>(json['type']),
+      entityId: serializer.fromJson<String?>(json['entityId']),
+      entityType: serializer.fromJson<String?>(json['entityType']),
+      action: serializer.fromJson<String?>(json['action']),
       isRead: serializer.fromJson<bool>(json['isRead']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
     );
@@ -8044,9 +8205,13 @@ class LocalNotification extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'userId': serializer.toJson<String>(userId),
+      'homeId': serializer.toJson<String>(homeId),
       'title': serializer.toJson<String>(title),
       'message': serializer.toJson<String>(message),
       'type': serializer.toJson<String?>(type),
+      'entityId': serializer.toJson<String?>(entityId),
+      'entityType': serializer.toJson<String?>(entityType),
+      'action': serializer.toJson<String?>(action),
       'isRead': serializer.toJson<bool>(isRead),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
     };
@@ -8055,17 +8220,25 @@ class LocalNotification extends DataClass
   LocalNotification copyWith({
     String? id,
     String? userId,
+    String? homeId,
     String? title,
     String? message,
     Value<String?> type = const Value.absent(),
+    Value<String?> entityId = const Value.absent(),
+    Value<String?> entityType = const Value.absent(),
+    Value<String?> action = const Value.absent(),
     bool? isRead,
     Value<DateTime?> createdAt = const Value.absent(),
   }) => LocalNotification(
     id: id ?? this.id,
     userId: userId ?? this.userId,
+    homeId: homeId ?? this.homeId,
     title: title ?? this.title,
     message: message ?? this.message,
     type: type.present ? type.value : this.type,
+    entityId: entityId.present ? entityId.value : this.entityId,
+    entityType: entityType.present ? entityType.value : this.entityType,
+    action: action.present ? action.value : this.action,
     isRead: isRead ?? this.isRead,
     createdAt: createdAt.present ? createdAt.value : this.createdAt,
   );
@@ -8073,9 +8246,15 @@ class LocalNotification extends DataClass
     return LocalNotification(
       id: data.id.present ? data.id.value : this.id,
       userId: data.userId.present ? data.userId.value : this.userId,
+      homeId: data.homeId.present ? data.homeId.value : this.homeId,
       title: data.title.present ? data.title.value : this.title,
       message: data.message.present ? data.message.value : this.message,
       type: data.type.present ? data.type.value : this.type,
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      entityType: data.entityType.present
+          ? data.entityType.value
+          : this.entityType,
+      action: data.action.present ? data.action.value : this.action,
       isRead: data.isRead.present ? data.isRead.value : this.isRead,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
@@ -8086,9 +8265,13 @@ class LocalNotification extends DataClass
     return (StringBuffer('LocalNotification(')
           ..write('id: $id, ')
           ..write('userId: $userId, ')
+          ..write('homeId: $homeId, ')
           ..write('title: $title, ')
           ..write('message: $message, ')
           ..write('type: $type, ')
+          ..write('entityId: $entityId, ')
+          ..write('entityType: $entityType, ')
+          ..write('action: $action, ')
           ..write('isRead: $isRead, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
@@ -8096,17 +8279,32 @@ class LocalNotification extends DataClass
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, userId, title, message, type, isRead, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    userId,
+    homeId,
+    title,
+    message,
+    type,
+    entityId,
+    entityType,
+    action,
+    isRead,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LocalNotification &&
           other.id == this.id &&
           other.userId == this.userId &&
+          other.homeId == this.homeId &&
           other.title == this.title &&
           other.message == this.message &&
           other.type == this.type &&
+          other.entityId == this.entityId &&
+          other.entityType == this.entityType &&
+          other.action == this.action &&
           other.isRead == this.isRead &&
           other.createdAt == this.createdAt);
 }
@@ -8114,18 +8312,26 @@ class LocalNotification extends DataClass
 class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
   final Value<String> id;
   final Value<String> userId;
+  final Value<String> homeId;
   final Value<String> title;
   final Value<String> message;
   final Value<String?> type;
+  final Value<String?> entityId;
+  final Value<String?> entityType;
+  final Value<String?> action;
   final Value<bool> isRead;
   final Value<DateTime?> createdAt;
   final Value<int> rowid;
   const LocalNotificationsCompanion({
     this.id = const Value.absent(),
     this.userId = const Value.absent(),
+    this.homeId = const Value.absent(),
     this.title = const Value.absent(),
     this.message = const Value.absent(),
     this.type = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.entityType = const Value.absent(),
+    this.action = const Value.absent(),
     this.isRead = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -8133,9 +8339,13 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
   LocalNotificationsCompanion.insert({
     required String id,
     required String userId,
+    this.homeId = const Value.absent(),
     required String title,
     required String message,
     this.type = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.entityType = const Value.absent(),
+    this.action = const Value.absent(),
     this.isRead = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -8146,9 +8356,13 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
   static Insertable<LocalNotification> custom({
     Expression<String>? id,
     Expression<String>? userId,
+    Expression<String>? homeId,
     Expression<String>? title,
     Expression<String>? message,
     Expression<String>? type,
+    Expression<String>? entityId,
+    Expression<String>? entityType,
+    Expression<String>? action,
     Expression<bool>? isRead,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
@@ -8156,9 +8370,13 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (userId != null) 'user_id': userId,
+      if (homeId != null) 'home_id': homeId,
       if (title != null) 'title': title,
       if (message != null) 'message': message,
       if (type != null) 'type': type,
+      if (entityId != null) 'entity_id': entityId,
+      if (entityType != null) 'entity_type': entityType,
+      if (action != null) 'action': action,
       if (isRead != null) 'is_read': isRead,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
@@ -8168,9 +8386,13 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
   LocalNotificationsCompanion copyWith({
     Value<String>? id,
     Value<String>? userId,
+    Value<String>? homeId,
     Value<String>? title,
     Value<String>? message,
     Value<String?>? type,
+    Value<String?>? entityId,
+    Value<String?>? entityType,
+    Value<String?>? action,
     Value<bool>? isRead,
     Value<DateTime?>? createdAt,
     Value<int>? rowid,
@@ -8178,9 +8400,13 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
     return LocalNotificationsCompanion(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      homeId: homeId ?? this.homeId,
       title: title ?? this.title,
       message: message ?? this.message,
       type: type ?? this.type,
+      entityId: entityId ?? this.entityId,
+      entityType: entityType ?? this.entityType,
+      action: action ?? this.action,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
@@ -8196,6 +8422,9 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
     if (userId.present) {
       map['user_id'] = Variable<String>(userId.value);
     }
+    if (homeId.present) {
+      map['home_id'] = Variable<String>(homeId.value);
+    }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
     }
@@ -8204,6 +8433,15 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
+    }
+    if (entityId.present) {
+      map['entity_id'] = Variable<String>(entityId.value);
+    }
+    if (entityType.present) {
+      map['entity_type'] = Variable<String>(entityType.value);
+    }
+    if (action.present) {
+      map['action'] = Variable<String>(action.value);
     }
     if (isRead.present) {
       map['is_read'] = Variable<bool>(isRead.value);
@@ -8222,9 +8460,13 @@ class LocalNotificationsCompanion extends UpdateCompanion<LocalNotification> {
     return (StringBuffer('LocalNotificationsCompanion(')
           ..write('id: $id, ')
           ..write('userId: $userId, ')
+          ..write('homeId: $homeId, ')
           ..write('title: $title, ')
           ..write('message: $message, ')
           ..write('type: $type, ')
+          ..write('entityId: $entityId, ')
+          ..write('entityType: $entityType, ')
+          ..write('action: $action, ')
           ..write('isRead: $isRead, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
@@ -14178,6 +14420,7 @@ typedef $$LocalShoppingListItemsTableCreateCompanionBuilder =
     LocalShoppingListItemsCompanion Function({
       required String id,
       required String shoppingListId,
+      Value<String> homeId,
       Value<String?> inventoryItemId,
       required String itemName,
       Value<String?> categoryName,
@@ -14202,6 +14445,7 @@ typedef $$LocalShoppingListItemsTableUpdateCompanionBuilder =
     LocalShoppingListItemsCompanion Function({
       Value<String> id,
       Value<String> shoppingListId,
+      Value<String> homeId,
       Value<String?> inventoryItemId,
       Value<String> itemName,
       Value<String?> categoryName,
@@ -14239,6 +14483,11 @@ class $$LocalShoppingListItemsTableFilterComposer
 
   ColumnFilters<String> get shoppingListId => $composableBuilder(
     column: $table.shoppingListId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get homeId => $composableBuilder(
+    column: $table.homeId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14352,6 +14601,11 @@ class $$LocalShoppingListItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get homeId => $composableBuilder(
+    column: $table.homeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get inventoryItemId => $composableBuilder(
     column: $table.inventoryItemId,
     builder: (column) => ColumnOrderings(column),
@@ -14459,6 +14713,9 @@ class $$LocalShoppingListItemsTableAnnotationComposer
     column: $table.shoppingListId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get homeId =>
+      $composableBuilder(column: $table.homeId, builder: (column) => column);
 
   GeneratedColumn<String> get inventoryItemId => $composableBuilder(
     column: $table.inventoryItemId,
@@ -14583,6 +14840,7 @@ class $$LocalShoppingListItemsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> shoppingListId = const Value.absent(),
+                Value<String> homeId = const Value.absent(),
                 Value<String?> inventoryItemId = const Value.absent(),
                 Value<String> itemName = const Value.absent(),
                 Value<String?> categoryName = const Value.absent(),
@@ -14605,6 +14863,7 @@ class $$LocalShoppingListItemsTableTableManager
               }) => LocalShoppingListItemsCompanion(
                 id: id,
                 shoppingListId: shoppingListId,
+                homeId: homeId,
                 inventoryItemId: inventoryItemId,
                 itemName: itemName,
                 categoryName: categoryName,
@@ -14629,6 +14888,7 @@ class $$LocalShoppingListItemsTableTableManager
               ({
                 required String id,
                 required String shoppingListId,
+                Value<String> homeId = const Value.absent(),
                 Value<String?> inventoryItemId = const Value.absent(),
                 required String itemName,
                 Value<String?> categoryName = const Value.absent(),
@@ -14651,6 +14911,7 @@ class $$LocalShoppingListItemsTableTableManager
               }) => LocalShoppingListItemsCompanion.insert(
                 id: id,
                 shoppingListId: shoppingListId,
+                homeId: homeId,
                 inventoryItemId: inventoryItemId,
                 itemName: itemName,
                 categoryName: categoryName,
@@ -15546,9 +15807,13 @@ typedef $$LocalNotificationsTableCreateCompanionBuilder =
     LocalNotificationsCompanion Function({
       required String id,
       required String userId,
+      Value<String> homeId,
       required String title,
       required String message,
       Value<String?> type,
+      Value<String?> entityId,
+      Value<String?> entityType,
+      Value<String?> action,
       Value<bool> isRead,
       Value<DateTime?> createdAt,
       Value<int> rowid,
@@ -15557,9 +15822,13 @@ typedef $$LocalNotificationsTableUpdateCompanionBuilder =
     LocalNotificationsCompanion Function({
       Value<String> id,
       Value<String> userId,
+      Value<String> homeId,
       Value<String> title,
       Value<String> message,
       Value<String?> type,
+      Value<String?> entityId,
+      Value<String?> entityType,
+      Value<String?> action,
       Value<bool> isRead,
       Value<DateTime?> createdAt,
       Value<int> rowid,
@@ -15584,6 +15853,11 @@ class $$LocalNotificationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get homeId => $composableBuilder(
+    column: $table.homeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get title => $composableBuilder(
     column: $table.title,
     builder: (column) => ColumnFilters(column),
@@ -15596,6 +15870,21 @@ class $$LocalNotificationsTableFilterComposer
 
   ColumnFilters<String> get type => $composableBuilder(
     column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get action => $composableBuilder(
+    column: $table.action,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15629,6 +15918,11 @@ class $$LocalNotificationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get homeId => $composableBuilder(
+    column: $table.homeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get title => $composableBuilder(
     column: $table.title,
     builder: (column) => ColumnOrderings(column),
@@ -15641,6 +15935,21 @@ class $$LocalNotificationsTableOrderingComposer
 
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get action => $composableBuilder(
+    column: $table.action,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -15670,6 +15979,9 @@ class $$LocalNotificationsTableAnnotationComposer
   GeneratedColumn<String> get userId =>
       $composableBuilder(column: $table.userId, builder: (column) => column);
 
+  GeneratedColumn<String> get homeId =>
+      $composableBuilder(column: $table.homeId, builder: (column) => column);
+
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
@@ -15678,6 +15990,17 @@ class $$LocalNotificationsTableAnnotationComposer
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+
+  GeneratedColumn<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get action =>
+      $composableBuilder(column: $table.action, builder: (column) => column);
 
   GeneratedColumn<bool> get isRead =>
       $composableBuilder(column: $table.isRead, builder: (column) => column);
@@ -15728,18 +16051,26 @@ class $$LocalNotificationsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> userId = const Value.absent(),
+                Value<String> homeId = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> message = const Value.absent(),
                 Value<String?> type = const Value.absent(),
+                Value<String?> entityId = const Value.absent(),
+                Value<String?> entityType = const Value.absent(),
+                Value<String?> action = const Value.absent(),
                 Value<bool> isRead = const Value.absent(),
                 Value<DateTime?> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalNotificationsCompanion(
                 id: id,
                 userId: userId,
+                homeId: homeId,
                 title: title,
                 message: message,
                 type: type,
+                entityId: entityId,
+                entityType: entityType,
+                action: action,
                 isRead: isRead,
                 createdAt: createdAt,
                 rowid: rowid,
@@ -15748,18 +16079,26 @@ class $$LocalNotificationsTableTableManager
               ({
                 required String id,
                 required String userId,
+                Value<String> homeId = const Value.absent(),
                 required String title,
                 required String message,
                 Value<String?> type = const Value.absent(),
+                Value<String?> entityId = const Value.absent(),
+                Value<String?> entityType = const Value.absent(),
+                Value<String?> action = const Value.absent(),
                 Value<bool> isRead = const Value.absent(),
                 Value<DateTime?> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalNotificationsCompanion.insert(
                 id: id,
                 userId: userId,
+                homeId: homeId,
                 title: title,
                 message: message,
                 type: type,
+                entityId: entityId,
+                entityType: entityType,
+                action: action,
                 isRead: isRead,
                 createdAt: createdAt,
                 rowid: rowid,

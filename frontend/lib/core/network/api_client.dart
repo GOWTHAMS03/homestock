@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import '../../features/auth/auth_state.dart';
 import '../constants/api_endpoints.dart';
@@ -151,7 +152,26 @@ class ApiClient {
     );
   }
 
+  Completer<bool>? _refreshCompleter;
+
   Future<bool> tryRefreshToken() async {
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+    _refreshCompleter = Completer<bool>();
+    try {
+      final result = await _executeRefreshToken();
+      _refreshCompleter!.complete(result);
+      return result;
+    } catch (e) {
+      _refreshCompleter!.complete(false);
+      return false;
+    } finally {
+      _refreshCompleter = null;
+    }
+  }
+
+  Future<bool> _executeRefreshToken() async {
     final refreshToken = await secureStorage.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) return false;
 

@@ -67,6 +67,10 @@ class SyncServiceTest {
     private ObjectMapper objectMapper;
     @Mock
     private com.homestock.modules.consumption.service.ConsumptionService consumptionService;
+    @Mock
+    private com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
+    @Mock
+    private com.homestock.modules.notification.service.NotificationEngine notificationEngine;
 
     @InjectMocks
     private SyncService syncService;
@@ -218,5 +222,78 @@ class SyncServiceTest {
         assertEquals(1, response.getResults().size());
         assertEquals("SYNCED", response.getResults().get(0).getStatus());
         verify(shoppingListItemRepository).deleteAllCompletedByShoppingListId(listId);
+    }
+
+    @Test
+    void pullChanges_withSinceVersion_returnsDeletedIdsAndServerVersion() {
+        UUID deletedShoppingId = UUID.randomUUID();
+        com.homestock.modules.sync.entity.HomeChangeLog change = com.homestock.modules.sync.entity.HomeChangeLog.builder()
+                .home(home)
+                .changeVersion(45L)
+                .entityType("SHOPPING_LIST_ITEM")
+                .entityId(deletedShoppingId)
+                .operationType("DELETE")
+                .createdAt(Instant.now())
+                .build();
+
+        when(homeChangeLogService.getMaxVersion(homeId)).thenReturn(50L);
+        when(homeChangeLogService.getChangesSince(eq(homeId), eq(40L), anyInt())).thenReturn(List.of(change));
+        when(categoryRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
+        when(inventoryItemRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
+        when(stockTransactionRepository.findByHomeIdAndCreatedAtAfter(eq(homeId), any())).thenReturn(List.of());
+        when(shoppingListRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
+        when(shoppingListItemRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
+        when(purchaseRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
+        when(storeRepository.findByHomeIdAndUpdatedAtAfter(eq(homeId), any())).thenReturn(List.of());
+
+        SyncPullResponse response = syncService.pullChanges(homeId, Instant.EPOCH, 40L);
+
+        assertNotNull(response);
+        assertEquals(50L, response.getServerVersion());
+        assertEquals(1, response.getDeletedShoppingItemIds().size());
+        assertEquals(deletedShoppingId.toString(), response.getDeletedShoppingItemIds().get(0));
+    }
+
+    @Test
+    void pushOperations_updateShoppingItem_updatesAndRecordsChange() {
+        UUID itemId = UUID.randomUUID();
+        com.homestock.modules.shopping.entity.ShoppingList mockList = com.homestock.modules.shopping.entity.ShoppingList.builder()
+                .home(home)
+                .name("Groceries")
+                .build();
+        com.homestock.modules.shopping.entity.ShoppingListItem existingItem = com.homestock.modules.shopping.entity.ShoppingListItem.builder()
+                .shoppingList(mockList)
+                .itemName("Milk")
+                .quantity(new BigDecimal("1.0"))
+                .unit("pcs")
+                .build();
+        existingItem.setId(itemId);
+
+        when(homeRepository.findById(homeId)).thenReturn(Optional.of(home));
+        when(processedOperationRepository.existsByOperationId("op-update-shop-1")).thenReturn(false);
+        when(shoppingListItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(shoppingListItemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        SyncOperationDto op = SyncOperationDto.builder()
+                .operationId("op-update-shop-1")
+                .operationType("UPDATE_SHOPPING_ITEM")
+                .entityType("SHOPPING_LIST_ITEM")
+                .entityId(itemId.toString())
+                .payload(Map.of("quantity", 3.0, "unit", "L"))
+                .build();
+
+        SyncRequest request = SyncRequest.builder()
+                .homeId(homeId)
+                .operations(List.of(op))
+                .build();
+
+        SyncPushResponse response = syncService.pushOperations(request);
+
+        assertNotNull(response);
+        assertEquals(1, response.getResults().size());
+        assertEquals("SYNCED", response.getResults().get(0).getStatus());
+        assertEquals(new BigDecimal("3.0"), existingItem.getQuantity());
+        assertEquals("L", existingItem.getUnit());
+        verify(homeChangeLogService).recordChange(eq(home), eq("SHOPPING_LIST_ITEM"), eq(itemId), eq("UPDATE"), any(), eq("op-update-shop-1"));
     }
 }

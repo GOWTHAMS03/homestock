@@ -147,6 +147,13 @@ class SyncPullResponse {
   final List<Map<String, dynamic>> purchaseItems;
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> stores;
+  final int? serverVersion;
+  final int? nextServerVersion;
+  final bool hasMore;
+  final List<String> deletedShoppingItemIds;
+  final List<String> deletedInventoryItemIds;
+  final List<String> deletedStoreIds;
+  final List<String> deletedCategoryIds;
   final String serverTimestamp;
 
   const SyncPullResponse({
@@ -158,6 +165,13 @@ class SyncPullResponse {
     this.purchaseItems = const [],
     this.categories = const [],
     this.stores = const [],
+    this.serverVersion,
+    this.nextServerVersion,
+    this.hasMore = false,
+    this.deletedShoppingItemIds = const [],
+    this.deletedInventoryItemIds = const [],
+    this.deletedStoreIds = const [],
+    this.deletedCategoryIds = const [],
     required this.serverTimestamp,
   });
 
@@ -171,6 +185,13 @@ class SyncPullResponse {
       purchaseItems: _toMapList(json['purchaseItems']),
       categories: _toMapList(json['categories']),
       stores: _toMapList(json['stores']),
+      serverVersion: (json['serverVersion'] as num?)?.toInt(),
+      nextServerVersion: (json['nextServerVersion'] as num?)?.toInt(),
+      hasMore: json['hasMore'] == true,
+      deletedShoppingItemIds: _toStringList(json['deletedShoppingItemIds']),
+      deletedInventoryItemIds: _toStringList(json['deletedInventoryItemIds']),
+      deletedStoreIds: _toStringList(json['deletedStoreIds']),
+      deletedCategoryIds: _toStringList(json['deletedCategoryIds']),
       serverTimestamp: json['serverTimestamp'] as String? ??
           DateTime.now().toUtc().toIso8601String(),
     );
@@ -181,6 +202,11 @@ class SyncPullResponse {
     return raw.cast<Map<String, dynamic>>();
   }
 
+  static List<String> _toStringList(dynamic raw) {
+    if (raw is! List) return [];
+    return raw.map((e) => e.toString()).toList();
+  }
+
   bool get isEmpty =>
       inventoryItems.isEmpty &&
       stockTransactions.isEmpty &&
@@ -189,5 +215,9 @@ class SyncPullResponse {
       purchases.isEmpty &&
       purchaseItems.isEmpty &&
       categories.isEmpty &&
-      stores.isEmpty;
+      stores.isEmpty &&
+      deletedShoppingItemIds.isEmpty &&
+      deletedInventoryItemIds.isEmpty &&
+      deletedStoreIds.isEmpty &&
+      deletedCategoryIds.isEmpty;
 }

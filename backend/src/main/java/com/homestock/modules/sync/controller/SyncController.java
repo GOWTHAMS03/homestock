@@ -36,12 +36,14 @@ public class SyncController {
 
     @GetMapping
     @PreAuthorize("@homeSecurity.isMember(#homeId)")
-    @Operation(summary = "Incremental pull server changes since timestamp")
+    @Operation(summary = "Incremental pull server changes since timestamp or cursor version")
     public ResponseEntity<ApiResponse<SyncPullResponse>> pullChanges(
             @RequestParam UUID homeId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since,
+            @RequestParam(required = false) Long sinceVersion,
+            @RequestParam(required = false, defaultValue = "500") Integer limit) {
         Instant effectiveSince = since != null ? since : Instant.EPOCH;
-        SyncPullResponse response = syncService.pullChanges(homeId, effectiveSince);
+        SyncPullResponse response = syncService.pullChanges(homeId, effectiveSince, sinceVersion, limit);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

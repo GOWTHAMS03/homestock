@@ -169,4 +169,88 @@ class SyncDao {
           ..where((t) => t.homeId.equals(homeId)))
         .watchSingleOrNull();
   }
+
+  /// Atomically apply all incremental changes from a pull response
+  /// within a single SQLite transaction. Updates sync cursor only if all updates succeed.
+  Future<void> applyPullChangesInTransaction({
+    required String homeId,
+    required List<LocalCategoriesCompanion> categories,
+    required List<LocalInventoryItemsCompanion> inventoryItems,
+    required List<LocalStockTransactionsCompanion> stockTransactions,
+    required List<LocalShoppingListsCompanion> shoppingLists,
+    required List<LocalShoppingListItemsCompanion> shoppingListItems,
+    required List<LocalPurchasesCompanion> purchases,
+    required List<LocalPurchaseItemsCompanion> purchaseItems,
+    required List<LocalStoresCompanion> stores,
+    required List<String> deletedShoppingItemIds,
+    required List<String> deletedInventoryItemIds,
+    required List<String> deletedStoreIds,
+    required List<String> deletedCategoryIds,
+    required DateTime serverTimestamp,
+    int? nextServerVersion,
+  }) {
+    return _db.transaction(() async {
+      // 1. Categories
+      for (final cat in categories) {
+        await _db.into(_db.localCategories).insertOnConflictUpdate(cat);
+      }
+      for (final catId in deletedCategoryIds) {
+        await (_db.delete(_db.localCategories)..where((t) => t.id.equals(catId))).go();
+      }
+
+      // 2. Inventory Items
+      for (final item in inventoryItems) {
+        await _db.into(_db.localInventoryItems).insertOnConflictUpdate(item);
+      }
+      for (final itemId in deletedInventoryItemIds) {
+        await (_db.update(_db.localInventoryItems)..where((t) => t.id.equals(itemId)))
+            .write(const LocalInventoryItemsCompanion(isDeleted: Value(true)));
+      }
+
+      // 3. Stock Transactions
+      for (final tx in stockTransactions) {
+        await _db.into(_db.localStockTransactions).insertOnConflictUpdate(tx);
+      }
+
+      // 4. Shopping Lists
+      for (final list in shoppingLists) {
+        await _db.into(_db.localShoppingLists).insertOnConflictUpdate(list);
+      }
+
+      // 5. Shopping List Items
+      for (final item in shoppingListItems) {
+        await _db.into(_db.localShoppingListItems).insertOnConflictUpdate(item);
+      }
+      for (final sId in deletedShoppingItemIds) {
+        await (_db.delete(_db.localShoppingListItems)..where((t) => t.id.equals(sId))).go();
+      }
+
+      // 6. Purchases & Purchase Items
+      for (final p in purchases) {
+        await _db.into(_db.localPurchases).insertOnConflictUpdate(p);
+      }
+      for (final pi in purchaseItems) {
+        await _db.into(_db.localPurchaseItems).insertOnConflictUpdate(pi);
+      }
+
+      // 7. Stores
+      for (final s in stores) {
+        await _db.into(_db.localStores).insertOnConflictUpdate(s);
+      }
+      for (final storeId in deletedStoreIds) {
+        await (_db.delete(_db.localStores)..where((t) => t.id.equals(storeId))).go();
+      }
+
+      // 8. Update sync metadata cursor atomically
+      await _db.into(_db.syncMetadataEntries).insertOnConflictUpdate(
+            SyncMetadataEntriesCompanion(
+              homeId: Value(homeId),
+              lastSyncedAt: Value(serverTimestamp),
+              syncVersion: nextServerVersion != null
+                  ? Value(nextServerVersion)
+                  : const Value.absent(),
+            ),
+          );
+    });
+  }
 }

@@ -47,6 +47,7 @@ public class InventoryService {
     private final ShoppingService shoppingService;
     private final StorageService storageService;
     private final NotificationEngine notificationEngine;
+    private final com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
 
     @Transactional(readOnly = true)
     public PagedResponse<InventoryItemDto> getItems(
@@ -134,8 +135,12 @@ public class InventoryService {
                     .unit(savedItem.getUnit())
                     .reason("Initial stock addition")
                     .build();
-            stockTransactionRepository.save(transaction);
+            StockTransaction savedTx = stockTransactionRepository.save(transaction);
+            homeChangeLogService.recordChange(home, "STOCK_TRANSACTION", savedTx.getId(), "INSERT", null, null);
         }
+
+        homeChangeLogService.recordChange(home, "INVENTORY_ITEM", savedItem.getId(), "INSERT", null, null);
+        notificationEngine.notifyHomeChanged(home, currentUserId);
 
         // Check if item is created at or below low stock threshold
         if (savedItem.getQuantity().compareTo(savedItem.getMinimumQuantity()) <= 0) {
@@ -168,10 +173,12 @@ public class InventoryService {
         item.setNotes(request.getNotes());
 
         InventoryItem updated = inventoryItemRepository.save(item);
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        homeChangeLogService.recordChange(item.getHome(), "INVENTORY_ITEM", updated.getId(), "UPDATE", null, null);
+        notificationEngine.notifyHomeChanged(item.getHome(), currentUserId);
 
         // Re-evaluate stock status after minimum threshold change
         if (updated.getQuantity().compareTo(updated.getMinimumQuantity()) <= 0) {
-            UUID currentUserId = SecurityUtils.getCurrentUserId();
             User currentUser = userRepository.findById(currentUserId).orElse(null);
             shoppingService.handleAutoLowStock(item.getHome(), updated, currentUser);
         }
@@ -220,8 +227,11 @@ public class InventoryService {
                 .unit(item.getUnit())
                 .reason(request.getReason())
                 .build();
-        stockTransactionRepository.save(tx);
+        StockTransaction savedTx = stockTransactionRepository.save(tx);
+        homeChangeLogService.recordChange(item.getHome(), "INVENTORY_ITEM", savedItem.getId(), "UPDATE", null, null);
+        homeChangeLogService.recordChange(item.getHome(), "STOCK_TRANSACTION", savedTx.getId(), "INSERT", null, null);
         notificationEngine.notifyStockUpdated(item.getHome(), currentUser, savedItem, change, item.getUnit());
+        notificationEngine.notifyHomeChanged(item.getHome(), currentUserId);
 
         // Trigger automatic low stock evaluation
         if (newQty.compareTo(item.getMinimumQuantity()) <= 0) {
@@ -252,7 +262,11 @@ public class InventoryService {
 
         String fileUrl = storageService.storeFile(file, "items");
         item.setImageUrl(fileUrl);
-        return InventoryItemDto.fromEntity(inventoryItemRepository.save(item));
+        InventoryItem saved = inventoryItemRepository.save(item);
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        homeChangeLogService.recordChange(item.getHome(), "INVENTORY_ITEM", saved.getId(), "UPDATE", null, null);
+        notificationEngine.notifyHomeChanged(item.getHome(), currentUserId);
+        return InventoryItemDto.fromEntity(saved);
     }
 
     @Transactional
@@ -261,5 +275,8 @@ public class InventoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory item not found"));
         item.setIsArchived(true);
         inventoryItemRepository.save(item);
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        homeChangeLogService.recordChange(item.getHome(), "INVENTORY_ITEM", itemId, "DELETE", null, null);
+        notificationEngine.notifyHomeChanged(item.getHome(), currentUserId);
     }
 }

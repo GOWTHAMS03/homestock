@@ -106,7 +106,8 @@ class ShoppingDao {
 
       return (_db.select(_db.localShoppingListItems)
             ..where((t) =>
-                t.shoppingListId.isIn(listIds) & t.isDeleted.equals(false))
+                (t.homeId.equals(homeId) | t.shoppingListId.isIn(listIds)) &
+                t.isDeleted.equals(false))
             ..orderBy([
               (t) => OrderingTerm.asc(t.isCompleted),
               (t) => OrderingTerm.desc(t.updatedAt),
@@ -127,7 +128,8 @@ class ShoppingDao {
 
     return (_db.select(_db.localShoppingListItems)
           ..where((t) =>
-              t.shoppingListId.isIn(listIds) & t.isDeleted.equals(false))
+              (t.homeId.equals(homeId) | t.shoppingListId.isIn(listIds)) &
+              t.isDeleted.equals(false))
           ..orderBy([
             (t) => OrderingTerm.asc(t.isCompleted),
             (t) => OrderingTerm.desc(t.updatedAt),

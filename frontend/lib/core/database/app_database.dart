@@ -148,6 +148,7 @@ class LocalShoppingLists extends Table {
 class LocalShoppingListItems extends Table {
   TextColumn get id => text()();
   TextColumn get shoppingListId => text()();
+  TextColumn get homeId => text().withDefault(const Constant(''))();
   TextColumn get inventoryItemId => text().nullable()();
   TextColumn get itemName => text()();
   TextColumn get categoryName => text().nullable()();
@@ -222,9 +223,13 @@ class LocalPurchaseItems extends Table {
 class LocalNotifications extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text()();
+  TextColumn get homeId => text().withDefault(const Constant(''))();
   TextColumn get title => text()();
   TextColumn get message => text()();
   TextColumn get type => text().nullable()();
+  TextColumn get entityId => text().nullable()();
+  TextColumn get entityType => text().nullable()();
+  TextColumn get action => text().nullable()();
   BoolColumn get isRead => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().nullable()();
 
@@ -350,7 +355,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -378,6 +383,13 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(localInventoryItems, localInventoryItems.estimatedDailyConsumption);
           await m.addColumn(localInventoryItems, localInventoryItems.lastVerifiedAt);
           await m.addColumn(localInventoryItems, localInventoryItems.lastEstimatedAt);
+        }
+        if (from < 5) {
+          await m.addColumn(localShoppingListItems, localShoppingListItems.homeId);
+          await m.addColumn(localNotifications, localNotifications.homeId);
+          await m.addColumn(localNotifications, localNotifications.entityId);
+          await m.addColumn(localNotifications, localNotifications.entityType);
+          await m.addColumn(localNotifications, localNotifications.action);
         }
       },
     );
