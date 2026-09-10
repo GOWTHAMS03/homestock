@@ -27,6 +27,9 @@ class ShoppingDao {
   /// If none exists, creates one and returns it.
   Future<LocalShoppingList> ensureDefaultList(String homeId,
       [String name = 'Home Shopping List']) async {
+    if (homeId.isEmpty || homeId == 'default_home') {
+      throw ArgumentError('Invalid homeId for shopping list: $homeId');
+    }
     final existing = await getDefaultList(homeId);
     if (existing != null) return existing;
 
@@ -63,18 +66,40 @@ class ShoppingDao {
         .go();
   }
 
+  /// Clean up any legacy dummy records where homeId was saved as 'default_home'.
+  Future<void> cleanupLegacyDefaultHome() async {
+    await (_db.delete(_db.localShoppingLists)
+          ..where((t) => t.homeId.equals('default_home') | t.id.equals('default_home')))
+        .go();
+    await (_db.delete(_db.localShoppingListItems)
+          ..where((t) => t.shoppingListId.equals('default_home') | t.homeId.equals('default_home')))
+        .go();
+    await (_db.delete(_db.syncQueueEntries)
+          ..where((t) => t.homeId.equals('default_home')))
+        .go();
+  }
+
   /// Resolve a fallback home ID from local database tables.
   Future<String?> resolveFallbackHomeId() async {
-    final home = await (_db.select(_db.localHomes)..limit(1)).getSingleOrNull();
-    if (home != null && home.id.isNotEmpty) return home.id;
+    final home = await (_db.select(_db.localHomes)
+          ..where((t) => t.id.isNotValue('default_home'))
+          ..limit(1))
+        .getSingleOrNull();
+    if (home != null && home.id.isNotEmpty && home.id != 'default_home') return home.id;
 
-    final list = await (_db.select(_db.localShoppingLists)..limit(1)).getSingleOrNull();
-    if (list != null && list.homeId.isNotEmpty) return list.homeId;
+    final list = await (_db.select(_db.localShoppingLists)
+          ..where((t) => t.homeId.isNotValue('default_home'))
+          ..limit(1))
+        .getSingleOrNull();
+    if (list != null && list.homeId.isNotEmpty && list.homeId != 'default_home') return list.homeId;
 
-    final item = await (_db.select(_db.localInventoryItems)..limit(1)).getSingleOrNull();
-    if (item != null && item.homeId.isNotEmpty) return item.homeId;
+    final item = await (_db.select(_db.localInventoryItems)
+          ..where((t) => t.homeId.isNotValue('default_home'))
+          ..limit(1))
+        .getSingleOrNull();
+    if (item != null && item.homeId.isNotEmpty && item.homeId != 'default_home') return item.homeId;
 
-    return 'default_home';
+    return null;
   }
 
   // ──── SHOPPING LIST ITEMS ────

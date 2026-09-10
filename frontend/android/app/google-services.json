@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "732023010251",
+    "project_id": "homestock-d660a",
+    "storage_bucket": "homestock-d660a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:732023010251:android:6b79a4c9f128a9009bbc4e",
+        "android_client_info": {
+          "package_name": "com.homestock.homestock"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDufE_32HymTdnq2fHNqEeYLQY1GoAVw5Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

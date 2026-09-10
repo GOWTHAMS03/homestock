@@ -162,7 +162,9 @@ class SyncEngine with WidgetsBindingObserver {
       }
 
       for (final homeId in homeIds) {
-        await _pullServerChanges(homeId);
+        if (homeId.isNotEmpty && homeId != 'default_home') {
+          await _pullServerChanges(homeId);
+        }
       }
 
       _updateState(_currentState.copyWith(
@@ -204,6 +206,7 @@ class SyncEngine with WidgetsBindingObserver {
 
   /// Sync operations for a specific home.
   Future<void> syncHome(String homeId) async {
+    if (homeId.isEmpty || homeId == 'default_home') return;
     if (_activeHomeSyncs.contains(homeId)) return;
     if (!_connectivity.isOnline) return;
 
@@ -271,10 +274,12 @@ class SyncEngine with WidgetsBindingObserver {
 
     if (allOps.isEmpty) return;
 
-    // Batch by home for efficiency
+    // Batch by home for efficiency (ignoring invalid/empty homeIds)
     final byHome = <String, List<SyncQueueEntry>>{};
     for (final op in allOps) {
-      byHome.putIfAbsent(op.homeId, () => []).add(op);
+      if (op.homeId.isNotEmpty && op.homeId != 'default_home') {
+        byHome.putIfAbsent(op.homeId, () => []).add(op);
+      }
     }
 
     for (final entry in byHome.entries) {
@@ -283,6 +288,7 @@ class SyncEngine with WidgetsBindingObserver {
   }
 
   Future<void> _pushPendingOperationsForHome(String homeId) async {
+    if (homeId.isEmpty || homeId == 'default_home') return;
     final pending = await _syncDao.getPendingOperationsForHome(homeId);
     final failed = await _syncDao.getFailedOperations();
     final homeOps = [...pending, ...failed.where((o) => o.homeId == homeId)];
@@ -382,6 +388,7 @@ class SyncEngine with WidgetsBindingObserver {
   // ──── PULL ────
 
   Future<void> _pullServerChanges(String homeId) async {
+    if (homeId.isEmpty || homeId == 'default_home') return;
     bool hasMore = true;
     int iterations = 0;
     const maxIterations = 20;

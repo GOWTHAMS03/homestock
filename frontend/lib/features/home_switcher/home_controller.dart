@@ -139,12 +139,14 @@ class HomeController extends StateNotifier<HomeState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final newHome = await _repo.createHome(name);
-      final updatedHomes = [...state.homes, newHome];
+      final updatedHomes = [...state.homes.where((h) => h.id != newHome.id), newHome];
+      await _storage.saveActiveHomeId(newHome.id);
       state = state.copyWith(
         isLoading: false,
         homes: updatedHomes,
         activeHome: newHome,
       );
+      _syncEngine?.syncHome(newHome.id);
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
@@ -156,12 +158,14 @@ class HomeController extends StateNotifier<HomeState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final joined = await _repo.joinHome(inviteCode);
-      final updatedHomes = [...state.homes, joined];
+      final updatedHomes = [...state.homes.where((h) => h.id != joined.id), joined];
+      await _storage.saveActiveHomeId(joined.id);
       state = state.copyWith(
         isLoading: false,
         homes: updatedHomes,
         activeHome: joined,
       );
+      _syncEngine?.syncHome(joined.id);
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());

@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' hide isNotNull;
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:homestock/core/database/app_database.dart';
@@ -114,10 +114,10 @@ void main() {
       expect(names.contains('Banana'), isTrue);
     });
 
-    test('resolveFallbackHomeId inspects local tables or returns default_home', () async {
+    test('resolveFallbackHomeId inspects local tables or returns null', () async {
       // Initially empty tables
       final initialFallback = await shoppingDao.resolveFallbackHomeId();
-      expect(initialFallback, 'default_home');
+      expect(initialFallback, isNull);
 
       // Now insert a local home
       await db.into(db.localHomes).insert(LocalHomesCompanion(

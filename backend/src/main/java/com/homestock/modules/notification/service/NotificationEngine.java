@@ -48,7 +48,7 @@ public class NotificationEngine {
     /**
      * Central dispatch for notifications across home members.
      */
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void dispatchHomeNotification(
             Home home,
             User excludedUser,
@@ -67,39 +67,43 @@ public class NotificationEngine {
 
         // 1. Deduplication check
         if (dedupKey != null && !dedupKey.isBlank()) {
-            Instant now = Instant.now();
-            Optional<NotificationDeduplication> existingDedup = deduplicationRepository.findByDedupKey(dedupKey);
+            try {
+                Instant now = Instant.now();
+                Optional<NotificationDeduplication> existingDedup = deduplicationRepository.findByDedupKey(dedupKey);
 
-            if (existingDedup.isPresent()) {
-                NotificationDeduplication dedup = existingDedup.get();
-                Duration effectiveCooldown = cooldown != null ? cooldown : Duration.ofHours(24);
+                if (existingDedup.isPresent()) {
+                    NotificationDeduplication dedup = existingDedup.get();
+                    Duration effectiveCooldown = cooldown != null ? cooldown : Duration.ofHours(24);
 
-                boolean withinCooldown = dedup.getLastSentAt().plus(effectiveCooldown).isAfter(now);
-                boolean statusChanged = currentStatus != null && dedup.getLastStatus() != null &&
-                        !currentStatus.equalsIgnoreCase(dedup.getLastStatus());
-                boolean qtyChangedSignificantly = currentQuantity != null && dedup.getLastQuantity() != null &&
-                        currentQuantity.compareTo(dedup.getLastQuantity()) != 0;
+                    boolean withinCooldown = dedup.getLastSentAt().plus(effectiveCooldown).isAfter(now);
+                    boolean statusChanged = currentStatus != null && dedup.getLastStatus() != null &&
+                            !currentStatus.equalsIgnoreCase(dedup.getLastStatus());
+                    boolean qtyChangedSignificantly = currentQuantity != null && dedup.getLastQuantity() != null &&
+                            currentQuantity.compareTo(dedup.getLastQuantity()) != 0;
 
-                // If within cooldown and condition has not changed, suppress duplicate alert
-                if (withinCooldown && !statusChanged && !qtyChangedSignificantly) {
-                    log.debug("Suppressing duplicate notification for dedupKey: {}", dedupKey);
-                    return;
+                    // If within cooldown and condition has not changed, suppress duplicate alert
+                    if (withinCooldown && !statusChanged && !qtyChangedSignificantly) {
+                        log.debug("Suppressing duplicate notification for dedupKey: {}", dedupKey);
+                        return;
+                    }
+
+                    // Update deduplication timestamp
+                    dedup.setLastSentAt(now);
+                    dedup.setLastQuantity(currentQuantity);
+                    dedup.setLastStatus(currentStatus);
+                    deduplicationRepository.save(dedup);
+                } else {
+                    NotificationDeduplication newDedup = NotificationDeduplication.builder()
+                            .dedupKey(dedupKey)
+                            .homeId(home.getId())
+                            .lastSentAt(now)
+                            .lastQuantity(currentQuantity)
+                            .lastStatus(currentStatus)
+                            .build();
+                    deduplicationRepository.save(newDedup);
                 }
-
-                // Update deduplication timestamp
-                dedup.setLastSentAt(now);
-                dedup.setLastQuantity(currentQuantity);
-                dedup.setLastStatus(currentStatus);
-                deduplicationRepository.save(dedup);
-            } else {
-                NotificationDeduplication newDedup = NotificationDeduplication.builder()
-                        .dedupKey(dedupKey)
-                        .homeId(home.getId())
-                        .lastSentAt(now)
-                        .lastQuantity(currentQuantity)
-                        .lastStatus(currentStatus)
-                        .build();
-                deduplicationRepository.save(newDedup);
+            } catch (Exception e) {
+                log.warn("Failed to check or update notification deduplication: {}", e.getMessage());
             }
         }
 
@@ -135,19 +139,23 @@ public class NotificationEngine {
                 continue;
             }
 
-            // Save in-app notification record in Database
-            Notification notification = Notification.builder()
-                    .home(home)
-                    .user(targetUser)
-                    .type(type)
-                    .priority(priority)
-                    .title(title)
-                    .body(body)
-                    .payloadJson(payloadJson)
-                    .dedupKey(dedupKey)
-                    .isRead(false)
-                    .build();
-            notificationRepository.save(notification);
+            // Save in-app notification record in Database safely
+            try {
+                Notification notification = Notification.builder()
+                        .home(home)
+                        .user(targetUser)
+                        .type(type)
+                        .priority(priority)
+                        .title(title)
+                        .body(body)
+                        .payloadJson(payloadJson)
+                        .dedupKey(dedupKey)
+                        .isRead(false)
+                        .build();
+                notificationRepository.save(notification);
+            } catch (Exception e) {
+                log.error("Failed to persist in-app notification for user {}: {}", targetUser.getId(), e.getMessage());
+            }
 
             // Check Quiet Hours for push notification dispatch
             if (pref != null && pref.isInsideQuietHours(currentTime) && priority != NotificationPriority.HIGH) {
@@ -160,22 +168,26 @@ public class NotificationEngine {
 
         // 4. Send FCM Push Notification to eligible device tokens
         if (!pushRecipientUserIds.isEmpty()) {
-            List<DeviceToken> activeTokens = deviceTokenService.getActiveTokensForUsers(pushRecipientUserIds);
-            firebaseNotificationProvider.sendPushNotification(
-                    activeTokens,
-                    type,
-                    priority,
-                    title,
-                    body,
-                    dataPayload
-            );
+            try {
+                List<DeviceToken> activeTokens = deviceTokenService.getActiveTokensForUsers(pushRecipientUserIds);
+                firebaseNotificationProvider.sendPushNotification(
+                        activeTokens,
+                        type,
+                        priority,
+                        title,
+                        body,
+                        dataPayload
+                );
+            } catch (Exception e) {
+                log.warn("Failed to dispatch push notifications: {}", e.getMessage());
+            }
         }
     }
 
     /**
      * Direct notification to a specific user.
      */
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void dispatchUserNotification(
             Home home,
             User targetUser,
@@ -201,18 +213,22 @@ public class NotificationEngine {
             } catch (Exception ignored) {}
         }
 
-        Notification notification = Notification.builder()
-                .home(home)
-                .user(targetUser)
-                .type(type)
-                .priority(priority)
-                .title(title)
-                .body(body)
-                .payloadJson(payloadJson)
-                .dedupKey(dedupKey)
-                .isRead(false)
-                .build();
-        notificationRepository.save(notification);
+        try {
+            Notification notification = Notification.builder()
+                    .home(home)
+                    .user(targetUser)
+                    .type(type)
+                    .priority(priority)
+                    .title(title)
+                    .body(body)
+                    .payloadJson(payloadJson)
+                    .dedupKey(dedupKey)
+                    .isRead(false)
+                    .build();
+            notificationRepository.save(notification);
+        } catch (Exception e) {
+            log.error("Failed to persist notification for user {}: {}", targetUser.getId(), e.getMessage());
+        }
 
         if (pref != null && pref.isInsideQuietHours(LocalTime.now()) && priority != NotificationPriority.HIGH) {
             return;

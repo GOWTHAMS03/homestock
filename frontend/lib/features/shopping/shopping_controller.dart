@@ -56,7 +56,7 @@ class ShoppingController extends StateNotifier<ShoppingState> {
   StreamSubscription? _listSub;
 
   ShoppingController(this._repo, this._homeId) : super(const ShoppingState()) {
-    if (_homeId != null && _homeId!.isNotEmpty) {
+    if (_homeId != null && _homeId!.isNotEmpty && _homeId != 'default_home') {
       _subscribeToLocalData();
       _fetchServerDataInBackground();
     } else {
@@ -65,8 +65,9 @@ class ShoppingController extends StateNotifier<ShoppingState> {
   }
 
   Future<void> _tryResolveHomeAndInitialize() async {
+    await _repo.cleanupLegacyDefaultHome();
     final resolved = await _repo.resolveFallbackHomeId();
-    if (resolved != null && resolved.isNotEmpty && mounted) {
+    if (resolved != null && resolved.isNotEmpty && resolved != 'default_home' && mounted) {
       _homeId = resolved;
       _subscribeToLocalData();
       _fetchServerDataInBackground();
@@ -74,11 +75,11 @@ class ShoppingController extends StateNotifier<ShoppingState> {
   }
 
   Future<String?> _getOrResolveHomeId() async {
-    if (_homeId != null && _homeId!.isNotEmpty) {
+    if (_homeId != null && _homeId!.isNotEmpty && _homeId != 'default_home') {
       return _homeId;
     }
     final resolved = await _repo.resolveFallbackHomeId();
-    if (resolved != null && resolved.isNotEmpty) {
+    if (resolved != null && resolved.isNotEmpty && resolved != 'default_home') {
       _homeId = resolved;
       _subscribeToLocalData();
       return _homeId;
@@ -89,7 +90,7 @@ class ShoppingController extends StateNotifier<ShoppingState> {
   /// Subscribe to local DB stream for instant UI updates.
   void _subscribeToLocalData() {
     final homeId = _homeId;
-    if (homeId == null || homeId.isEmpty) return;
+    if (homeId == null || homeId.isEmpty || homeId == 'default_home') return;
 
     _listSub?.cancel();
     _listSub = _repo.watchDefaultList(homeId).listen(

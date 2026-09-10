@@ -148,6 +148,11 @@ class ShoppingRepository {
     return _shoppingDao.resolveFallbackHomeId();
   }
 
+  /// Clean up legacy invalid records.
+  Future<void> cleanupLegacyDefaultHome() {
+    return _shoppingDao.cleanupLegacyDefaultHome();
+  }
+
   // ──── WRITE (local-first) ────
 
   /// Add an item to the shopping list locally and queue for sync.
@@ -593,6 +598,7 @@ class ShoppingRepository {
 
   /// Fetch from server and populate local DB.
   Future<void> fetchAndCacheFromServer(String homeId) async {
+    if (homeId.isEmpty || homeId == 'default_home') return;
     if (_connectivity != null && !_connectivity.isOnline) return;
     try {
       final response = await _apiClient.dio
