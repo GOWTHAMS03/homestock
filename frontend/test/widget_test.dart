@@ -39,9 +39,9 @@ void main() {
       ),
     );
 
-    expect(find.text('IN STOCK'), findsOneWidget);
-    expect(find.text('LOW STOCK'), findsOneWidget);
-    expect(find.text('OUT OF STOCK'), findsOneWidget);
+    expect(find.text('In stock'), findsOneWidget);
+    expect(find.text('Low stock'), findsOneWidget);
+    expect(find.text('Out of stock'), findsOneWidget);
   });
 
   testWidgets('QuantityStepper increments and decrements quantity', (WidgetTester tester) async {

@@ -105,4 +105,53 @@ void main() {
       expect(find.text('Retry'), findsOneWidget);
     });
   });
+
+  group('SubtleStatusIndicator Widget Tests', () {
+    testWidgets('renders Online indicator with subtle status dot', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            syncStateProvider.overrideWith(
+              (ref) => Stream.value(const SyncState(
+                status: NetworkStatus.online,
+                isSyncInProgress: false,
+              )),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SubtleStatusIndicator(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Online'), findsOneWidget);
+      expect(find.byType(SubtleStatusIndicator), findsOneWidget);
+    });
+
+    testWidgets('renders calm Offline indicator with sync note', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            syncStateProvider.overrideWith(
+              (ref) => Stream.value(const SyncState(
+                status: NetworkStatus.offline,
+                pendingOperationsCount: 3,
+              )),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SubtleStatusIndicator(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Offline · Changes will sync automatically'), findsOneWidget);
+    });
+  });
 }

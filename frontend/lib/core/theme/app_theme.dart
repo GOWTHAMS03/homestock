@@ -41,41 +41,41 @@ class HomeStockThemeColors extends ThemeExtension<HomeStockThemeColors> {
     required this.isOffline,
   });
 
-  /// Online Palette: Royal Amethyst Purple with Near-White
+  /// Online Palette: Calm Purple with Soft Neutral
   static const online = HomeStockThemeColors(
-    primary: AppColors.primary, // 0xFF7C3AED
-    primaryLight: AppColors.primaryLight, // 0xFFA78BFA
-    primaryDark: AppColors.primaryDark, // 0xFF5B21B6
-    primaryContainer: AppColors.primaryContainer, // 0xFFF3E8FF
-    onPrimaryContainer: AppColors.primaryDark,
+    primary: AppColors.primary,
+    primaryLight: AppColors.primaryLight,
+    primaryDark: AppColors.primaryDark,
+    primaryContainer: AppColors.primaryContainer,
+    onPrimaryContainer: AppColors.onPrimaryContainer,
     secondary: AppColors.secondary,
     secondaryContainer: AppColors.secondaryContainer,
-    background: AppColors.background, // 0xFFFAF8FF
-    surface: AppColors.surface, // 0xFFFFFFFF
-    surfaceVariant: AppColors.surfaceVariant, // 0xFFF5F3FF
-    outline: AppColors.outline, // 0xFFE9D5FF
+    background: AppColors.background,
+    surface: AppColors.surface,
+    surfaceVariant: AppColors.surfaceVariant,
+    outline: AppColors.outline,
     outlineVariant: AppColors.outlineVariant,
-    headerGradientStart: AppColors.headerGradientStart, // 0xFFF3E8FF
-    headerGradientEnd: AppColors.headerGradientEnd, // 0xFFFAF8FF
+    headerGradientStart: AppColors.surface,
+    headerGradientEnd: AppColors.surface,
     isOffline: false,
   );
 
-  /// Offline Palette: Warm Crimson Rose Red with Near-White
+  /// Offline Palette: Calm Purple with Soft Neutral (Offline is a normal mode, not an alarming red!)
   static const offline = HomeStockThemeColors(
-    primary: AppColors.offlinePrimary, // 0xFFE11D48
-    primaryLight: AppColors.offlinePrimaryLight, // 0xFFFB7185
-    primaryDark: AppColors.offlinePrimaryDark, // 0xFF9F1239
-    primaryContainer: AppColors.offlinePrimaryContainer, // 0xFFFFE4E6
-    onPrimaryContainer: AppColors.offlinePrimaryDark,
-    secondary: AppColors.offlineSecondary, // 0xFFD97706
-    secondaryContainer: AppColors.offlineSecondaryContainer, // 0xFFFEF3C7
-    background: AppColors.offlineBackground, // 0xFFFFF9F9
-    surface: AppColors.surface, // 0xFFFFFFFF
-    surfaceVariant: AppColors.offlineSurfaceVariant, // 0xFFFFF1F2
-    outline: AppColors.offlineOutline, // 0xFFFECDD3
-    outlineVariant: AppColors.offlineOutlineVariant,
-    headerGradientStart: AppColors.offlineHeaderGradientStart, // 0xFFFFE4E6
-    headerGradientEnd: AppColors.offlineHeaderGradientEnd, // 0xFFFFF9F9
+    primary: AppColors.primary,
+    primaryLight: AppColors.primaryLight,
+    primaryDark: AppColors.primaryDark,
+    primaryContainer: AppColors.primaryContainer,
+    onPrimaryContainer: AppColors.onPrimaryContainer,
+    secondary: AppColors.secondary,
+    secondaryContainer: AppColors.secondaryContainer,
+    background: AppColors.background,
+    surface: AppColors.surface,
+    surfaceVariant: AppColors.surfaceVariant,
+    outline: AppColors.outline,
+    outlineVariant: AppColors.outlineVariant,
+    headerGradientStart: AppColors.surface,
+    headerGradientEnd: AppColors.surface,
     isOffline: true,
   );
 

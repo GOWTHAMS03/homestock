@@ -549,8 +549,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         Expanded(
           child: _buildActionTile(
             icon: Icons.bolt_rounded,
-            iconColor: const Color(0xFFD97706),
-            iconBg: const Color(0xFFFEF3C7),
+            iconColor: AppColors.primary,
+            iconBg: AppColors.primaryContainer,
             title: 'Price Deals ⚡',
             subtitle: 'Compare stores',
             onTap: () => Navigator.of(context).push(
@@ -564,8 +564,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         Expanded(
           child: _buildActionTile(
             icon: Icons.shopping_cart_checkout_rounded,
-            iconColor: AppColors.hsGreen,
-            iconBg: AppColors.hsGreenBg,
+            iconColor: AppColors.textPrimary,
+            iconBg: AppColors.surfaceSubtle,
             title: 'Shop Mode',
             subtitle: 'Store checklist',
             onTap: () => Navigator.of(context).push(
@@ -579,8 +579,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         Expanded(
           child: _buildActionTile(
             icon: Icons.receipt_long_rounded,
-            iconColor: AppColors.primary,
-            iconBg: AppColors.primaryContainer,
+            iconColor: AppColors.textSecondary,
+            iconBg: AppColors.surfaceSubtle,
             title: 'Restocked',
             subtitle: 'Bills & receipts',
             onTap: () => Navigator.of(context).push(
@@ -604,12 +604,12 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: AppColors.outline),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -634,7 +634,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 const SizedBox(height: 7),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -663,15 +663,15 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
+                color: AppColors.lowStockBg,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(Icons.warning_amber_rounded, size: 15, color: Color(0xFFD97706)),
+              child: const Icon(Icons.warning_amber_rounded, size: 15, color: AppColors.lowStockText),
             ),
             const SizedBox(width: 6),
             const Text(
               'Pantry Running Low',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
             ),
             const SizedBox(width: 6),
             HomeStockPillBadge(
@@ -687,17 +687,17 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD97706),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(50),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.bolt_rounded, size: 13, color: Colors.white),
+                    const Icon(Icons.add_rounded, size: 13, color: Colors.white),
                     const SizedBox(width: 2),
                     Text(
                       'Restock All (${lowStockSuggestions.length})',
-                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.white),
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                   ],
                 ),
@@ -1310,7 +1310,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                   height: 32,
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
-                    color: item.isCompleted ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7),
+                    color: AppColors.surfaceSubtle,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
@@ -1466,18 +1466,18 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
+                          color: AppColors.surfaceSubtle,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFFDE68A)),
+                          border: Border.all(color: AppColors.outline),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.bolt_rounded, size: 12, color: Color(0xFFD97706)),
+                            Icon(Icons.bolt_rounded, size: 12, color: AppColors.primary),
                             SizedBox(width: 3),
                             Text(
                               'Deals',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF92400E)),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                             ),
                           ],
                         ),
@@ -1494,18 +1494,18 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withValues(alpha: 0.6),
+                          color: AppColors.surfaceSubtle,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.6)),
+                          border: Border.all(color: AppColors.outline),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.qr_code_scanner_rounded, size: 12, color: AppColors.primary),
+                            Icon(Icons.qr_code_scanner_rounded, size: 12, color: AppColors.textSecondary),
                             SizedBox(width: 3),
                             Text(
                               'Scan',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                             ),
                           ],
                         ),

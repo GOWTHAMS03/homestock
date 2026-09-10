@@ -7,7 +7,6 @@ import '../../core/constants/household_staples.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
-import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../../core/widgets/quantity_stepper.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/stock_status_badge.dart';
@@ -237,9 +236,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     return Container(
       margin: const EdgeInsets.only(left: AppSpacing.lg, right: AppSpacing.lg, top: 4, bottom: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB).withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFDE68A).withValues(alpha: 0.8)),
+        color: AppColors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outline, width: 0.8),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Column(
@@ -251,26 +250,26 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: AppColors.primaryContainer,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.bolt_rounded, size: 14, color: Color(0xFFD97706)),
+                child: const Icon(Icons.bolt_rounded, size: 14, color: AppColors.primary),
               ),
               const SizedBox(width: 6),
               const Text(
                 'Quick Add Staples',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF92400E)),
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
               ),
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
                   '650+ Items',
-                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
                 ),
               ),
               const Spacer(),
@@ -284,9 +283,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     children: [
                       Text(
                         'Explore All',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.primary),
                       ),
-                      Icon(Icons.chevron_right_rounded, size: 15, color: Color(0xFFD97706)),
+                      Icon(Icons.chevron_right_rounded, size: 15, color: AppColors.primary),
                     ],
                   ),
                 ),
@@ -611,7 +610,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           Icon(
                             cat.iconData,
                             size: 13,
-                            color: isSelected ? Theme.of(context).colorScheme.primary : cat.color,
+                            color: isSelected ? Theme.of(context).colorScheme.primary : AppColors.textSecondary,
                           ),
                           const SizedBox(width: 5),
                           Text(
@@ -1045,25 +1044,25 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 const SizedBox(width: 4),
               ],
 
-              // Left Category / Staple Indicator with soft pastel color
+              // Left Category / Staple Indicator with calm neutral surface
               Container(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: item.categoryColorParsed.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: item.categoryColorParsed.withValues(alpha: 0.28),
-                    width: 1,
+                    color: AppColors.outline,
+                    width: 0.8,
                   ),
                 ),
                 alignment: Alignment.center,
                 child: staple != null && staple.emoji.isNotEmpty
-                    ? Text(staple.emoji, style: const TextStyle(fontSize: 24))
+                    ? Text(staple.emoji, style: const TextStyle(fontSize: 22))
                     : Icon(
                         item.categoryIconData,
-                        size: 24,
-                        color: item.categoryColorParsed,
+                        size: 20,
+                        color: AppColors.textSecondary,
                       ),
               ),
               const SizedBox(width: 12),
@@ -1080,8 +1079,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           child: Text(
                             formattedName,
                             style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
                               letterSpacing: -0.2,
                             ),
@@ -1094,68 +1093,97 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEDE9FE),
-                              borderRadius: BorderRadius.circular(5),
+                              color: AppColors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               staple!.tamilName!,
                               style: const TextStyle(
                                 fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF6D28D9),
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
                         if (item.categoryName.isNotEmpty)
                           Text(
                             item.categoryName,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: item.categoryColorParsed,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w400,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         if (item.categoryName.isNotEmpty &&
                             item.storageLocation != null &&
                             item.storageLocation!.isNotEmpty)
-                          const Text(' • ', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                          const Text(' • ', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
                         if (item.storageLocation != null && item.storageLocation!.isNotEmpty)
                           Expanded(
                             child: Text(
                               item.storageLocation!,
-                              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        // Stock status pill
-                        HomeStockPillBadge(
-                          label: isOut ? 'Out of Stock' : (isLow ? 'Low Stock' : 'In Stock'),
-                          variant: isOut
-                              ? HomeStockPillVariant.pink
-                              : (isLow ? HomeStockPillVariant.yellow : HomeStockPillVariant.green),
-                          fontSize: 10,
+                        // Subtle Stock status tag
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isOut
+                                ? AppColors.outOfStockBg
+                                : (isLow ? AppColors.lowStockBg : AppColors.inStockBg),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: isOut
+                                  ? AppColors.outOfStockBorder
+                                  : (isLow ? AppColors.lowStockBorder : AppColors.inStockBorder),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            isOut ? 'Out of stock' : (isLow ? 'Low stock' : 'In stock'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isOut
+                                  ? AppColors.outOfStockText
+                                  : (isLow ? AppColors.lowStockText : AppColors.inStockText),
+                            ),
+                          ),
                         ),
 
                         if (isOnShoppingList)
-                          const HomeStockPillBadge(
-                            label: '🛒 On Shopping List',
-                            variant: HomeStockPillVariant.purple,
-                            fontSize: 10,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: AppColors.outline, width: 0.8),
+                            ),
+                            child: const Text(
+                              'On Shopping List',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ),
 
                         if (item.expiryDate != null)
@@ -1200,18 +1228,18 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3E8FF),
+                      color: AppColors.primaryContainer,
                       borderRadius: BorderRadius.circular(50),
-                      border: Border.all(color: const Color(0xFFD8B4FE)),
+                      border: Border.all(color: AppColors.outline),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('🛒', style: TextStyle(fontSize: 10.5)),
+                        const Icon(Icons.shopping_cart_outlined, size: 12, color: AppColors.primary),
                         const SizedBox(width: 4),
                         Text(
                           'On Shopping List (${pendingShoppingItem.quantity % 1 == 0 ? pendingShoppingItem.quantity.toInt() : pendingShoppingItem.quantity} ${pendingShoppingItem.unit})',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF7E22CE)),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
                         ),
                       ],
                     ),
@@ -1223,9 +1251,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: AppColors.surfaceSubtle,
                         borderRadius: BorderRadius.circular(50),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: AppColors.outline),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1234,7 +1262,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           SizedBox(width: 4),
                           Text(
                             '+ Shopping List',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
                           ),
                         ],
                       ),

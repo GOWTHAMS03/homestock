@@ -25,7 +25,7 @@ class HomeStockAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.showBackButton = true,
     this.onBack,
-    this.useGradient = true,
+    this.useGradient = false,
   });
 
   @override

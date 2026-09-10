@@ -211,7 +211,7 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
           )?.id;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: HomeStockAppBar(
         title: isEditing ? 'Edit Item' : 'Add Household Item',
         subtitle: isEditing ? 'Update pantry item specifications' : 'New pantry item record',
@@ -230,16 +230,16 @@ class _AddEditItemScreenState extends ConsumerState<AddEditItemScreen> {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFFD97706)),
+                        Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.primary),
                         SizedBox(width: 6),
                         Text(
                           'Quick Pick Suggested Staples',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                         ),
                         SizedBox(width: 6),
                         HomeStockPillBadge(
                           label: '1-Tap Auto-fill',
-                          variant: HomeStockPillVariant.yellow,
+                          variant: HomeStockPillVariant.neutral,
                           fontSize: 9.5,
                         ),
                       ],

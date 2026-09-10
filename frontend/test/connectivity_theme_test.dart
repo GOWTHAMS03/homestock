@@ -32,36 +32,36 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  group('Dynamic Connectivity Themes (Purple Online vs Warm Red Offline)', () {
-    testWidgets('AppTheme.onlineTheme defines Royal Amethyst Purple and Near-White palette', (tester) async {
+  group('Dynamic Connectivity Themes (Calm Purple Online & Offline)', () {
+    testWidgets('AppTheme.onlineTheme defines Calm Purple and Soft Neutral palette', (tester) async {
       final theme = AppTheme.onlineTheme;
-      expect(theme.colorScheme.primary, equals(const Color(0xFF7C3AED)));
-      expect(theme.scaffoldBackgroundColor, equals(const Color(0xFFFAF8FF)));
-      expect(theme.colorScheme.primaryContainer, equals(const Color(0xFFF3E8FF)));
+      expect(theme.colorScheme.primary, equals(const Color(0xFF6C4AB6)));
+      expect(theme.scaffoldBackgroundColor, equals(const Color(0xFFFAF9FC)));
+      expect(theme.colorScheme.primaryContainer, equals(const Color(0xFFF3EFFF)));
 
       final ext = theme.extension<HomeStockThemeColors>();
       expect(ext, isNotNull);
       expect(ext!.isOffline, isFalse);
-      expect(ext.primary, equals(const Color(0xFF7C3AED)));
-      expect(ext.headerGradientStart, equals(const Color(0xFFF3E8FF)));
-      expect(ext.headerGradientEnd, equals(const Color(0xFFFAF8FF)));
+      expect(ext.primary, equals(const Color(0xFF6C4AB6)));
+      expect(ext.headerGradientStart, equals(const Color(0xFFFFFFFF)));
+      expect(ext.headerGradientEnd, equals(const Color(0xFFFFFFFF)));
     });
 
-    testWidgets('AppTheme.offlineTheme defines Warm Crimson Rose Red and Warm Near-White palette', (tester) async {
+    testWidgets('AppTheme.offlineTheme maintains Calm Purple and Soft Neutral palette without alarming red shifts', (tester) async {
       final theme = AppTheme.offlineTheme;
-      expect(theme.colorScheme.primary, equals(const Color(0xFFE11D48)));
-      expect(theme.scaffoldBackgroundColor, equals(const Color(0xFFFFF9F9)));
-      expect(theme.colorScheme.primaryContainer, equals(const Color(0xFFFFE4E6)));
+      expect(theme.colorScheme.primary, equals(const Color(0xFF6C4AB6)));
+      expect(theme.scaffoldBackgroundColor, equals(const Color(0xFFFAF9FC)));
+      expect(theme.colorScheme.primaryContainer, equals(const Color(0xFFF3EFFF)));
 
       final ext = theme.extension<HomeStockThemeColors>();
       expect(ext, isNotNull);
       expect(ext!.isOffline, isTrue);
-      expect(ext.primary, equals(const Color(0xFFE11D48)));
-      expect(ext.headerGradientStart, equals(const Color(0xFFFFE4E6)));
-      expect(ext.headerGradientEnd, equals(const Color(0xFFFFF9F9)));
+      expect(ext.primary, equals(const Color(0xFF6C4AB6)));
+      expect(ext.headerGradientStart, equals(const Color(0xFFFFFFFF)));
+      expect(ext.headerGradientEnd, equals(const Color(0xFFFFFFFF)));
     });
 
-    testWidgets('appThemeProvider dynamically switches MaterialApp theme between Online (Purple) and Offline (Red)',
+    testWidgets('appThemeProvider dynamically switches isOffline flag while maintaining calm UI',
         (WidgetTester tester) async {
       final onlineState = StateProvider<bool>((ref) => true);
 
@@ -91,7 +91,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('PrimaryHex: ff7c3aed, Offline: false'), findsOneWidget);
+      expect(find.text('PrimaryHex: ff6c4ab6, Offline: false'), findsOneWidget);
 
       // Now toggle to offline mode
       final element = tester.element(find.byType(Scaffold));
@@ -99,7 +99,7 @@ void main() {
       container.read(onlineState.notifier).state = false;
       await tester.pumpAndSettle();
 
-      expect(find.text('PrimaryHex: ffe11d48, Offline: true'), findsOneWidget);
+      expect(find.text('PrimaryHex: ff6c4ab6, Offline: true'), findsOneWidget);
     });
 
     testWidgets('HomeStockAppBar renders without any Wi-Fi icon', (WidgetTester tester) async {

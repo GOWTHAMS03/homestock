@@ -4,6 +4,142 @@ import '../constants/app_colors.dart';
 import '../sync/sync_providers.dart';
 import '../sync/sync_status.dart';
 
+/// Subtle, calm status indicator answering:
+/// - Online: ● Online (muted red dot #C85C5C)
+/// - Offline: ● Offline · Changes will sync automatically (purple dot #7653C6)
+/// Non-intrusive, offline is NOT an error.
+class SubtleStatusIndicator extends ConsumerWidget {
+  final bool showSyncNote;
+
+  const SubtleStatusIndicator({
+    super.key,
+    this.showSyncNote = true,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncStateAsync = ref.watch(syncStateProvider);
+
+    return syncStateAsync.when(
+      data: (syncState) => _buildIndicator(context, ref, syncState),
+      loading: () => _buildOnlineIndicator(),
+      error: (_, _) => _buildOfflineIndicator(context, ref, 0),
+    );
+  }
+
+  Widget _buildIndicator(BuildContext context, WidgetRef ref, SyncState syncState) {
+    if (syncState.isSyncing) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 8,
+            height: 8,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'Syncing...',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (syncState.isOnline) {
+      return _buildOnlineIndicator();
+    }
+
+    return _buildOfflineIndicator(context, ref, syncState.pendingOperationsCount);
+  }
+
+  Widget _buildOnlineIndicator() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(
+            color: AppColors.statusOnline,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          'Online',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOfflineIndicator(BuildContext context, WidgetRef ref, int pendingCount) {
+    return InkWell(
+      onTap: () {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              pendingCount > 0
+                  ? '$pendingCount change(s) saved locally. Syncing will resume automatically when connected.'
+                  : 'Working offline: Everything is saved locally on your phone.',
+              style: const TextStyle(fontSize: 12.5),
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF1E293B),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: AppColors.primaryLight,
+              onPressed: () => ref.read(syncEngineProvider).syncAll(),
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: const BoxDecoration(
+                color: AppColors.statusOffline,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              showSyncNote
+                  ? 'Offline · Changes will sync automatically'
+                  : 'Offline',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// A sleek, non-disruptive offline indicator that renders a simple wifi icon
 /// without pushing or disrupting the UI.
 class OfflineWifiBadge extends ConsumerWidget {
@@ -39,12 +175,12 @@ class OfflineWifiBadge extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: AppColors.primary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: const SizedBox(
-              width: 14,
-              height: 14,
+              width: 12,
+              height: 12,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
@@ -55,7 +191,7 @@ class OfflineWifiBadge extends ConsumerWidget {
       );
     }
 
-    // Clean, minimal Wi-Fi off badge
+    // Clean, minimal Wi-Fi off badge with calm purple accent (Offline != Error)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: InkWell(
@@ -90,19 +226,19 @@ class OfflineWifiBadge extends ConsumerWidget {
         },
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: showText ? 8 : 6, vertical: 4),
+          padding: EdgeInsets.symmetric(horizontal: showText ? 8 : 6, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
+            color: AppColors.surfaceVariant,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFFECACA), width: 0.8),
+            border: Border.all(color: AppColors.outline, width: 0.8),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.wifi_off_rounded,
-                size: 14,
-                color: Color(0xFFDC2626),
+                size: 13,
+                color: AppColors.statusOffline,
               ),
               if (showText) ...[
                 const SizedBox(width: 4),
@@ -110,8 +246,8 @@ class OfflineWifiBadge extends ConsumerWidget {
                   'Offline',
                   style: TextStyle(
                     fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

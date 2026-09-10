@@ -20,6 +20,7 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final _dashboardNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'dashboard');
 final _inventoryNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'inventory');
 final _shoppingNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shopping');
+final _profileNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
@@ -86,11 +87,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
-        path: '/profile',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
         path: '/analytics',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const AnalyticsScreen(),
@@ -109,7 +105,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Main 3-tab Bottom Navigation Shell (Home, Inventory, Shopping List)
+      // Main 4-tab Bottom Navigation Shell (Home, Inventory, Shopping, Profile)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainScaffold(navigationShell: navigationShell);
@@ -144,6 +140,17 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/shopping',
                 builder: (context, state) => const ShoppingScreen(),
+              ),
+            ],
+          ),
+
+          // 4. Profile Tab
+          StatefulShellBranch(
+            navigatorKey: _profileNavigatorKey,
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (context, state) => const ProfileScreen(),
               ),
             ],
           ),

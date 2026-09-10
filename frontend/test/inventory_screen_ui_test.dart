@@ -7,10 +7,19 @@ import 'package:homestock/features/inventory/inventory_controller.dart';
 import 'package:homestock/features/inventory/inventory_model.dart';
 import 'package:homestock/features/inventory/inventory_screen.dart';
 import 'package:homestock/features/voice/widgets/voice_input_button.dart';
+import 'package:homestock/features/shopping/shopping_controller.dart';
 
 class MockInventoryController extends StateNotifier<InventoryState>
     implements InventoryController {
   MockInventoryController(super.state);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class MockShoppingController extends StateNotifier<ShoppingState>
+    implements ShoppingController {
+  MockShoppingController(super.state);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -74,6 +83,9 @@ void main() {
       ProviderScope(
         overrides: [
           inventoryControllerProvider.overrideWith((ref) => mockController),
+          shoppingControllerProvider.overrideWith(
+            (ref) => MockShoppingController(const ShoppingState(list: null, isLoading: false)),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,

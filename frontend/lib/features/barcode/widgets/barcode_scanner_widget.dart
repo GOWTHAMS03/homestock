@@ -262,8 +262,8 @@ class _BarcodeScannerWidgetState extends ConsumerState<BarcodeScannerWidget>
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
-                          'Align barcode inside box',
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                          'Align barcode within frame',
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
@@ -322,9 +322,9 @@ class _BarcodeScannerWidgetState extends ConsumerState<BarcodeScannerWidget>
                       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 4),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade900.withValues(alpha: 0.85),
+                        color: AppColors.primary.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.8)),
+                        border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.8)),
                       ),
                       child: Row(
                         children: [

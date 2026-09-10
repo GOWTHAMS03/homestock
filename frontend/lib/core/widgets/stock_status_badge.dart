@@ -36,21 +36,21 @@ class StockStatusBadge extends StatelessWidget {
         bg = AppColors.outOfStockBg;
         text = AppColors.outOfStockText;
         border = AppColors.outOfStockBorder;
-        label = 'OUT OF STOCK';
+        label = 'Out of stock';
         icon = Icons.cancel_outlined;
         break;
       case StockStatusType.lowStock:
         bg = AppColors.lowStockBg;
         text = AppColors.lowStockText;
         border = AppColors.lowStockBorder;
-        label = 'LOW STOCK';
+        label = 'Low stock';
         icon = Icons.warning_amber_rounded;
         break;
       case StockStatusType.inStock:
         bg = AppColors.inStockBg;
         text = AppColors.inStockText;
         border = AppColors.inStockBorder;
-        label = 'IN STOCK';
+        label = 'In stock';
         icon = Icons.check_circle_outline_rounded;
         break;
     }
@@ -75,8 +75,8 @@ class StockStatusBadge extends StatelessWidget {
             style: TextStyle(
               color: text,
               fontSize: compact ? 10 : 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
             ),
           ),
         ],
