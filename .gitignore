@@ -3,9 +3,32 @@ __pycache__/
 *.py[cod]
 *.class
 
+# Maven & Java Build Outputs
+target/
+**/target/
+*.jar
+*.war
+*.ear
+*.lst
+*.dumpstream
+
+# Flutter & Dart Build Outputs
+**/build/
+.dart_tool/
+**/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
 # IDE and OS
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+*.iml
 *.log
+
+# Scratch directory
+scratch/
