@@ -158,16 +158,18 @@ class InventoryController extends StateNotifier<InventoryState> {
   }
 
   /// Fetch server data in background (non-blocking).
-  /// Local data is displayed immediately from SQLite.
+  /// Pushes local pending changes first, then pulls and reconciles remote changes.
   Future<void> _fetchServerDataInBackground() async {
     if (_homeId == null) return;
     if (!_repo.isOnline) return;
 
     try {
-      await _repo.fetchAndCacheCategories(_homeId);
-      await _repo.fetchAndCacheFromServer(_homeId);
+      await _repo.sync(_homeId);
     } catch (_) {
-      // Server fetch failures are non-fatal — local data still shows
+      try {
+        await _repo.fetchAndCacheCategories(_homeId);
+        await _repo.fetchAndCacheFromServer(_homeId);
+      } catch (_) {}
     }
   }
 

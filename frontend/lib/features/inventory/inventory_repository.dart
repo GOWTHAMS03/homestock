@@ -328,47 +328,79 @@ class InventoryRepository {
     final operationId = _uuid.v4();
     final now = DateTime.now();
 
-    final quantity = (data['quantity'] as num?)?.toDouble();
-    final minQty = (data['minimumQuantity'] as num?)?.toDouble();
-    final expiryDate = data['expiryDate'] as String?;
-
     // Get current item for fields not being updated
     final current = await _inventoryDao.getItemById(itemId);
 
+    final quantity = (data['quantity'] as num?)?.toDouble();
+    final minQty = (data['minimumQuantity'] as num?)?.toDouble();
+    final expiryDate = data.containsKey('expiryDate')
+        ? (data['expiryDate'] as String?)
+        : current?.expiryDate;
+
     final effectiveQty = quantity ?? current?.quantity ?? 0.0;
     final effectiveMinQty = minQty ?? current?.minimumQuantity ?? 1.0;
-    final stockStatus = _computeStockStatus(effectiveQty, effectiveMinQty);
-    final expiryStatus =
-        _computeExpiryStatus(expiryDate ?? current?.expiryDate);
+    final stockStatus = data['stockStatus'] as String? ??
+        _computeStockStatus(effectiveQty, effectiveMinQty);
+    final expiryStatus = data['expiryStatus'] as String? ??
+        _computeExpiryStatus(expiryDate);
 
-    // 1. Update local DB
+    // 1. Update local DB preserving all existing fields
     final companion = LocalInventoryItemsCompanion(
       id: Value(itemId),
       homeId: Value(homeId),
-      categoryId: Value(data['categoryId'] as String?),
-      categoryName:
-          Value(data['categoryName'] as String? ?? current?.categoryName ?? 'General'),
-      categoryIcon:
-          Value(data['categoryIcon'] as String? ?? current?.categoryIcon ?? 'category'),
-      categoryColor:
-          Value(data['categoryColor'] as String? ?? current?.categoryColor ?? '#6366F1'),
+      categoryId: Value(data.containsKey('categoryId')
+          ? (data['categoryId'] as String?)
+          : current?.categoryId),
+      categoryName: Value(data['categoryName'] as String? ??
+          current?.categoryName ??
+          'General'),
+      categoryIcon: Value(data['categoryIcon'] as String? ??
+          current?.categoryIcon ??
+          'category'),
+      categoryColor: Value(data['categoryColor'] as String? ??
+          current?.categoryColor ??
+          '#6366F1'),
       name: Value((data['name'] as String?)?.trim() ?? current?.name ?? ''),
-      brand: Value(data['brand'] as String?),
+      brand: Value(data.containsKey('brand')
+          ? (data['brand'] as String?)
+          : current?.brand),
       quantity: Value(effectiveQty),
+      quantityStatus: Value(data['quantityStatus'] as String? ??
+          current?.quantityStatus),
       unit: Value((data['unit'] as String?)?.trim() ?? current?.unit ?? 'pcs'),
       minimumQuantity: Value(effectiveMinQty),
-      maximumQuantity:
-          Value((data['maximumQuantity'] as num?)?.toDouble()),
-      storageLocation: Value(data['storageLocation'] as String?),
-      purchasePrice:
-          Value((data['purchasePrice'] as num?)?.toDouble()),
-      purchaseDate: Value(data['purchaseDate'] as String?),
+      maximumQuantity: Value(data.containsKey('maximumQuantity')
+          ? (data['maximumQuantity'] as num?)?.toDouble()
+          : current?.maximumQuantity),
+      storageLocation: Value(data.containsKey('storageLocation')
+          ? (data['storageLocation'] as String?)
+          : current?.storageLocation),
+      purchasePrice: Value(data.containsKey('purchasePrice')
+          ? (data['purchasePrice'] as num?)?.toDouble()
+          : current?.purchasePrice),
+      purchaseDate: Value(data.containsKey('purchaseDate')
+          ? (data['purchaseDate'] as String?)
+          : current?.purchaseDate),
       expiryDate: Value(expiryDate),
-      notes: Value(data['notes'] as String?),
-      barcode: Value(data['barcode'] as String? ?? current?.barcode),
-      productId: Value(data['productId'] as String? ?? current?.productId),
+      imageUrl: Value(data.containsKey('imageUrl')
+          ? (data['imageUrl'] as String?)
+          : current?.imageUrl),
+      notes: Value(data.containsKey('notes')
+          ? (data['notes'] as String?)
+          : current?.notes),
+      barcode: Value(data.containsKey('barcode')
+          ? (data['barcode'] as String?)
+          : current?.barcode),
+      productId: Value(data.containsKey('productId')
+          ? (data['productId'] as String?)
+          : current?.productId),
       stockStatus: Value(stockStatus),
       expiryStatus: Value(expiryStatus),
+      daysUntilExpiry: Value(data.containsKey('daysUntilExpiry')
+          ? (data['daysUntilExpiry'] as int?)
+          : current?.daysUntilExpiry),
+      isDeleted: const Value(false),
+      isLocalOnly: Value(current?.isLocalOnly ?? false),
       updatedAt: Value(now),
     );
 
@@ -503,9 +535,11 @@ class InventoryRepository {
     _syncEngine.trySyncImmediate();
   }
 
-  // ──── REMOTE (for initial load & sync) ────
+  /// Push pending operations and pull fresh changes via SyncEngine.
+  Future<void> sync(String homeId) => _syncEngine.syncHome(homeId);
 
   /// Fetch all items from server and populate local DB.
+  /// Protects items with pending sync operations from being overwritten.
   Future<void> fetchAndCacheFromServer(String homeId) async {
     if (!_connectivity.isOnline) return;
     try {
@@ -516,7 +550,14 @@ class InventoryRepository {
       final data = response.data['data'];
       final content = data['content'] as List? ?? [];
 
-      final companions = content.map((json) {
+      final pendingEntityIds = await _syncDao.getActivePendingEntityIds(homeId: homeId);
+
+      final companions = content
+          .where((json) {
+            final id = json['id'] as String? ?? '';
+            return !pendingEntityIds.contains(id);
+          })
+          .map((json) {
         return LocalInventoryItemsCompanion(
           id: Value(json['id'] as String? ?? ''),
           homeId: Value(homeId),
@@ -548,7 +589,9 @@ class InventoryRepository {
         );
       }).toList();
 
-      await _inventoryDao.upsertItems(companions);
+      if (companions.isNotEmpty) {
+        await _inventoryDao.upsertItems(companions);
+      }
     } catch (e) {
       if (kDebugMode) print('[InventoryRepo] Fetch from server failed: $e');
     }

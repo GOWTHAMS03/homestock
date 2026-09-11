@@ -14,7 +14,9 @@ import 'features/auth/auth_controller.dart' show apiClientProvider, secureStorag
 import 'features/home_switcher/home_controller.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/notifications/notification_providers.dart';
+import 'core/widgets/in_app_notification_banner.dart';
 import 'features/notifications/notification_controller.dart';
+import 'features/notifications/notification_repository.dart';
 import 'package:go_router/go_router.dart';
 
 void main() async {
@@ -69,6 +71,21 @@ void main() async {
       silentSyncCallback: (homeId) {
         syncEngine.syncHome(homeId);
       },
+      tokenCallback: (token) async {
+        debugPrint('[Main] FCM Token acquired: ${token.substring(0, 10)}... Registering with backend');
+        try {
+          final notifRepo = NotificationRepository(
+            apiClient: apiClient,
+            connectivityMonitor: connectivityMonitor,
+          );
+          await notifRepo.registerDeviceToken(
+            token: token,
+            platform: 'ANDROID',
+          );
+        } catch (e) {
+          debugPrint('[Main] Token registration failed on startup: $e');
+        }
+      },
       payloadTapCallback: (payload) {
         // Payload-based navigation will be handled by NotificationRouter
         // at tap time within the widget tree (requires WidgetRef).
@@ -85,6 +102,44 @@ void main() async {
           route = '/analytics';
         }
         rootNavigatorKey.currentContext?.push(route);
+      },
+      foregroundNotificationCallback: (title, body, data) {
+        final context = rootNavigatorKey.currentContext;
+        if (context == null) return;
+        final type = (data['type']?.toString() ?? 'SYSTEM').toUpperCase();
+        final entityId = data['entityId']?.toString() ?? data['itemId']?.toString();
+
+        InAppNotificationBanner.show(
+          context: context,
+          title: title,
+          body: body,
+          type: type,
+          entityId: entityId,
+          payload: data,
+          onTap: () {
+            String route = '/notifications';
+            if (entityId != null && entityId.isNotEmpty &&
+                (type.contains('STOCK') || type.contains('EXPIR') || type == 'SMART_RESTOCK_SUGGESTION')) {
+              route = '/inventory/detail/$entityId';
+            } else if (type == 'SHOPPING_LIST_UPDATE') {
+              route = '/shopping';
+            } else if (type == 'WEEKLY_INSIGHT' || type == 'MONTHLY_REPORT') {
+              route = '/analytics';
+            }
+            rootNavigatorKey.currentContext?.push(route);
+          },
+          onActionTap: () {
+            if (type.contains('STOCK') || type == 'SMART_RESTOCK_SUGGESTION') {
+              rootNavigatorKey.currentContext?.push('/shopping');
+            } else if (type.contains('EXPIR')) {
+              if (entityId != null && entityId.isNotEmpty) {
+                rootNavigatorKey.currentContext?.push('/inventory/detail/$entityId');
+              }
+            } else if (type == 'SHOPPING_LIST_UPDATE') {
+              rootNavigatorKey.currentContext?.push('/shopping');
+            }
+          },
+        );
       },
     );
   } catch (e) {

@@ -13,11 +13,13 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   final inventoryDao = ref.watch(inventoryDaoProvider);
   final shoppingDao = ref.watch(shoppingDaoProvider);
   final connectivity = ref.watch(connectivityMonitorProvider);
+  final syncDao = ref.watch(syncDaoProvider);
   return DashboardRepository(
     apiClient: client,
     inventoryDao: inventoryDao,
     shoppingDao: shoppingDao,
     connectivity: connectivity,
+    syncDao: syncDao,
   );
 });
 
@@ -119,9 +121,10 @@ class DashboardController extends StateNotifier<DashboardState> {
         final remoteSummary = await _repo.fetchRemoteSummary(_homeId);
         final insights = await _repo.getHomeInsights(_homeId);
         final returnSum = await _repo.getReturnSummary(_homeId);
+        final hasPending = await _repo.hasPendingSyncOperations(_homeId);
         if (mounted) {
           state = state.copyWith(
-            summary: remoteSummary ?? state.summary,
+            summary: hasPending ? state.summary : (remoteSummary ?? state.summary),
             homeInsight: insights,
             returnSummary: returnSum,
           );

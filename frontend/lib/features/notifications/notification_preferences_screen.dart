@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/notifications/notification_providers.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
+import '../../core/widgets/in_app_notification_banner.dart';
 import 'notification_controller.dart';
 import 'notification_preference_model.dart';
 
@@ -17,6 +22,8 @@ class NotificationPreferencesScreen extends ConsumerStatefulWidget {
 
 class _NotificationPreferencesScreenState extends ConsumerState<NotificationPreferencesScreen> {
   bool _osPermissionEnabled = true;
+  bool _isTestingPush = false;
+  String _previewScenario = 'LOW_STOCK'; // 'LOW_STOCK', 'EXPIRING', 'SHOPPING'
 
   @override
   void initState() {
@@ -71,6 +78,10 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
 
                 // 2. Quiet Hours Card
                 _buildQuietHoursCard(prefs),
+                const SizedBox(height: 16),
+
+                // 2b. Firebase Test Card
+                _buildTestPushCard(),
                 const SizedBox(height: 20),
 
                 // 3. Inventory & Restock Alerts
@@ -362,6 +373,701 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
         },
       ),
     );
+  }
+
+  Widget _buildTestPushCard() {
+    final token = NotificationService.instance.fcmToken;
+    final hasToken = token != null && token.isNotEmpty;
+
+    // Determine current preview metadata based on selected scenario
+    final String previewEmoji;
+    final Color previewBg;
+    final Color previewBorder;
+    final String previewBadge;
+    final Color previewBadgeBg;
+    final Color previewBadgeTextColor;
+    final String previewTitle;
+    final String previewSubtitle;
+    final String previewAction;
+    final Color previewActionColor;
+
+    if (_previewScenario == 'EXPIRING') {
+      previewEmoji = '🥚';
+      previewBg = const Color(0xFFFFEDD5);
+      previewBorder = const Color(0xFFFED7AA);
+      previewBadge = '⏳ EXPIRING SOON';
+      previewBadgeBg = const Color(0xFFFFEDD5);
+      previewBadgeTextColor = const Color(0xFFC2410C);
+      previewTitle = 'Eggs Expiring in 3 Days';
+      previewSubtitle = '24 pcs remaining • Use soon to avoid waste';
+      previewAction = 'Inspect Item';
+      previewActionColor = const Color(0xFFF59E0B);
+    } else if (_previewScenario == 'SHOPPING') {
+      previewEmoji = '🛒';
+      previewBg = const Color(0xFFF3E8FF);
+      previewBorder = const Color(0xFFDDD6FE);
+      previewBadge = '🛒 SHOPPING LIST';
+      previewBadgeBg = const Color(0xFFEDE9FE);
+      previewBadgeTextColor = const Color(0xFF6D28D9);
+      previewTitle = 'Shopping List Updated';
+      previewSubtitle = 'Gowtham added Rice (2 kg) & Milk (1 L)';
+      previewAction = 'View List';
+      previewActionColor = const Color(0xFF6366F1);
+    } else {
+      previewEmoji = '🥛';
+      previewBg = const Color(0xFFFEF9C3);
+      previewBorder = const Color(0xFFFDE68A);
+      previewBadge = '⚠️ LOW STOCK';
+      previewBadgeBg = const Color(0xFFFEF3C7);
+      previewBadgeTextColor = const Color(0xFFB45309);
+      previewTitle = 'Milk (பால்) is running low';
+      previewSubtitle = 'Only 0.5 L left • Min reserve: 2 L';
+      previewAction = '+ Add to Shopping';
+      previewActionColor = const Color(0xFF6366F1);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFFFFF),
+            Color(0xFFFAF9FF),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: const Color(0xFFDDD6FE),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. TOP ROW: Firebase Flame Squircle + Title & Subtitle + Active Pill
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 48x48 Multi-tone flame squircle
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFF59E0B),
+                      Color(0xFFEA580C),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.local_fire_department_rounded,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 13),
+
+              // Title & Subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Firebase Cloud Push',
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Realtime alerts for stockouts, expiries & sync',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Status Badge Pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                decoration: BoxDecoration(
+                  color: hasToken ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: hasToken ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
+                    width: 0.9,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      hasToken ? '🟢' : '🟡',
+                      style: const TextStyle(fontSize: 8.5),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      hasToken ? 'Connected' : 'Local Mode',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: hasToken ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 2. CARD THEME SHOWCASE / LIVE PREVIEW
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 1.0,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Subheader with icon
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.preview_rounded,
+                      size: 13,
+                      color: Color(0xFF6366F1),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'NOTIFICATION CARD PREVIEW',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF6366F1),
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDE9FE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Project Theme',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6D28D9),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                // Nested Interactive Card
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: previewBorder,
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 40x40 Food Emoji Squircle
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: previewBg,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                previewEmoji,
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+
+                          // Metadata + Title
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: previewBadgeBg,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        previewBadge,
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: previewBadgeTextColor,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      'Just now',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF6366F1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  previewTitle,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                    letterSpacing: -0.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ],
+                      ),
+
+                      // Subtitle
+                      Padding(
+                        padding: const EdgeInsets.only(left: 50, top: 3),
+                        child: Text(
+                          previewSubtitle,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Action Button in Preview Card
+                      Padding(
+                        padding: const EdgeInsets.only(left: 50),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: previewActionColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.touch_app_rounded,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    previewAction,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Spacer(),
+                            const Text(
+                              '⚡ Realtime Push',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // 3. SCENARIO SELECTOR CHIPS
+                Row(
+                  children: [
+                    const Text(
+                      'Scenario: ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            _buildScenarioChip('LOW_STOCK', '🥛 Low Stock'),
+                            const SizedBox(width: 6),
+                            _buildScenarioChip('EXPIRING', '⏳ Expiry'),
+                            const SizedBox(width: 6),
+                            _buildScenarioChip('SHOPPING', '🛒 Shopping'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // 4. TOKEN DIAGNOSTICS BAR
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9).withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.vpn_key_rounded,
+                  size: 13,
+                  color: Color(0xFF64748B),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    hasToken
+                        ? 'Token: ${token.substring(0, 8)}...${token.substring(token.length - 6)}'
+                        : 'Token: Initialized with Mock/Local Fallback',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF475569),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (hasToken)
+                  InkWell(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: token));
+                      HapticFeedback.lightImpact();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('FCM Device Token copied to clipboard!'),
+                          duration: Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        children: [
+                          Icon(Icons.copy_rounded, size: 12, color: Color(0xFF6366F1)),
+                          SizedBox(width: 3),
+                          Text(
+                            'Copy',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6366F1),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 5. PRIMARY SEND TEST BUTTON
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isTestingPush ? null : _sendTestPush,
+              icon: _isTestingPush
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.send_rounded, size: 17),
+              label: Text(
+                _isTestingPush ? 'Dispatching Firebase Alert...' : 'Send Test Notification',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScenarioChip(String key, String label) {
+    final isSelected = _previewScenario == key;
+    return InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _previewScenario = key);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6366F1) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFCBD5E1),
+            width: 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF334155),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendTestPush() async {
+    setState(() => _isTestingPush = true);
+    HapticFeedback.mediumImpact();
+
+    String title;
+    String body;
+    String type;
+    String? entityId;
+
+    if (_previewScenario == 'EXPIRING') {
+      title = 'Eggs Expiring in 3 Days';
+      body = '24 pcs of fresh eggs will expire soon. Consider using to avoid waste!';
+      type = 'EXPIRING_SOON';
+      entityId = 'item-eggs';
+    } else if (_previewScenario == 'SHOPPING') {
+      title = 'Shopping List Updated';
+      body = 'Gowtham added Rice (2 kg) and Milk (1 L) to household shopping list.';
+      type = 'SHOPPING_LIST_UPDATE';
+      entityId = null;
+    } else {
+      title = 'Low stock: Milk (பால்)';
+      body = 'Only 0.5 L remaining in Refrigerator. Recommended minimum: 2 L.';
+      type = 'LOW_STOCK';
+      entityId = 'item-milk';
+    }
+
+    // Immediately show the in-app foreground notification card with project theme
+    InAppNotificationBanner.show(
+      context: context,
+      title: title,
+      body: body,
+      type: type,
+      entityId: entityId,
+      onTap: () {
+        if (entityId != null && entityId.isNotEmpty) {
+          context.push('/inventory/detail/$entityId');
+        } else if (type == 'SHOPPING_LIST_UPDATE') {
+          context.push('/shopping');
+        } else {
+          context.push('/notifications');
+        }
+      },
+      onActionTap: () {
+        if (type == 'LOW_STOCK') {
+          context.push('/shopping');
+        } else if (type == 'EXPIRING_SOON' && entityId != null) {
+          context.push('/inventory/detail/$entityId');
+        } else {
+          context.push('/shopping');
+        }
+      },
+    );
+
+    try {
+      // Ensure token is registered first
+      String? token = NotificationService.instance.fcmToken;
+      if (token == null || token.isEmpty) {
+        try {
+          token = await FirebaseMessaging.instance.getToken();
+        } catch (_) {}
+      }
+      if (token != null && token.isNotEmpty) {
+        await ref.read(notificationRepositoryProvider).registerDeviceToken(
+          token: token,
+          platform: 'ANDROID',
+        );
+      }
+
+      final result = await ref.read(notificationRepositoryProvider).sendTestNotification(
+        title: title,
+        message: body,
+      );
+      if (!mounted) return;
+      final tokensCount = result?['tokensCount'] ?? 0;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  tokensCount > 0
+                      ? 'Test push sent to $tokensCount device(s)! Banner displayed.'
+                      : 'Test alert triggered with foreground card preview!',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF15803D),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'In-app notification card shown. (Backend notice: $e)',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF6366F1),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isTestingPush = false);
+    }
   }
 }
 

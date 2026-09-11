@@ -88,8 +88,12 @@ class PurchaseController extends StateNotifier<PurchaseState> {
     if (!_repo.isOnline) return;
 
     try {
-      await _repo.fetchAndCacheFromServer(_homeId);
-    } catch (_) {}
+      await _repo.sync(_homeId);
+    } catch (_) {
+      try {
+        await _repo.fetchAndCacheFromServer(_homeId);
+      } catch (_) {}
+    }
   }
 
   Future<void> loadPurchases() async {

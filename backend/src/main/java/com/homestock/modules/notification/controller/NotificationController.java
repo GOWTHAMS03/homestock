@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ public class NotificationController {
     private final NotificationPreferenceService preferenceService;
     private final DeviceTokenService deviceTokenService;
     private final UserRepository userRepository;
+    private final com.homestock.modules.notification.provider.FirebaseNotificationProvider firebaseNotificationProvider;
 
     @GetMapping
     @Operation(summary = "Get user's notifications with pagination")
@@ -79,6 +81,14 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success("Notification deleted", null));
     }
 
+    @DeleteMapping
+    @Operation(summary = "Clear all notifications for current user")
+    public ResponseEntity<ApiResponse<Void>> deleteAllNotifications() {
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        notificationService.deleteAllNotifications(currentUserId);
+        return ResponseEntity.ok(ApiResponse.success("All notifications deleted", null));
+    }
+
     // ==========================================
     // Notification Preferences Endpoints
     // ==========================================
@@ -108,7 +118,7 @@ public class NotificationController {
     // FCM Device Token Endpoints
     // ==========================================
 
-    @PostMapping("/device-token")
+    @PostMapping({"/device-token", "/device-tokens"})
     @Operation(summary = "Register or update FCM device token for authenticated user")
     public ResponseEntity<ApiResponse<Void>> registerDeviceToken(@Valid @RequestBody DeviceTokenRequest request) {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
@@ -118,7 +128,7 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success("Device token registered successfully", null));
     }
 
-    @DeleteMapping("/device-token")
+    @DeleteMapping({"/device-token", "/device-tokens"})
     @Operation(summary = "Deactivate FCM device token on logout")
     public ResponseEntity<ApiResponse<Void>> deactivateDeviceToken(
             @RequestParam(required = false) String token,
@@ -130,5 +140,47 @@ public class NotificationController {
         }
         deviceTokenService.deactivateDeviceToken(currentUserId, tokenToDeactivate);
         return ResponseEntity.ok(ApiResponse.success("Device token deactivated", null));
+    }
+
+    @PostMapping("/test")
+    @Operation(summary = "Send a test Firebase push notification to current user's registered devices")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> sendTestNotification(
+            @RequestParam(defaultValue = "Test Alert") String title,
+            @RequestParam(defaultValue = "HomeStock Firebase push notifications are working perfectly! \uD83C\uDF89") String message) {
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<com.homestock.modules.notification.entity.DeviceToken> tokens = deviceTokenService.getActiveTokensForUser(currentUserId);
+        boolean isConfigured = firebaseNotificationProvider.isConfigured();
+
+        if (tokens.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.success("No active device tokens found for user. Please register a device token first.", Map.of(
+                    "firebaseConfigured", isConfigured,
+                    "tokensCount", 0,
+                    "status", "NO_TOKENS"
+            )));
+        }
+
+        Map<String, String> data = Map.of(
+                "action", "TEST",
+                "type", "SYSTEM",
+                "timestamp", java.time.Instant.now().toString()
+        );
+
+        firebaseNotificationProvider.sendPushNotification(
+                tokens,
+                com.homestock.modules.notification.entity.NotificationType.SYSTEM,
+                com.homestock.modules.notification.entity.NotificationPriority.HIGH,
+                title,
+                message,
+                data
+        );
+
+        return ResponseEntity.ok(ApiResponse.success("Test notification dispatched to " + tokens.size() + " device(s)", Map.of(
+                "firebaseConfigured", isConfigured,
+                "tokensCount", tokens.size(),
+                "status", "SENT"
+        )));
     }
 }

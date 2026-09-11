@@ -60,6 +60,11 @@ public class NotificationService {
         notificationRepository.delete(notification);
     }
 
+    @Transactional
+    public void deleteAllNotifications(UUID userId) {
+        notificationRepository.deleteAllByUserId(userId);
+    }
+
     /**
      * Backward-compatible delegation to NotificationEngine.
      */

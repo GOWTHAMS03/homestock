@@ -63,7 +63,7 @@ app:
       expiry-hours: ${NOTIFICATION_EXPIRY_COOLDOWN_HOURS:24}
       smart-restock-hours: ${NOTIFICATION_RESTOCK_COOLDOWN_HOURS:72}
     quiet-hours:
-      default-enabled: ${QUIET_HOURS_ENABLED:true}
+      default-enabled: ${QUIET_HOURS_ENABLED:false}
       default-start: ${QUIET_HOURS_START:22:00}
       default-end: ${QUIET_HOURS_END:07:00}
 

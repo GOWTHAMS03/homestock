@@ -594,9 +594,13 @@ class ShoppingRepository {
     _syncEngine.trySyncImmediate();
   }
 
+  /// Push pending operations and pull fresh changes via SyncEngine.
+  Future<void> sync(String homeId) => _syncEngine.syncHome(homeId);
+
   // ──── REMOTE (for initial load) ────
 
   /// Fetch from server and populate local DB.
+  /// Protects items with pending sync operations from being overwritten.
   Future<void> fetchAndCacheFromServer(String homeId) async {
     if (homeId.isEmpty || homeId == 'default_home') return;
     if (_connectivity != null && !_connectivity.isOnline) return;
@@ -623,9 +627,16 @@ class ShoppingRepository {
         await _shoppingDao.deleteShoppingListById(homeId);
       }
 
-      // Upsert items
+      final pendingEntityIds = await _syncDao.getActivePendingEntityIds(homeId: homeId);
+
+      // Upsert items (protecting any items that have pending local mutations)
       final rawItems = data['items'] as List? ?? [];
-      final companions = rawItems.map((json) {
+      final companions = rawItems
+          .where((json) {
+            final id = json['id'] as String? ?? '';
+            return !pendingEntityIds.contains(id);
+          })
+          .map((json) {
         return LocalShoppingListItemsCompanion(
           id: Value(json['id'] as String),
           shoppingListId: Value(json['shoppingListId'] as String? ?? serverListId),
@@ -648,7 +659,9 @@ class ShoppingRepository {
         );
       }).toList();
 
-      await _shoppingDao.upsertShoppingItems(companions);
+      if (companions.isNotEmpty) {
+        await _shoppingDao.upsertShoppingItems(companions);
+      }
     } catch (e) {
       if (kDebugMode) print('[ShoppingRepo] Fetch from server failed: $e');
     }

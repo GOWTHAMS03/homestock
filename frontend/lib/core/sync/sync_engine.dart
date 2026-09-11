@@ -9,7 +9,6 @@ import 'package:flutter/widgets.dart';
 
 import '../database/app_database.dart';
 import '../database/daos/inventory_dao.dart';
-import '../database/daos/shopping_dao.dart';
 import '../database/daos/sync_dao.dart';
 import '../network/api_client.dart';
 import 'connectivity_monitor.dart';
@@ -33,7 +32,6 @@ class SyncEngine with WidgetsBindingObserver {
 
   late final SyncDao _syncDao;
   late final InventoryDao _inventoryDao;
-  late final ShoppingDao _shoppingDao;
 
   final StreamController<SyncState> _stateController =
       StreamController<SyncState>.broadcast();
@@ -55,7 +53,6 @@ class SyncEngine with WidgetsBindingObserver {
         _connectivity = connectivity {
     _syncDao = SyncDao(_db);
     _inventoryDao = InventoryDao(_db);
-    _shoppingDao = ShoppingDao(_db);
   }
 
   /// Stream of sync state changes for UI consumption.
@@ -207,7 +204,7 @@ class SyncEngine with WidgetsBindingObserver {
   /// Sync operations for a specific home.
   Future<void> syncHome(String homeId) async {
     if (homeId.isEmpty || homeId == 'default_home') return;
-    if (_activeHomeSyncs.contains(homeId)) return;
+    if (_isSyncing || _activeHomeSyncs.contains(homeId)) return;
     if (!_connectivity.isOnline) return;
 
     _activeHomeSyncs.add(homeId);
@@ -345,6 +342,10 @@ class SyncEngine with WidgetsBindingObserver {
             case 'SYNCED':
             case 'ALREADY_PROCESSED':
               await _syncDao.markSynced(opId);
+              final matchedOp = operations.where((o) => o.operationId == opId).firstOrNull;
+              if (matchedOp != null) {
+                await _markEntitySyncedLocally(matchedOp.entityType, matchedOp.entityId);
+              }
               break;
             case 'CONFLICT':
               await _syncDao.markConflict(
@@ -372,6 +373,7 @@ class SyncEngine with WidgetsBindingObserver {
         // If server doesn't return per-operation results, mark all synced
         for (final op in operations) {
           await _syncDao.markSynced(op.operationId);
+          await _markEntitySyncedLocally(op.entityType, op.entityId);
         }
       }
     } catch (e) {
@@ -647,28 +649,65 @@ class SyncEngine with WidgetsBindingObserver {
 
   Future<void> _updateLocalFromServerEntity(
       String entityType, Map<String, dynamic> json) async {
+    final entityId = json['id'] as String?;
+    if (entityId == null || entityId.isEmpty) return;
+
     switch (entityType) {
       case SyncEntityType.inventoryItem:
+        final existing = await _inventoryDao.getItemById(entityId);
         await _inventoryDao.upsertItem(LocalInventoryItemsCompanion(
-          id: Value(json['id'] as String),
-          homeId: Value(json['homeId'] as String? ?? ''),
-          name: Value(json['name'] as String? ?? ''),
-          quantity: Value((json['quantity'] as num?)?.toDouble() ?? 0.0),
-          stockStatus: Value(json['stockStatus'] as String? ?? 'IN_STOCK'),
+          id: Value(entityId),
+          homeId: Value(json['homeId'] as String? ?? existing?.homeId ?? ''),
+          categoryId: Value(json['categoryId'] as String? ?? existing?.categoryId),
+          categoryName: Value(json['categoryName'] as String? ?? existing?.categoryName ?? 'General'),
+          categoryIcon: Value(json['categoryIcon'] as String? ?? existing?.categoryIcon ?? 'category'),
+          categoryColor: Value(json['categoryColor'] as String? ?? existing?.categoryColor ?? '#6366F1'),
+          name: Value(json['name'] as String? ?? existing?.name ?? ''),
+          brand: Value(json['brand'] as String? ?? existing?.brand),
+          quantity: Value((json['quantity'] as num?)?.toDouble() ?? existing?.quantity ?? 0.0),
+          unit: Value(json['unit'] as String? ?? existing?.unit ?? 'pcs'),
+          minimumQuantity: Value((json['minimumQuantity'] as num?)?.toDouble() ?? existing?.minimumQuantity ?? 1.0),
+          maximumQuantity: Value((json['maximumQuantity'] as num?)?.toDouble() ?? existing?.maximumQuantity),
+          storageLocation: Value(json['storageLocation'] as String? ?? existing?.storageLocation),
+          purchasePrice: Value((json['purchasePrice'] as num?)?.toDouble() ?? existing?.purchasePrice),
+          purchaseDate: Value(json['purchaseDate'] as String? ?? existing?.purchaseDate),
+          expiryDate: Value(json['expiryDate'] as String? ?? existing?.expiryDate),
+          imageUrl: Value(json['imageUrl'] as String? ?? existing?.imageUrl),
+          notes: Value(json['notes'] as String? ?? existing?.notes),
+          stockStatus: Value(json['stockStatus'] as String? ?? existing?.stockStatus ?? 'IN_STOCK'),
+          expiryStatus: Value(json['expiryStatus'] as String? ?? existing?.expiryStatus ?? 'SAFE'),
+          daysUntilExpiry: Value(json['daysUntilExpiry'] as int? ?? existing?.daysUntilExpiry),
+          isDeleted: Value(json['isDeleted'] as bool? ?? existing?.isDeleted ?? false),
           isLocalOnly: const Value(false),
           updatedAt: Value(DateTime.now()),
         ));
         break;
       case SyncEntityType.shoppingListItem:
-        await _shoppingDao.upsertShoppingItem(LocalShoppingListItemsCompanion(
-          id: Value(json['id'] as String),
-          isLocalOnly: const Value(false),
-          updatedAt: Value(DateTime.now()),
-        ));
+        await (_db.update(_db.localShoppingListItems)..where((t) => t.id.equals(entityId)))
+            .write(const LocalShoppingListItemsCompanion(isLocalOnly: Value(false)));
         break;
       default:
         break;
     }
+  }
+
+  Future<void> _markEntitySyncedLocally(String entityType, String entityId) async {
+    try {
+      switch (entityType) {
+        case SyncEntityType.inventoryItem:
+          await (_db.update(_db.localInventoryItems)..where((t) => t.id.equals(entityId)))
+              .write(const LocalInventoryItemsCompanion(isLocalOnly: Value(false)));
+          break;
+        case SyncEntityType.shoppingListItem:
+          await (_db.update(_db.localShoppingListItems)..where((t) => t.id.equals(entityId)))
+              .write(const LocalShoppingListItemsCompanion(isLocalOnly: Value(false)));
+          break;
+        case SyncEntityType.purchase:
+          await (_db.update(_db.localPurchases)..where((t) => t.id.equals(entityId)))
+              .write(const LocalPurchasesCompanion(isLocalOnly: Value(false)));
+          break;
+      }
+    } catch (_) {}
   }
 
   // ──── RETRY ────

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/network/api_client.dart';
@@ -200,9 +201,21 @@ class AuthController extends StateNotifier<AuthState> {
     state = const AuthState(isAuthenticated: false);
   }
 
+  /// Ensure FCM device token is registered with the backend.
+  Future<void> ensureFcmTokenRegistered() async {
+    await _registerFcmToken();
+  }
+
   Future<void> _registerFcmToken() async {
-    final token = NotificationService.instance.fcmToken;
-    if (token != null) {
+    String? token = NotificationService.instance.fcmToken;
+    if (token == null || token.isEmpty) {
+      try {
+        token = await FirebaseMessaging.instance.getToken();
+      } catch (e) {
+        // Firebase messaging may be in mock/offline mode
+      }
+    }
+    if (token != null && token.isNotEmpty) {
       try {
         await _ref.read(notificationRepositoryProvider).registerDeviceToken(
           token: token,

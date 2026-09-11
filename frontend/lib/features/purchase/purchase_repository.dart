@@ -308,12 +308,18 @@ class PurchaseRepository {
     return StoreModel(id: storeId, name: name, location: location);
   }
 
+  /// Push pending operations and pull fresh changes via SyncEngine.
+  Future<void> sync(String homeId) => _syncEngine.syncHome(homeId);
+
   // ──── REMOTE (for initial load) ────
 
   /// Fetch from server and cache locally.
+  /// Protects purchases with pending sync operations from being overwritten.
   Future<void> fetchAndCacheFromServer(String homeId) async {
     if (_connectivity != null && !_connectivity.isOnline) return;
     try {
+      final pendingEntityIds = await _syncDao.getActivePendingEntityIds(homeId: homeId);
+
       // Fetch purchases
       final response = await _apiClient.dio.get(
         ApiEndpoints.purchases(homeId),
@@ -323,6 +329,7 @@ class PurchaseRepository {
 
       for (final json in list) {
         final purchaseId = json['id'] as String;
+        if (pendingEntityIds.contains(purchaseId)) continue;
         final rawItems = json['items'] as List? ?? [];
 
         await _purchaseDao.upsertPurchase(LocalPurchasesCompanion(

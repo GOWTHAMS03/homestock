@@ -128,8 +128,12 @@ public class NotificationEngine {
             if (targetUser == null) continue;
 
             // Exclude actor (do not notify the member who initiated the action)
-            if (excludedUser != null && targetUser.getId().equals(excludedUser.getId())) {
-                continue;
+            // But if there is only 1 member in the home, or if the event is a critical stock alert
+            // (LOW_STOCK, OUT_OF_STOCK, EXPIRY_REMINDER), never exclude them.
+            if (excludedUser != null && members.size() > 1 && targetUser.getId().equals(excludedUser.getId())) {
+                if (type != NotificationType.LOW_STOCK && type != NotificationType.OUT_OF_STOCK && type != NotificationType.EXPIRY_REMINDER) {
+                    continue;
+                }
             }
 
             // Check User Preferences
@@ -461,23 +465,25 @@ public class NotificationEngine {
         List<UUID> recipientIds = new ArrayList<>();
         for (HomeMember member : members) {
             User u = member.getUser();
-            if (u != null && (actorUserId == null || !u.getId().equals(actorUserId))) {
+            if (u != null && (actorUserId == null || !u.getId().equals(actorUserId) || members.size() == 1)) {
                 recipientIds.add(u.getId());
             }
         }
         if (!recipientIds.isEmpty()) {
             List<DeviceToken> activeTokens = deviceTokenService.getActiveTokensForUsers(recipientIds);
             if (!activeTokens.isEmpty()) {
+                String homeName = (home.getName() != null && !home.getName().isBlank()) ? home.getName() : "Household";
                 Map<String, String> data = Map.of(
                         "type", "HOME_CHANGED",
-                        "homeId", home.getId().toString()
+                        "homeId", home.getId().toString(),
+                        "action", "SYNC_HOME"
                 );
                 firebaseNotificationProvider.sendPushNotification(
                         activeTokens,
                         NotificationType.SYSTEM,
-                        NotificationPriority.LOW,
-                        null,
-                        null,
+                        NotificationPriority.MEDIUM,
+                        "Pantry Updated",
+                        "Changes were synced for " + homeName + ".",
                         data
                 );
             }

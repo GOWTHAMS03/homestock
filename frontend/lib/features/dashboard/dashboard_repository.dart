@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/database/daos/inventory_dao.dart';
 import '../../core/database/daos/shopping_dao.dart';
+import '../../core/database/daos/sync_dao.dart';
 import '../../core/network/api_client.dart';
 import '../../core/sync/connectivity_monitor.dart';
 import '../inventory/consumption_model.dart';
@@ -17,6 +18,7 @@ class DashboardRepository {
   final InventoryDao _inventoryDao;
   final ShoppingDao _shoppingDao;
   final ConnectivityMonitor _connectivity;
+  final SyncDao? _syncDao;
 
   DashboardSummaryModel? _cachedSummary;
   WhatDoINeedModel? _cachedRecommendations;
@@ -26,12 +28,21 @@ class DashboardRepository {
     required InventoryDao inventoryDao,
     required ShoppingDao shoppingDao,
     required ConnectivityMonitor connectivity,
+    SyncDao? syncDao,
   })  : _apiClient = apiClient,
         _inventoryDao = inventoryDao,
         _shoppingDao = shoppingDao,
-        _connectivity = connectivity;
+        _connectivity = connectivity,
+        _syncDao = syncDao;
 
   bool get isOnline => _connectivity.isOnline;
+
+  /// Check whether there are local sync queue entries waiting to be pushed for this home.
+  Future<bool> hasPendingSyncOperations(String homeId) async {
+    if (_syncDao == null) return false;
+    final ops = await _syncDao.getPendingOperationsForHome(homeId);
+    return ops.isNotEmpty;
+  }
 
   /// Watch inventory items to re-trigger local dashboard summary computation on any stock change.
   Stream<List<dynamic>> watchInventoryItems(String homeId) {

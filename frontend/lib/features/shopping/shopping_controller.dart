@@ -111,15 +111,18 @@ class ShoppingController extends StateNotifier<ShoppingState> {
   }
 
   /// Fetch from server in background (non-blocking).
+  /// Pushes local pending changes first, then pulls and reconciles remote changes.
   Future<void> _fetchServerDataInBackground() async {
     final homeId = await _getOrResolveHomeId();
     if (homeId == null) return;
     if (!_repo.isOnline) return;
 
     try {
-      await _repo.fetchAndCacheFromServer(homeId);
+      await _repo.sync(homeId);
     } catch (_) {
-      // Server failures are non-fatal
+      try {
+        await _repo.fetchAndCacheFromServer(homeId);
+      } catch (_) {}
     }
   }
 

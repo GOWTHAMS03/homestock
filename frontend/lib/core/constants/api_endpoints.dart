@@ -2,7 +2,8 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   // Android emulator uses 10.0.2.2, desktop/web uses localhost, physical phone uses PC LAN IP or 127.0.0.1 with adb reverse
-  static const String currentWifiUrl = 'http://192.168.0.182:8080/api/v1';
+  static const String currentWifiUrl = 'http://10.211.55.217:8080/api/v1';
+  static const String alternateWifiUrl = 'http://192.168.0.182:8080/api/v1';
   static const String usbAdbUrl = 'http://127.0.0.1:8080/api/v1';
   static const String emulatorUrl = 'http://10.0.2.2:8080/api/v1';
   static const String localhostUrl = 'http://localhost:8080/api/v1';
@@ -17,8 +18,9 @@ class ApiEndpoints {
   /// Candidate backend URLs to test in order of preference
   static List<String> get candidateUrls => {
         baseUrl,
-        usbAdbUrl,
         currentWifiUrl,
+        usbAdbUrl,
+        alternateWifiUrl,
         emulatorUrl,
         localhostUrl,
       }.toList();
@@ -89,6 +91,7 @@ class ApiEndpoints {
   static String deleteNotification(String id) => '/notifications/$id';
   static const String notificationPreferences = '/notifications/preferences';
   static const String notificationDeviceToken = '/notifications/device-tokens';
+  static const String notificationTest = '/notifications/test';
 
   // Smart Shopping — Price Comparison
   static String itemOffers(String homeId, String itemId) =>

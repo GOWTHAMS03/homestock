@@ -108,6 +108,20 @@ class NotificationRepository {
     }
   }
 
+  /// Clear all notifications.
+  Future<void> clearAllNotifications() async {
+    if (notificationDao != null) {
+      await notificationDao!.clearAll();
+    }
+    if (_isOnline) {
+      try {
+        await apiClient.dio.delete(ApiEndpoints.notifications);
+      } catch (e) {
+        debugPrint('[NotificationRepository] Remote clearAllNotifications failed: $e');
+      }
+    }
+  }
+
   /// Get user notification preferences.
   Future<NotificationPreferenceModel> getPreferences() async {
     if (_isOnline) {
@@ -156,12 +170,15 @@ class NotificationRepository {
       await apiClient.dio.post(
         ApiEndpoints.notificationDeviceToken,
         data: {
+          'deviceToken': token,
           'token': token,
-          'platform': platform,
+          'platform': platform.toUpperCase(),
+          'deviceName': deviceModel ?? 'Mobile App',
           'deviceModel': deviceModel,
           'appVersion': appVersion,
         },
       );
+      debugPrint('[NotificationRepository] FCM Device token registered with backend successfully');
     } catch (e) {
       debugPrint('[NotificationRepository] Device token registration failed: $e');
     }
@@ -177,6 +194,27 @@ class NotificationRepository {
       );
     } catch (e) {
       debugPrint('[NotificationRepository] Device token deactivation failed: $e');
+    }
+  }
+
+  /// Send an immediate test push notification via backend FCM.
+  Future<Map<String, dynamic>?> sendTestNotification({
+    String title = 'Test Alert',
+    String message = 'HomeStock Firebase push notifications are working perfectly! \uD83C\uDF89',
+  }) async {
+    if (!_isOnline) return null;
+    try {
+      final response = await apiClient.dio.post(
+        ApiEndpoints.notificationTest,
+        queryParameters: {
+          'title': title,
+          'message': message,
+        },
+      );
+      return response.data['data'] as Map<String, dynamic>?;
+    } catch (e) {
+      debugPrint('[NotificationRepository] Test notification failed: $e');
+      rethrow;
     }
   }
 }

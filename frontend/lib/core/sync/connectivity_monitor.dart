@@ -140,6 +140,8 @@ class ConnectivityMonitor {
     }
   }
 
+  Timer? _restoredDebounce;
+
   /// Immediately mark as offline (called instantly by ApiClient on network errors/timeouts).
   void markOffline() {
     _setOffline();
@@ -151,6 +153,7 @@ class ConnectivityMonitor {
   }
 
   void _setOffline() {
+    _restoredDebounce?.cancel();
     if (_currentStatus != NetworkStatus.offline) {
       _currentStatus = NetworkStatus.offline;
       _statusController.add(_currentStatus);
@@ -195,19 +198,16 @@ class ConnectivityMonitor {
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
       // Don't interrupt while actively syncing
       if (_currentStatus == NetworkStatus.syncing) return;
-      // Fast lightweight probe without heavy multi-phase LAN discovery when offline
-      final isCurrentlyOffline = _currentStatus == NetworkStatus.offline;
       await checkRealReachability(
-        timeout: isCurrentlyOffline
-            ? const Duration(milliseconds: 2500)
-            : const Duration(milliseconds: 2500),
-        allowDiscovery: !isCurrentlyOffline,
+        timeout: const Duration(milliseconds: 2500),
+        allowDiscovery: true, // Allow discovery when offline so backend can be rediscovered on LAN
       );
     });
   }
 
   /// Dispose all resources.
   void dispose() {
+    _restoredDebounce?.cancel();
     _heartbeatTimer?.cancel();
     _subscription?.cancel();
     _statusController.close();

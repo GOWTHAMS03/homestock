@@ -28,4 +28,9 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     @Modifying
     @Query("DELETE FROM Notification n WHERE n.isRead = true AND n.createdAt < :cutoff")
     int deleteReadOlderThan(@Param("cutoff") Instant cutoff);
+
+    @org.springframework.transaction.annotation.Transactional
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.user.id = :userId")
+    void deleteAllByUserId(@Param("userId") UUID userId);
 }

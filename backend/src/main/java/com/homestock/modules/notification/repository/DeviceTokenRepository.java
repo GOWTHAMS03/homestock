@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Repository
 public interface DeviceTokenRepository extends JpaRepository<DeviceToken, UUID> {
     List<DeviceToken> findAllByUserIdAndIsActiveTrue(UUID userId);
@@ -19,10 +21,12 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, UUID> 
 
     Optional<DeviceToken> findByDeviceToken(String deviceToken);
 
+    @Transactional
     @Modifying
     @Query("UPDATE DeviceToken d SET d.isActive = false WHERE d.deviceToken = :token")
     void deactivateToken(@Param("token") String token);
 
+    @Transactional
     @Modifying
     @Query("UPDATE DeviceToken d SET d.isActive = false WHERE d.user.id = :userId AND d.deviceToken = :token")
     void deactivateUserToken(@Param("userId") UUID userId, @Param("token") String token);

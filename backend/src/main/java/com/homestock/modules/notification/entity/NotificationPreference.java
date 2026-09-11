@@ -60,7 +60,7 @@ public class NotificationPreference extends BaseEntity {
 
     @Builder.Default
     @Column(name = "quiet_hours_enabled", nullable = false)
-    private Boolean quietHoursEnabled = true;
+    private Boolean quietHoursEnabled = false;
 
     @Builder.Default
     @Column(name = "quiet_hours_start", nullable = false)

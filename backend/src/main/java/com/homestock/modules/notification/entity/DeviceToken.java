@@ -38,7 +38,30 @@ public class DeviceToken extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "token", length = 512)
+    private String token;
+
+    @Column(name = "device_type", length = 20)
+    private String deviceType;
+
+    @Column(name = "last_used_at")
+    private Instant lastUsedAt;
+
     @Column(name = "last_seen_at")
     private Instant lastSeenAt;
+
+    @PrePersist
+    @PreUpdate
+    public void syncLegacyFields() {
+        if (this.token == null || this.token.isBlank()) {
+            this.token = this.deviceToken;
+        }
+        if (this.deviceType == null || this.deviceType.isBlank()) {
+            this.deviceType = this.platform != null ? this.platform.name() : "ANDROID";
+        }
+        if (this.lastUsedAt == null) {
+            this.lastUsedAt = this.lastSeenAt != null ? this.lastSeenAt : Instant.now();
+        }
+    }
 }
 

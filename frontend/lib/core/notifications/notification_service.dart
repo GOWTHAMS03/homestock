@@ -33,6 +33,10 @@ class NotificationService {
   /// Receives the raw payload map for the NotificationRouter to handle.
   Function(Map<String, dynamic> payload)? onPayloadTapped;
 
+  /// Called when a foreground notification is received from Firebase
+  /// to display the interactive in-app notification card matching the project theme.
+  Function(String title, String body, Map<String, dynamic> data)? onForegroundNotificationReceived;
+
   // Android Notification Channels
   static const String channelImportant = 'home_stock_important';
   static const String channelGeneral = 'home_stock_general';
@@ -72,6 +76,7 @@ class NotificationService {
     Function(String token)? tokenCallback,
     Function(String homeId)? silentSyncCallback,
     Function(Map<String, dynamic> payload)? payloadTapCallback,
+    Function(String title, String body, Map<String, dynamic> data)? foregroundNotificationCallback,
   }) async {
     if (_isInitialized) return;
 
@@ -79,6 +84,7 @@ class NotificationService {
     onTokenRegistered = tokenCallback;
     onSilentSyncTriggered = silentSyncCallback;
     onPayloadTapped = payloadTapCallback;
+    onForegroundNotificationReceived = foregroundNotificationCallback;
 
     try {
       tz.initializeTimeZones();
@@ -176,24 +182,26 @@ class NotificationService {
     bool granted = false;
 
     // Local notifications permission (Android 13+)
-    final androidImpl = _localNotifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (androidImpl != null) {
-      final androidGranted = await androidImpl.requestNotificationsPermission();
-      granted = androidGranted ?? false;
-    }
+    try {
+      final androidImpl = _localNotifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImpl != null) {
+        final androidGranted = await androidImpl.requestNotificationsPermission();
+        granted = androidGranted ?? false;
+      }
 
-    // iOS local notification permissions
-    final iosImpl = _localNotifications.resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>();
-    if (iosImpl != null) {
-      final iosGranted = await iosImpl.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      granted = iosGranted ?? false;
-    }
+      // iOS local notification permissions
+      final iosImpl = _localNotifications.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+      if (iosImpl != null) {
+        final iosGranted = await iosImpl.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        granted = iosGranted ?? false;
+      }
+    } catch (_) {}
 
     // Firebase Messaging permissions (if available)
     if (_firebaseEnabled) {
@@ -215,11 +223,13 @@ class NotificationService {
 
   /// Check whether notification permissions are currently enabled.
   Future<bool> areNotificationsEnabled() async {
-    final androidImpl = _localNotifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (androidImpl != null) {
-      return await androidImpl.areNotificationsEnabled() ?? false;
-    }
+    try {
+      final androidImpl = _localNotifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImpl != null) {
+        return await androidImpl.areNotificationsEnabled() ?? false;
+      }
+    } catch (_) {}
     return true;
   }
 
@@ -331,19 +341,24 @@ class NotificationService {
   void _showForegroundFcmNotification(RemoteMessage message) {
     final notification = message.notification;
     final type = message.data['type']?.toString().toUpperCase() ?? 'SYSTEM';
+    final homeId = message.data['homeId']?.toString();
 
-    // Handle silent HOME_CHANGED push — trigger sync, don't show notification
-    if (type == 'HOME_CHANGED' || type == 'SILENT_SYNC') {
-      final homeId = message.data['homeId']?.toString();
-      if (homeId != null && homeId.isNotEmpty) {
-        debugPrint('[NotificationService] Silent sync trigger for home: $homeId');
-        onSilentSyncTriggered?.call(homeId);
-      }
+    // Trigger sync for home change events
+    if (homeId != null && homeId.isNotEmpty && (type == 'HOME_CHANGED' || type == 'SILENT_SYNC')) {
+      debugPrint('[NotificationService] Sync trigger for home: $homeId');
+      onSilentSyncTriggered?.call(homeId);
+    }
+
+    // Only skip showing notification banner if message has no visible title at all
+    final hasTitle = (notification?.title != null && notification!.title!.isNotEmpty) ||
+        (message.data['title'] != null && message.data['title']!.toString().isNotEmpty);
+
+    if (!hasTitle && (type == 'HOME_CHANGED' || type == 'SILENT_SYNC')) {
       return;
     }
 
     final title = notification?.title ?? message.data['title'] ?? 'HomeStock';
-    final body = notification?.body ?? message.data['body'] ?? '';
+    final body = notification?.body ?? message.data['body'] ?? 'Your household stock was updated.';
 
     String channel = channelGeneral;
     if (type.contains('STOCK') || type.contains('EXPIR')) {
@@ -353,7 +368,7 @@ class NotificationService {
     }
 
     final payload = jsonEncode(message.data);
-    final id = message.messageId.hashCode;
+    final id = message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch;
 
     showNotification(
       id: id,
@@ -362,6 +377,9 @@ class NotificationService {
       channelId: channel,
       payload: payload,
     );
+
+    // Present the in-app foreground notification card matching the project theme
+    onForegroundNotificationReceived?.call(title, body, message.data);
   }
 
   void _handleFcmData(Map<String, dynamic> data) {

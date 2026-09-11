@@ -8,7 +8,6 @@ import '../../core/constants/household_staples.dart';
 import '../../core/sync/sync_providers.dart';
 import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../auth/auth_controller.dart';
-import '../dashboard/dashboard_controller.dart';
 import '../shopping/shopping_controller.dart';
 import 'inventory_controller.dart';
 import 'inventory_model.dart';
@@ -125,10 +124,6 @@ class _SmartConfirmationSheetState extends ConsumerState<SmartConfirmationSheet>
         }());
       }
 
-      // 3. Background reload
-      ref.read(inventoryControllerProvider.notifier).loadData();
-      ref.read(dashboardControllerProvider.notifier).loadDashboard();
-
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -224,10 +219,6 @@ class _SmartConfirmationSheetState extends ConsumerState<SmartConfirmationSheet>
           } catch (_) {}
         }());
       }
-
-      // 3. Background reload
-      ref.read(inventoryControllerProvider.notifier).loadData();
-      ref.read(dashboardControllerProvider.notifier).loadDashboard();
 
       if (mounted) {
         Navigator.of(context).pop();

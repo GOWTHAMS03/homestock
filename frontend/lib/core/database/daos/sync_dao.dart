@@ -37,6 +37,20 @@ class SyncDao {
         .get();
   }
 
+  /// Get set of entity IDs that currently have pending, syncing, or failed sync operations.
+  Future<Set<String>> getActivePendingEntityIds({String? homeId}) async {
+    final query = _db.select(_db.syncQueueEntries)
+      ..where((t) =>
+          t.status.equals('PENDING') |
+          t.status.equals('SYNCING') |
+          t.status.equals('FAILED'));
+    if (homeId != null && homeId.isNotEmpty) {
+      query.where((t) => t.homeId.equals(homeId));
+    }
+    final ops = await query.get();
+    return ops.map((o) => o.entityId).toSet();
+  }
+
   /// Add a new operation to the sync queue.
   Future<int> addToSyncQueue(SyncQueueEntriesCompanion entry) {
     return _db.into(_db.syncQueueEntries).insert(entry);
@@ -202,19 +216,28 @@ class SyncDao {
     int? nextServerVersion,
   }) {
     return _db.transaction(() async {
+      final pendingEntityIds = await getActivePendingEntityIds(homeId: homeId);
+
       // 1. Categories
       for (final cat in categories) {
+        if (pendingEntityIds.contains(cat.id.value)) continue;
         await _db.into(_db.localCategories).insertOnConflictUpdate(cat);
       }
       for (final catId in deletedCategoryIds) {
+        if (pendingEntityIds.contains(catId)) continue;
         await (_db.delete(_db.localCategories)..where((t) => t.id.equals(catId))).go();
       }
 
       // 2. Inventory Items
       for (final item in inventoryItems) {
+        if (pendingEntityIds.contains(item.id.value)) {
+          // Local entity has unpushed modifications — protect user changes!
+          continue;
+        }
         await _db.into(_db.localInventoryItems).insertOnConflictUpdate(item);
       }
       for (final itemId in deletedInventoryItemIds) {
+        if (pendingEntityIds.contains(itemId)) continue;
         await (_db.update(_db.localInventoryItems)..where((t) => t.id.equals(itemId)))
             .write(const LocalInventoryItemsCompanion(isDeleted: Value(true)));
       }
@@ -231,14 +254,17 @@ class SyncDao {
 
       // 5. Shopping List Items
       for (final item in shoppingListItems) {
+        if (pendingEntityIds.contains(item.id.value)) continue;
         await _db.into(_db.localShoppingListItems).insertOnConflictUpdate(item);
       }
       for (final sId in deletedShoppingItemIds) {
+        if (pendingEntityIds.contains(sId)) continue;
         await (_db.delete(_db.localShoppingListItems)..where((t) => t.id.equals(sId))).go();
       }
 
       // 6. Purchases & Purchase Items
       for (final p in purchases) {
+        if (pendingEntityIds.contains(p.id.value)) continue;
         await _db.into(_db.localPurchases).insertOnConflictUpdate(p);
       }
       for (final pi in purchaseItems) {

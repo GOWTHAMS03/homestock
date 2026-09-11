@@ -107,6 +107,26 @@ class NotificationController extends StateNotifier<NotificationState> {
     } catch (_) {}
   }
 
+  /// Clear all notifications
+  Future<void> clearAllNotifications() async {
+    try {
+      await _repo.clearAllNotifications();
+      state = state.copyWith(notifications: [], unreadCount: 0);
+    } catch (_) {}
+  }
+
+  /// Restore a deleted notification (Undo action)
+  Future<void> restoreNotification(NotificationModel notif) async {
+    try {
+      if (_repo.notificationDao != null) {
+        await _repo.notificationDao!.upsertNotification(notif.toLocalCompanion('current_user'));
+      }
+      final updated = [notif, ...state.notifications];
+      final unread = updated.where((n) => !n.isRead).length;
+      state = state.copyWith(notifications: updated, unreadCount: unread);
+    } catch (_) {}
+  }
+
   /// Load notification preferences
   Future<void> loadPreferences() async {
     state = state.copyWith(isPreferencesLoading: true);

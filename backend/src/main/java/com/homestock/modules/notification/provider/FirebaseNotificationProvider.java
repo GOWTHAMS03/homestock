@@ -112,16 +112,29 @@ public class FirebaseNotificationProvider {
 
         try {
             // Build FCM MulticastMessage
-            com.google.firebase.messaging.Notification fcmNotification = com.google.firebase.messaging.Notification.builder()
-                    .setTitle(title)
-                    .setBody(body)
-                    .build();
+            com.google.firebase.messaging.Notification fcmNotification = null;
+            if (title != null && !title.isBlank()) {
+                fcmNotification = com.google.firebase.messaging.Notification.builder()
+                        .setTitle(title)
+                        .setBody(body != null ? body : "")
+                        .build();
+            }
 
             MulticastMessage.Builder messageBuilder = MulticastMessage.builder()
                     .addAllTokens(tokens)
-                    .setNotification(fcmNotification)
-                    .putData("type", type.name())
-                    .putData("priority", priority.name());
+                    .putData("type", type != null ? type.name() : "SYSTEM")
+                    .putData("priority", priority != null ? priority.name() : "MEDIUM");
+
+            if (title != null && !title.isBlank()) {
+                messageBuilder.putData("title", title);
+            }
+            if (body != null && !body.isBlank()) {
+                messageBuilder.putData("body", body);
+            }
+
+            if (fcmNotification != null) {
+                messageBuilder.setNotification(fcmNotification);
+            }
 
             if (dataPayload != null) {
                 for (Map.Entry<String, String> entry : dataPayload.entrySet()) {
@@ -132,7 +145,7 @@ public class FirebaseNotificationProvider {
             }
 
             // Android specific priority & channel configuration
-            String channelId = switch (priority) {
+            String channelId = switch (priority != null ? priority : NotificationPriority.MEDIUM) {
                 case HIGH -> "home_stock_important";
                 case MEDIUM -> "home_stock_general";
                 case LOW -> "home_stock_insights";
@@ -148,6 +161,8 @@ public class FirebaseNotificationProvider {
                     .setNotification(com.google.firebase.messaging.AndroidNotification.builder()
                             .setChannelId(channelId)
                             .setSound("default")
+                            .setDefaultSound(true)
+                            .setDefaultVibrateTimings(true)
                             .build())
                     .build();
 
