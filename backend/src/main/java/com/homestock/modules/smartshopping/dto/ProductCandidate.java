@@ -25,9 +25,14 @@ public class ProductCandidate {
 
     private String productName;
     private String brand;
+    private String canonicalBrand;
+    private String canonicalProduct;
     private String variant;
     private String packageSize;
     private String unit;
+    private BigDecimal normalizedPackSizeValue;
+    private String normalizedPackSizeUnit;
+
     private String category;
     private String description;
 
@@ -55,4 +60,40 @@ public class ProductCandidate {
     private Instant lastVerifiedAt;
     private String imageVerificationTier; // OFFICIAL_PRODUCT_PAGE, TRUSTED_RETAILER, CATALOG, SEARCH_SNIPPET
     private Double imageConfidence;
+
+    @Builder.Default
+    private int sourceAgreementCount = 1;
+    private DealEvidence evidence;
+    private RejectionReason rejectionReason;
+
+    public Double getPriceAsDouble() {
+        return price != null ? price.doubleValue() : 0.0;
+    }
+
+    public BigDecimal getOriginalPrice() {
+        return mrp != null ? mrp : price;
+    }
+
+    public Double getScore() {
+        return matchScore;
+    }
+
+    public void setScore(Double score) {
+        this.matchScore = score;
+    }
+
+    public boolean isInStock() {
+        return availability == null || "IN_STOCK".equalsIgnoreCase(availability);
+    }
+
+    public Double getSellerRating() {
+        return rating != null ? rating : 4.0;
+    }
+
+    public Double getDiscountPercent() {
+        if (mrp != null && price != null && mrp.compareTo(BigDecimal.ZERO) > 0) {
+            return Math.max(0.0, (mrp.doubleValue() - price.doubleValue()) / mrp.doubleValue() * 100.0);
+        }
+        return 0.0;
+    }
 }

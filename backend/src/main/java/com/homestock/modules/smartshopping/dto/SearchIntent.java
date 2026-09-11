@@ -29,6 +29,21 @@ public enum SearchIntent {
     GENERIC_PRODUCT,
 
     /**
+     * Category level search.
+     */
+    CATEGORY_SEARCH,
+
+    /**
+     * Alias / Generic search.
+     */
+    GENERIC_SEARCH,
+
+    /**
+     * Exact barcode search.
+     */
+    BARCODE_SEARCH,
+
+    /**
      * Ambiguous single-token input that cannot be resolved safely to a single product type
      * (e.g. "oil", "soap", "rice").
      */

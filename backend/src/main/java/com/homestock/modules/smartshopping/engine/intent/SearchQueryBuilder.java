@@ -132,6 +132,92 @@ public class SearchQueryBuilder {
         return requests;
     }
 
+    /**
+     * Builds a structured 5-level progressive QueryPlan from canonical ProductIdentity.
+     */
+    public com.homestock.modules.smartshopping.dto.QueryPlan buildQueryPlan(com.homestock.modules.smartshopping.dto.ProductIdentity identity, String rawInput) {
+        String brand = identity.getBrand();
+        String variant = identity.getVariant();
+        String prod = identity.getProduct() != null ? identity.getProduct() : identity.getGenericName();
+        String pack = identity.getPackSize() != null ? identity.getPackSize().stripTrailingZeros().toPlainString() + (identity.getPackUnit() != null ? identity.getPackUnit() : "") : null;
+
+        // Level 1: Raw user formulation
+        String l1 = rawInput != null && !rawInput.isBlank() ? rawInput.trim() : "";
+
+        // Level 2: Canonical brand + variant + generic product + pack size
+        StringBuilder l2Sb = new StringBuilder();
+        if (brand != null) l2Sb.append(brand).append(" ");
+        if (variant != null) l2Sb.append(variant).append(" ");
+        if (prod != null && (variant == null || !prod.toLowerCase().contains(variant.toLowerCase()))) {
+            l2Sb.append(prod).append(" ");
+        }
+        if (pack != null) l2Sb.append(pack);
+        String l2 = l2Sb.toString().replaceAll("\\s+", " ").trim();
+
+        // Level 3: Canonical brand + product + pack size
+        StringBuilder l3Sb = new StringBuilder();
+        if (brand != null) l3Sb.append(brand).append(" ");
+        if (prod != null) l3Sb.append(prod).append(" ");
+        if (pack != null) l3Sb.append(pack);
+        String l3 = l3Sb.toString().replaceAll("\\s+", " ").trim();
+
+        // Level 4: Canonical brand + product
+        StringBuilder l4Sb = new StringBuilder();
+        if (brand != null) l4Sb.append(brand).append(" ");
+        if (prod != null) l4Sb.append(prod);
+        String l4 = l4Sb.toString().replaceAll("\\s+", " ").trim();
+
+        // Level 5: Broader category / product query
+        String l5 = prod != null ? prod.trim() : (identity.getCategory() != null ? identity.getCategory() : "");
+
+        List<String> active = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String q : List.of(l1, l2, l3, l4, l5)) {
+            String clean = q.replaceAll("\\s+", " ").trim();
+            if (!clean.isBlank() && seen.add(clean)) {
+                active.add(clean);
+            }
+        }
+
+        return com.homestock.modules.smartshopping.dto.QueryPlan.builder()
+                .level1ExactQuery(l1)
+                .level2NormalizedExactQuery(l2)
+                .level3BrandProductSizeQuery(l3)
+                .level4BrandProductQuery(l4)
+                .level5BroaderQuery(l5)
+                .activeQueries(active)
+                .build();
+    }
+
+    /**
+     * Converts a QueryPlan into search requests for provider execution.
+     */
+    public List<ProductSearchRequest> buildSearchRequestsFromPlan(com.homestock.modules.smartshopping.dto.QueryPlan plan,
+                                                                 com.homestock.modules.smartshopping.dto.ProductIdentity identity,
+                                                                 int maxResults) {
+        List<ProductSearchRequest> requests = new ArrayList<>();
+        if (identity != null && identity.getBarcode() != null && !identity.getBarcode().isBlank()) {
+            requests.add(ProductSearchRequest.builder()
+                    .barcode(identity.getBarcode())
+                    .itemName(identity.getBarcode())
+                    .brand(identity.getBrand())
+                    .category(identity.getCategory())
+                    .maxResults(maxResults)
+                    .build());
+            return requests;
+        }
+
+        for (String query : plan.getActiveQueries()) {
+            requests.add(ProductSearchRequest.builder()
+                    .itemName(query)
+                    .brand(identity != null ? identity.getBrand() : null)
+                    .category(identity != null ? identity.getCategory() : null)
+                    .maxResults(maxResults)
+                    .build());
+        }
+        return requests;
+    }
+
     private void addQuery(Set<String> set, String query) {
         if (query != null) {
             String clean = query.replaceAll("\\s+", " ").trim();

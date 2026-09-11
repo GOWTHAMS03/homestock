@@ -12,6 +12,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductDealSearchResponse {
+    /** The original user query */
+    private String query;
+
     /** Structured shopping item input summary */
     private ShoppingItemIntentDto shoppingItem;
 
@@ -20,6 +23,9 @@ public class ProductDealSearchResponse {
 
     /** Overall match status for the search */
     private MatchStatus matchStatus;
+
+    /** Overall confidence score (0.0 to 1.0) */
+    private Double confidence;
 
     /** Primary deals list (matching intent) */
     private List<ProductDealDto> deals;
@@ -30,8 +36,14 @@ public class ProductDealSearchResponse {
     /** Strictly verified exact deals (brand + product + pack size match) */
     private List<ProductDealDto> exactDeals;
 
-    /** Separated alternative or similar products (shown only when exact is missing or as separate recommendations) */
+    /** Separated alternative or similar products */
     private List<ProductDealDto> similarDeals;
+
+    /** Alias for similarDeals matching Section 36 specification */
+    private List<ProductDealDto> similarProducts;
+
+    /** Canonical Product Identity */
+    private ProductIdentity productIdentity;
 
     /** Structured rich product intent */
     private ProductIntent productIntent;
@@ -50,4 +62,7 @@ public class ProductDealSearchResponse {
 
     /** Descriptive status or failure message */
     private String message;
+
+    /** Debug audit trace showing candidate filtering and scoring reasoning */
+    private SearchDebugTrace debugTrace;
 }

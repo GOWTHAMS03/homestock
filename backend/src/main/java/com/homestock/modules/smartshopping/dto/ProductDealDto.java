@@ -15,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 public class ProductDealDto {
     private String id;
+    private String canonicalProductId; // Unique canonical cluster identifier
     private String productName;
     private String brand;
     private String variantType;
@@ -58,6 +59,7 @@ public class ProductDealDto {
     private boolean isExactMatch;
 
     private Double matchConfidence;
+    private Double identityConfidence;
     private Double matchScore; // 0 - 100
     private MatchStatus matchStatus;
 
@@ -66,6 +68,9 @@ public class ProductDealDto {
     private Instant lastVerifiedAt;
 
     private Double dealScore; // Combined weighted ranking score
+    private int sourceCount; // Number of search engines confirming this product
+
+    private DealEvidence evidence; // Explainable identity and price evidence
 
     private List<StoreOfferDto> storeOffers;
 }

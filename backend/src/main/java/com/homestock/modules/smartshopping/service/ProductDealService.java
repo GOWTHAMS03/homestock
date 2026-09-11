@@ -10,10 +10,19 @@ import com.homestock.modules.smartshopping.engine.ProductComparisonEngine;
 import com.homestock.modules.smartshopping.engine.ProductIntentEngine;
 import com.homestock.modules.smartshopping.engine.ProductMatchingEngine;
 import com.homestock.modules.smartshopping.engine.ProductSearchEngine;
+import com.homestock.modules.smartshopping.engine.clustering.CanonicalProductClusterer;
+import com.homestock.modules.smartshopping.engine.filter.HardConstraintFilter;
+import com.homestock.modules.smartshopping.engine.identity.BrandResolver;
+import com.homestock.modules.smartshopping.engine.identity.ProductAttributeExtractor;
+import com.homestock.modules.smartshopping.engine.identity.ProductIdentityResolver;
+import com.homestock.modules.smartshopping.engine.identity.ProductTaxonomy;
 import com.homestock.modules.smartshopping.engine.intent.ProductIntentExtractor;
 import com.homestock.modules.smartshopping.engine.intent.ProductNormalizer;
 import com.homestock.modules.smartshopping.engine.intent.SearchIntentClassifier;
 import com.homestock.modules.smartshopping.engine.intent.SearchQueryBuilder;
+import com.homestock.modules.smartshopping.engine.matching.EvidenceScorer;
+import com.homestock.modules.smartshopping.engine.matching.FuzzySimilarityEngine;
+import com.homestock.modules.smartshopping.engine.matching.ProductIdentityMatcher;
 import com.homestock.modules.smartshopping.engine.matching.ProductMatchEngine;
 import com.homestock.modules.smartshopping.provider.ShoppingProviderRegistry;
 import com.homestock.modules.smartshopping.service.anomaly.PriceAnomalyDetector;
@@ -36,39 +45,36 @@ import java.util.stream.Collectors;
 /**
  * ProductDealService:
  * Central orchestrator for product deal discovery across the 6 search engines.
- * Coordinates 12 modular components:
- * 1. ProductIntentExtractor
- * 2. ProductNormalizer
- * 3. SearchIntentClassifier
- * 4. SearchQueryBuilder
- * 5. MultiEngineSearchService (6 search providers)
- * 6. ProductMatchEngine (Point-based scoring & Brand Protection)
- * 7. ProductDeduplicationService (Canonical fingerprinting)
- * 8. PriceVerificationService
- * 9. ImageVerificationService
- * 10. DealRankingService (Effective price, unit price, quantity cost, Deal Score)
- * 11. PriceAnomalyDetector
- * 12. DealCacheService (TTL caching)
+ * Redesigned around PRODUCT IDENTITY RESOLUTION:
+ * 1. ProductIdentityResolver (Canonical Identity & Hard Constraints)
+ * 2. SearchQueryBuilder & QueryPlan (5-level progressive relaxation)
+ * 3. MultiEngineSearchService (6 search providers, parallel dispatch, 0% mock guarantee)
+ * 4. HardConstraintFilter & ProductIdentityMatcher (Hard pre-filter, multi-signal evidence, rejection tracing)
+ * 5. CanonicalProductClusterer (Multi-seller grouping, price verification, anomaly detection, effective quantity cost)
+ * 6. DealCacheService (TTL caching)
  */
 @Service
 public class ProductDealService {
 
     private static final Logger log = LoggerFactory.getLogger(ProductDealService.class);
 
+    private final ProductIdentityResolver identityResolver;
+    private final ProductIdentityMatcher identityMatcher;
+    private final CanonicalProductClusterer clusterer;
+    private final SearchQueryBuilder queryBuilder;
+    private final MultiEngineSearchService multiEngineSearchService;
+    private final DealCacheService cacheService;
+
+    // Legacy engines & repository preserved for backward compatibility
     private final ProductIntentExtractor intentExtractor;
     private final ProductNormalizer normalizer;
     private final SearchIntentClassifier intentClassifier;
-    private final SearchQueryBuilder queryBuilder;
-    private final MultiEngineSearchService multiEngineSearchService;
     private final ProductMatchEngine matchEngine;
     private final ProductDeduplicationService dedupService;
     private final PriceVerificationService priceVerificationService;
     private final ImageVerificationService imageVerificationService;
     private final DealRankingService dealRankingService;
     private final PriceAnomalyDetector anomalyDetector;
-    private final DealCacheService cacheService;
-
-    // Legacy engines & repository preserved for backward compatibility
     private final ProductIntentEngine legacyIntentEngine;
     private final AIRecommendationEngine recommendationEngine;
     private final ShoppingListItemRepository listItemRepository;
@@ -78,6 +84,9 @@ public class ProductDealService {
      */
     @Autowired
     public ProductDealService(
+            ProductIdentityResolver identityResolver,
+            ProductIdentityMatcher identityMatcher,
+            CanonicalProductClusterer clusterer,
             ProductIntentExtractor intentExtractor,
             ProductNormalizer normalizer,
             SearchIntentClassifier intentClassifier,
@@ -94,6 +103,9 @@ public class ProductDealService {
             AIRecommendationEngine recommendationEngine,
             ShoppingListItemRepository listItemRepository
     ) {
+        this.identityResolver = identityResolver;
+        this.identityMatcher = identityMatcher;
+        this.clusterer = clusterer;
         this.intentExtractor = intentExtractor;
         this.normalizer = normalizer;
         this.intentClassifier = intentClassifier;
@@ -123,6 +135,17 @@ public class ProductDealService {
             AIRecommendationEngine recommendationEngine,
             ShoppingListItemRepository listItemRepository
     ) {
+        FuzzySimilarityEngine fuzzyEngine = new FuzzySimilarityEngine();
+        BrandResolver brandResolver = new BrandResolver(fuzzyEngine);
+        ProductTaxonomy taxonomy = new ProductTaxonomy();
+        ProductAttributeExtractor attributeExtractor = new ProductAttributeExtractor(brandResolver, taxonomy);
+
+        this.identityResolver = new ProductIdentityResolver(attributeExtractor);
+        HardConstraintFilter filter = new HardConstraintFilter(brandResolver, attributeExtractor, taxonomy);
+        EvidenceScorer scorer = new EvidenceScorer(fuzzyEngine, brandResolver, attributeExtractor);
+        this.identityMatcher = new ProductIdentityMatcher(filter, scorer);
+        this.clusterer = new CanonicalProductClusterer();
+
         this.normalizer = new ProductNormalizer();
         this.intentClassifier = new SearchIntentClassifier();
         this.intentExtractor = new ProductIntentExtractor(this.normalizer, this.intentClassifier);
@@ -185,72 +208,56 @@ public class ProductDealService {
             return cached.get();
         }
 
-        // 1. Build Structured Product Intent (18+ fields, quantity vs pack size separated)
+        // 1. Resolve Canonical Product Identity & Hard Identity Constraints
+        ProductIdentity identity = identityResolver.resolve(query, barcode);
+
+        // If brand was explicitly passed as parameter and not extracted, overlay it
+        if (identity.getBrand() == null && brand != null && !brand.isBlank()) {
+            identity.setBrand(brand.trim());
+        }
+
+        // Backward compatibility intent
         ProductIntent productIntent = intentExtractor.extractIntent(query, barcode, brand, unit);
         ProductSearchIntentDto legacyIntent = legacyIntentEngine.parseIntent(query, barcode, brand, unit);
 
-        // 2. Ambiguous query check
-        if (productIntent.getSearchIntent() == SearchIntent.INSUFFICIENT_INFORMATION) {
-            log.info("[ProductDealService] Query '{}' classified as INSUFFICIENT_INFORMATION", query);
-        }
+        // 2. Build 5-level progressive QueryPlan
+        QueryPlan queryPlan = queryBuilder.buildQueryPlan(identity, query);
 
         // 3. Dispatch parallel search across the 6 enabled search engines with timeouts & fallback
-        List<ProductCandidate> candidates = multiEngineSearchService.searchAllEngines(productIntent, 30);
+        List<ProductCandidate> rawCandidates = multiEngineSearchService.searchAllEngines(identity, queryPlan, 30);
 
-        // 4. Verify prices, images, anomalies, and calculate Product Match Scores
-        List<ProductCandidate> scoredCandidates = new ArrayList<>();
-        for (ProductCandidate candidate : candidates) {
-            // Strict 0% Mock Guarantee: reject any mock or demo candidates
-            if (candidate.getProvider() != null &&
-                    (candidate.getProvider().toUpperCase().contains("MOCK") ||
-                     candidate.getProvider().toUpperCase().contains("DEMO"))) {
-                continue;
-            }
+        // 4. Hard Constraint Pre-Filtering + Multi-Signal Evidence Scoring + Rejection Tracing
+        ProductIdentityMatcher.MatchResult matchResult = identityMatcher.matchCandidates(identity, rawCandidates);
+        List<ProductCandidate> validCandidates = matchResult.getValidCandidates();
+        List<RejectedCandidate> rejectedCandidates = matchResult.getRejectedCandidates();
 
-            priceVerificationService.verifyPrice(candidate);
-            imageVerificationService.verifyImage(candidate);
-            anomalyDetector.inspect(candidate);
+        // 5. Cluster candidates into canonical products, verify prices, and isolate similar products
+        CanonicalProductClusterer.ClusteringResult clusteringResult = clusterer.clusterAndRank(identity, validCandidates);
+        List<ProductDealDto> primaryDeals = clusteringResult.getPrimaryDeals();
+        List<ProductDealDto> similarProducts = clusteringResult.getSimilarProducts();
 
-            ProductMatchEngine.ScoredCandidate scored = matchEngine.match(productIntent, candidate);
-            candidate.setMatchScore(scored.score());
-            candidate.setMatchStatus(scored.status());
+        // 6. Apply In-Memory Filters (Subtype / Brand / Pack Size) if specified
+        List<ProductDealDto> filteredPrimaryDeals = applyFilters(primaryDeals, filterSubtype, filterBrand, filterPackSize);
+        List<ProductDealDto> filteredSimilarProducts = applyFilters(similarProducts, filterSubtype, filterBrand, filterPackSize);
 
-            // Exclude rejected matches (< 70) from deals consideration
-            if (scored.score() >= 70.0 && !scored.isBrandClash()) {
-                scoredCandidates.add(candidate);
-            } else if (!scored.isBrandClash() && scored.score() >= 50.0) {
-                // Keep for similar products pool
-                scoredCandidates.add(candidate);
-            }
-        }
-
-        // 5. Deduplicate candidates using canonical fingerprint (BRAND|NAME|VARIANT|PACK_SIZE|BARCODE)
-        List<ProductDealDto> rawDeals = dedupService.deduplicateAndGroup(scoredCandidates);
-
-        // 6. Rank deals, compute effective price (price + delivery), unit price, quantity total, and segregate exact vs similar
-        DealRankingService.RankedDealsContainer ranked = dealRankingService.rankAndSegregate(rawDeals, productIntent, sortBy);
-
-        // 7. Apply In-Memory Filters (Subtype / Brand / Pack Size) if specified
-        List<ProductDealDto> displayedDeals = applyFilters(ranked.primaryDeals(), filterSubtype, filterBrand, filterPackSize);
-        List<ProductDealDto> exactDeals = applyFilters(ranked.exactDeals(), filterSubtype, filterBrand, filterPackSize);
-        List<ProductDealDto> similarDeals = applyFilters(ranked.similarDeals(), filterSubtype, filterBrand, filterPackSize);
-
-        // 8. Determine Overall Match Status
+        // 7. Determine Overall Match Status and Message
         MatchStatus matchStatus;
-        String message = null;
+        String message;
 
-        if (productIntent.getSearchIntent() == SearchIntent.INSUFFICIENT_INFORMATION && displayedDeals.isEmpty()) {
+        if (identity.getSearchMode() == SearchIntent.INSUFFICIENT_INFORMATION && filteredPrimaryDeals.isEmpty()) {
             matchStatus = MatchStatus.AMBIGUOUS;
             message = "Term is ambiguous. Please specify a brand or variant for exact deal matching.";
-        } else if (!exactDeals.isEmpty()) {
-            double topScore = exactDeals.get(0).getMatchScore() != null ? exactDeals.get(0).getMatchScore() : 90.0;
-            matchStatus = topScore >= 95.0 ? MatchStatus.VERIFIED_EXACT : MatchStatus.HIGH_CONFIDENCE;
-            if (productIntent.getSearchIntent() == SearchIntent.GENERIC_PRODUCT) {
-                message = "Best deals for " + (productIntent.getGenericName() != null ? productIntent.getGenericName() : query);
+        } else if (!filteredPrimaryDeals.isEmpty()) {
+            double topConfidence = filteredPrimaryDeals.get(0).getIdentityConfidence() != null
+                    ? filteredPrimaryDeals.get(0).getIdentityConfidence()
+                    : 0.9;
+            matchStatus = topConfidence >= 0.90 ? MatchStatus.VERIFIED_EXACT : MatchStatus.HIGH_CONFIDENCE;
+            if (identity.getSearchMode() == SearchIntent.GENERIC_PRODUCT || identity.getSearchMode() == SearchIntent.GENERIC_SEARCH) {
+                message = "Best deals for " + (identity.getProduct() != null ? identity.getProduct() : query);
             } else {
                 message = "Exact match found";
             }
-        } else if (!similarDeals.isEmpty()) {
+        } else if (!filteredSimilarProducts.isEmpty()) {
             matchStatus = MatchStatus.POSSIBLE_MATCH;
             message = "Exact product unavailable. Showing similar products.";
         } else {
@@ -258,33 +265,56 @@ public class ProductDealService {
             message = "Exact product could not be verified.";
         }
 
-        // 9. Generate AI Recommendation & Highlights
+        // 8. Generate SearchDebugTrace
+        SearchDebugTrace debugTrace = SearchDebugTrace.builder()
+                .rawInput(query)
+                .resolvedIdentity(identity)
+                .generatedQueries(queryPlan.getActiveQueries())
+                .rawEngineCandidatesCount(rawCandidates.size())
+                .rejectedCandidates(rejectedCandidates)
+                .validCandidatesCount(validCandidates.size())
+                .clustersCount(clusteringResult.getTotalClustersCount())
+                .build();
+
+        // 9. Rank deals and compute summary & filter facets
+        DealRankingService.RankedDealsContainer ranked = dealRankingService.rankAndSegregate(
+                filteredPrimaryDeals, productIntent, sortBy);
+
         AIRecommendationEngine.AIRecommendationResult aiResult = recommendationEngine.generateSummaryAndHighlights(
                 legacyIntent,
-                displayedDeals,
+                filteredPrimaryDeals,
                 ranked.lowestPriceDeal(),
                 ranked.bestValueDeal(),
                 ranked.popularDeal()
         );
 
         // 10. Build Shopping Item Intent Summary
+        String packSizeStr = identity.getPackSize() != null
+                ? identity.getPackSize().stripTrailingZeros().toPlainString() + (identity.getPackUnit() != null ? identity.getPackUnit() : "")
+                : null;
+
         ShoppingItemIntentDto shoppingItem = ShoppingItemIntentDto.builder()
-                .name(productIntent.getProductName())
-                .brand(productIntent.getBrand())
-                .requiredQuantity(productIntent.getQuantity())
-                .unit(productIntent.getUnit())
-                .packSize(productIntent.getPackSize())
+                .name(identity.getProduct())
+                .brand(identity.getBrand())
+                .requiredQuantity(identity.getRequestedQuantity() != null ? identity.getRequestedQuantity() : BigDecimal.ONE)
+                .unit(identity.getRequestedQuantityUnit())
+                .packSize(packSizeStr)
                 .build();
 
         // 11. Construct Response
         ProductDealSearchResponse response = ProductDealSearchResponse.builder()
+                .query(query)
+                .productIdentity(identity)
+                .confidence(identity.getConfidence())
                 .shoppingItem(shoppingItem)
                 .searchIntent(productIntent.getSearchIntent())
                 .matchStatus(matchStatus)
-                .deals(displayedDeals)
-                .products(displayedDeals) // backward compatibility
-                .exactDeals(exactDeals)
-                .similarDeals(similarDeals)
+                .deals(filteredPrimaryDeals)
+                .products(filteredPrimaryDeals) // backward compatibility
+                .exactDeals(filteredPrimaryDeals)
+                .similarDeals(filteredSimilarProducts)
+                .similarProducts(filteredSimilarProducts)
+                .debugTrace(debugTrace)
                 .productIntent(productIntent)
                 .intent(legacyIntent)
                 .summary(aiResult.summary())

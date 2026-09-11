@@ -65,6 +65,28 @@ public class MultiEngineSearchService {
         return candidates;
     }
 
+    /**
+     * Search enabled providers in parallel using identity-aware progressive QueryPlan.
+     */
+    public List<ProductCandidate> searchAllEngines(com.homestock.modules.smartshopping.dto.ProductIdentity identity,
+                                                   com.homestock.modules.smartshopping.dto.QueryPlan plan,
+                                                   int maxResultsPerProvider) {
+        List<ShoppingProvider> enabledProviders = providerRegistry.getEnabledProviders();
+        if (enabledProviders.isEmpty()) {
+            log.warn("[MultiEngineSearchService] No enabled shopping providers found");
+            return Collections.emptyList();
+        }
+
+        List<ProductSearchRequest> searchRequests = queryBuilder.buildSearchRequestsFromPlan(plan, identity, maxResultsPerProvider);
+        log.info("[MultiEngineSearchService] Dispatching {} identity-aware queries across {} enabled providers",
+                searchRequests.size(), enabledProviders.size());
+
+        List<ProductCandidate> candidates = executeParallelSearch(enabledProviders, searchRequests);
+        log.info("[MultiEngineSearchService] Aggregated {} product candidates across engines for identity '{}'",
+                candidates.size(), identity.getProduct());
+        return candidates;
+    }
+
     private List<ProductCandidate> executeParallelSearch(
             List<ShoppingProvider> providers,
             List<ProductSearchRequest> requests
