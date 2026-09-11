@@ -32,7 +32,9 @@ app:
     provider-timeout-seconds: ${PROVIDER_TIMEOUT_SECONDS:5}
     providers:
       mock:
-        enabled: ${MOCK_PROVIDER_ENABLED:true}
+        enabled: ${MOCK_PROVIDER_ENABLED:false}
+      online:
+        enabled: ${ONLINE_PROVIDER_ENABLED:true}
       amazon:
         enabled: ${AMAZON_PROVIDER_ENABLED:false}
         partner-tag: ${AMAZON_PARTNER_TAG:}
@@ -66,6 +68,27 @@ app:
       default-enabled: ${QUIET_HOURS_ENABLED:false}
       default-start: ${QUIET_HOURS_START:22:00}
       default-end: ${QUIET_HOURS_END:07:00}
+    scoring:
+      weight-urgency: ${NOTIF_WEIGHT_URGENCY:0.30}
+      weight-relevance: ${NOTIF_WEIGHT_RELEVANCE:0.25}
+      weight-confidence: ${NOTIF_WEIGHT_CONFIDENCE:0.20}
+      weight-action-probability: ${NOTIF_WEIGHT_ACTION_PROB:0.15}
+      weight-fatigue: ${NOTIF_WEIGHT_FATIGUE:0.10}
+    limits:
+      max-push-per-day: ${NOTIF_MAX_PUSH_PER_DAY:5}
+      max-notifications-per-hour: ${NOTIF_MAX_NOTIF_PER_HOUR:2}
+      consecutive-dismissals-threshold: ${NOTIF_DISMISSAL_THRESHOLD:3}
+    grouping:
+      min-items-threshold: ${NOTIF_GROUPING_MIN_ITEMS:3}
+  scheduler:
+    ml-notification:
+      enabled: ${ML_NOTIFICATION_SCHEDULER_ENABLED:true}
+      cron: ${ML_NOTIFICATION_CRON:0 0 */4 * * *}
+  away-summary:
+    enabled: ${AWAY_SUMMARY_ENABLED:true}
+    min-inactive-days: ${AWAY_MIN_INACTIVE_DAYS:3}
+    confidence-threshold: ${AWAY_CONFIDENCE_THRESHOLD:0.40}
+    max-summary-items: ${AWAY_MAX_SUMMARY_ITEMS:5}
 
 springdoc:
   api-docs:

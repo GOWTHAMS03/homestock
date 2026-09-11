@@ -35,3 +35,7 @@ Thumbs.db
 
 # Scratch directory
 scratch/
+
+# Sensitive credentials
+firebase-service-account*.json
+**/firebase-service-account*.json

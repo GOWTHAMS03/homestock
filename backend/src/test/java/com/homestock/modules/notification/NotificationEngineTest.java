@@ -138,7 +138,7 @@ class NotificationEngineTest {
         Notification saved = notifCaptor.getValue();
         assertThat(saved.getType()).isEqualTo(NotificationType.OUT_OF_STOCK);
         assertThat(saved.getTitle()).contains("Oat Milk is out of stock");
-        assertThat(saved.getPriority()).isEqualTo(NotificationPriority.HIGH);
+        assertThat(saved.getPriority()).isEqualTo(NotificationPriority.CRITICAL);
     }
 
     @Test

@@ -29,6 +29,7 @@ public class ProductOfferDto {
     private String imageUrl;
     private String productUrl;
     private String affiliateUrl;
+    private String deepLink;
 
     private BigDecimal price;
     private String currency;

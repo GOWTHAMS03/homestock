@@ -110,6 +110,10 @@ class ApiEndpoints {
       '/homes/$homeId/shopping/price-history';
   static String affiliateClick(String homeId) =>
       '/homes/$homeId/affiliate/click';
+  static String dealSearch(String homeId) =>
+      '/homes/$homeId/shopping/deals/search';
+  static String itemDeals(String homeId, String itemId) =>
+      '/homes/$homeId/shopping-list/items/$itemId/deals';
   static const String shoppingCompare = '/shopping/compare';
 
   // Voice & STT

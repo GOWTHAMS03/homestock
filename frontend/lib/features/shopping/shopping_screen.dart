@@ -11,6 +11,7 @@ import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_model.dart';
 import '../purchase/add_purchase_screen.dart';
 import '../purchase/purchases_screen.dart';
+import '../smart_shopping/product_deal_search_screen.dart';
 import '../smart_shopping/smart_shopping_screen.dart';
 import '../voice/widgets/voice_input_button.dart';
 import 'add_shopping_item_dialog.dart';
@@ -1379,7 +1380,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: InkWell(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
+          MaterialPageRoute(builder: (_) => const ProductDealSearchScreen()),
         ),
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -1766,12 +1767,11 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                     child: InkWell(
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => SmartShoppingScreen(
-                            itemId: item.id,
-                            inventoryItemId: item.inventoryItemId,
-                            itemName: item.itemName,
-                            quantity: item.quantity,
-                            unit: item.unit,
+                          builder: (_) => ProductDealSearchScreen(
+                            initialQuery: item.itemName,
+                            initialItemId: item.id,
+                            initialBarcode: item.barcode,
+                            initialUnit: item.unit,
                           ),
                         ),
                       ),

@@ -58,6 +58,7 @@ void main() {
     // Verify title, body, badge, and action button are displayed
     expect(find.text('Milk (பால்) is running low'), findsOneWidget);
     expect(find.text('Only 0.5 L remaining in Refrigerator.'), findsOneWidget);
+    expect(tapped, isFalse);
     expect(find.text('⚠️ LOW STOCK'), findsOneWidget);
     expect(find.text('+ Add to Shopping'), findsOneWidget);
     expect(find.text('Just now'), findsOneWidget);

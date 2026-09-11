@@ -36,4 +36,10 @@ public interface ShoppingListItemRepository extends JpaRepository<ShoppingListIt
 
     @Query("SELECT s FROM ShoppingListItem s WHERE s.shoppingList.home.id = :homeId AND s.barcode = :barcode AND s.isCompleted = false")
     Optional<ShoppingListItem> findActiveItemByHomeIdAndBarcode(@Param("homeId") UUID homeId, @Param("barcode") String barcode);
+
+    @Query("SELECT s FROM ShoppingListItem s WHERE s.shoppingList.home.id = :homeId AND s.inventoryItem.id = :itemId AND s.isCompleted = false")
+    Optional<ShoppingListItem> findActiveItemByHomeIdAndInventoryItemId(@Param("homeId") UUID homeId, @Param("itemId") UUID itemId);
+
+    @Query("SELECT MAX(s.createdAt) FROM ShoppingListItem s WHERE s.addedBy.id = :userId")
+    Optional<java.time.Instant> findLatestAddedTimeByUserId(@Param("userId") UUID userId);
 }

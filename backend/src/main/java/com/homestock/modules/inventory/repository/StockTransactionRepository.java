@@ -20,4 +20,15 @@ public interface StockTransactionRepository extends JpaRepository<StockTransacti
 
     @Query("SELECT t FROM StockTransaction t WHERE t.home.id = :homeId AND t.createdAt > :since ORDER BY t.createdAt DESC")
     List<StockTransaction> findByHomeIdAndCreatedAtAfter(@Param("homeId") UUID homeId, @Param("since") Instant since);
+
+    @Query("SELECT t FROM StockTransaction t WHERE t.item.id = :itemId AND t.createdAt > :since ORDER BY t.createdAt DESC")
+    List<StockTransaction> findByItemIdAndCreatedAtAfter(@Param("itemId") UUID itemId, @Param("since") Instant since);
+
+    List<StockTransaction> findTop20ByItemIdOrderByCreatedAtDesc(UUID itemId);
+
+    @Query("SELECT MAX(t.createdAt) FROM StockTransaction t WHERE t.user.id = :userId")
+    java.util.Optional<Instant> findLatestTransactionTimeByUserId(@Param("userId") UUID userId);
+
+    @Query("SELECT t FROM StockTransaction t WHERE t.home.id = :homeId AND t.user.id != :userId AND t.createdAt >= :since ORDER BY t.createdAt DESC")
+    List<StockTransaction> findFamilyTransactionsSince(@Param("homeId") UUID homeId, @Param("userId") UUID userId, @Param("since") Instant since);
 }

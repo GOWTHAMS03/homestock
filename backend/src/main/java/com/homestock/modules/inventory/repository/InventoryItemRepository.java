@@ -29,6 +29,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
     List<InventoryItem> findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(UUID homeId);
 
+    List<InventoryItem> findAllByHomeIdOrderByNameAsc(UUID homeId);
+
     @Query("SELECT i FROM InventoryItem i WHERE i.home.id = :homeId AND i.isArchived = false AND i.quantity <= i.minimumQuantity")
     List<InventoryItem> findLowStockItems(@Param("homeId") UUID homeId);
 

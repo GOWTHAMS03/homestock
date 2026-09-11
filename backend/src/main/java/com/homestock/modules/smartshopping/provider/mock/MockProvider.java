@@ -25,7 +25,7 @@ public class MockProvider implements ShoppingProvider {
 
     private static final Logger log = LoggerFactory.getLogger(MockProvider.class);
 
-    @Value("${app.smart-shopping.providers.mock.enabled:true}")
+    @Value("${app.smart-shopping.providers.mock.enabled:false}")
     private boolean enabled;
 
     private static final List<MockProduct> CATALOG = buildCatalog();

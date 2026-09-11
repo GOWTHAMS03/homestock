@@ -9,6 +9,7 @@ import com.homestock.modules.notification.dto.NotificationDto;
 import com.homestock.modules.notification.dto.NotificationPreferenceDto;
 import com.homestock.modules.notification.entity.NotificationPreference;
 import com.homestock.modules.notification.service.DeviceTokenService;
+import com.homestock.modules.notification.service.NotificationAnalyticsService;
 import com.homestock.modules.notification.service.NotificationPreferenceService;
 import com.homestock.modules.notification.service.NotificationService;
 import com.homestock.modules.user.entity.User;
@@ -36,6 +37,7 @@ public class NotificationController {
     private final NotificationPreferenceService preferenceService;
     private final DeviceTokenService deviceTokenService;
     private final UserRepository userRepository;
+    private final NotificationAnalyticsService analyticsService;
     private final com.homestock.modules.notification.provider.FirebaseNotificationProvider firebaseNotificationProvider;
 
     @GetMapping
@@ -63,6 +65,33 @@ public class NotificationController {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
         notificationService.markAsRead(id, currentUserId);
         return ResponseEntity.ok(ApiResponse.success("Notification marked read", null));
+    }
+
+    @PostMapping("/{id}/action")
+    @Operation(summary = "Record action taken on notification by user (e.g. Added to List, Viewed Deal)")
+    public ResponseEntity<ApiResponse<Void>> recordAction(
+            @PathVariable UUID id,
+            @Valid @RequestBody com.homestock.modules.notification.dto.NotificationActionRequest request) {
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        analyticsService.recordAction(id, currentUserId, request.getActionType());
+        return ResponseEntity.ok(ApiResponse.success("Action recorded successfully", null));
+    }
+
+    @PostMapping("/{id}/dismiss")
+    @Operation(summary = "Record notification dismissal for fatigue and relevance learning")
+    public ResponseEntity<ApiResponse<Void>> recordDismiss(@PathVariable UUID id) {
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        analyticsService.recordDismissal(id, currentUserId);
+        return ResponseEntity.ok(ApiResponse.success("Dismissal recorded", null));
+    }
+
+    @GetMapping("/insights")
+    @Operation(summary = "Get high-value household restock and savings insights")
+    public ResponseEntity<ApiResponse<List<com.homestock.modules.notification.dto.SmartInsightDto>>> getSmartInsights(
+            @RequestParam(required = false) UUID homeId) {
+        UUID effectiveHomeId = homeId != null ? homeId : SecurityUtils.getCurrentUserId();
+        List<com.homestock.modules.notification.dto.SmartInsightDto> insights = analyticsService.getSmartInsights(effectiveHomeId);
+        return ResponseEntity.ok(ApiResponse.success(insights));
     }
 
     @PostMapping("/read-all")

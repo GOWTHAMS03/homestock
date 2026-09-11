@@ -162,7 +162,7 @@ public class NotificationEngine {
             }
 
             // Check Quiet Hours for push notification dispatch
-            if (pref != null && pref.isInsideQuietHours(currentTime) && priority != NotificationPriority.HIGH) {
+            if (pref != null && pref.isInsideQuietHours(currentTime) && priority != NotificationPriority.CRITICAL && priority != NotificationPriority.HIGH) {
                 log.debug("Quiet hours active for user {}. In-app notification saved; push deferred/suppressed.", targetUser.getId());
                 continue;
             }

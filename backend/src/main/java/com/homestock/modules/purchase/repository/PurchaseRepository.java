@@ -32,4 +32,10 @@ public interface PurchaseRepository extends JpaRepository<Purchase, UUID> {
     int countPurchasesSince(@Param("homeId") UUID homeId, @Param("startDate") LocalDate startDate);
 
     List<Purchase> findByHomeIdAndUpdatedAtAfter(UUID homeId, java.time.Instant since);
+
+    @Query("SELECT MAX(p.createdAt) FROM Purchase p WHERE p.recordedBy.id = :userId")
+    Optional<java.time.Instant> findLatestPurchaseTimeByUserId(@Param("userId") UUID userId);
+
+    @Query("SELECT p FROM Purchase p WHERE p.home.id = :homeId AND p.recordedBy.id != :userId AND p.createdAt >= :since ORDER BY p.createdAt DESC")
+    List<Purchase> findFamilyPurchasesSince(@Param("homeId") UUID homeId, @Param("userId") UUID userId, @Param("since") java.time.Instant since);
 }

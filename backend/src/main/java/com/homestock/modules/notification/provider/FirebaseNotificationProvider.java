@@ -146,13 +146,13 @@ public class FirebaseNotificationProvider {
 
             // Android specific priority & channel configuration
             String channelId = switch (priority != null ? priority : NotificationPriority.MEDIUM) {
-                case HIGH -> "home_stock_important";
+                case CRITICAL, HIGH -> "home_stock_important";
                 case MEDIUM -> "home_stock_general";
                 case LOW -> "home_stock_insights";
             };
 
             com.google.firebase.messaging.AndroidConfig.Priority androidPriority =
-                    (priority == NotificationPriority.HIGH)
+                    (priority == NotificationPriority.CRITICAL || priority == NotificationPriority.HIGH)
                             ? com.google.firebase.messaging.AndroidConfig.Priority.HIGH
                             : com.google.firebase.messaging.AndroidConfig.Priority.NORMAL;
 

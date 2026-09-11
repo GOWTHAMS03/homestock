@@ -9,6 +9,7 @@ import com.homestock.modules.smartshopping.entity.ShoppingSession;
 import com.homestock.modules.smartshopping.provider.ShoppingProviderRegistry;
 import com.homestock.modules.smartshopping.repository.PriceHistoryRepository;
 import com.homestock.modules.smartshopping.service.PriceComparisonService;
+import com.homestock.modules.smartshopping.service.ProductDealService;
 import com.homestock.modules.smartshopping.service.ShoppingSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 public class SmartShoppingController {
 
     private final PriceComparisonService priceComparisonService;
+    private final ProductDealService productDealService;
     private final ShoppingSessionService shoppingSessionService;
     private final ShoppingProviderRegistry providerRegistry;
     private final PriceHistoryRepository priceHistoryRepository;
@@ -43,6 +45,39 @@ public class SmartShoppingController {
 
         PriceComparisonResponse comparison = priceComparisonService.compareItem(homeId, itemId);
         return ResponseEntity.ok(ApiResponse.success("Price comparison completed", comparison));
+    }
+
+    @GetMapping("/shopping/deals/search")
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
+    @Operation(summary = "Search real-world product deals",
+            description = "Analyzes query intent (generic discovery vs exact), compares cross-store prices, computes unit values, and returns ranked deals.")
+    public ResponseEntity<ApiResponse<ProductDealSearchResponse>> searchDeals(
+            @PathVariable UUID homeId,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String barcode,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String unit,
+            @RequestParam(required = false) String subtype,
+            @RequestParam(required = false) String filterBrand,
+            @RequestParam(required = false) String filterPackSize,
+            @RequestParam(defaultValue = "default") String sortBy) {
+
+        ProductDealSearchResponse response = productDealService.searchDeals(
+                homeId, query, barcode, brand, unit, subtype, filterBrand, filterPackSize, sortBy);
+        return ResponseEntity.ok(ApiResponse.success("Deals search completed", response));
+    }
+
+    @GetMapping("/shopping-list/items/{itemId}/deals")
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
+    @Operation(summary = "Find real-world deals for a shopping list item",
+            description = "Extracts intent and parameters from the shopping list item and returns live cross-store deals.")
+    public ResponseEntity<ApiResponse<ProductDealSearchResponse>> getItemDeals(
+            @PathVariable UUID homeId,
+            @PathVariable UUID itemId,
+            @RequestParam(defaultValue = "default") String sortBy) {
+
+        ProductDealSearchResponse response = productDealService.searchDealsForShoppingListItem(homeId, itemId, sortBy);
+        return ResponseEntity.ok(ApiResponse.success("Item deals retrieved", response));
     }
 
     @PostMapping("/shopping/compare/basket")

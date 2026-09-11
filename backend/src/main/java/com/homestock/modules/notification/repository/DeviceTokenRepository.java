@@ -30,5 +30,8 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, UUID> 
     @Modifying
     @Query("UPDATE DeviceToken d SET d.isActive = false WHERE d.user.id = :userId AND d.deviceToken = :token")
     void deactivateUserToken(@Param("userId") UUID userId, @Param("token") String token);
+
+    @Query("SELECT MAX(d.lastUsedAt) FROM DeviceToken d WHERE d.user.id = :userId")
+    Optional<java.time.Instant> findLatestActivityByUserId(@Param("userId") UUID userId);
 }
 
