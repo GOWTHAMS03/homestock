@@ -18,6 +18,7 @@ import com.homestock.modules.smartshopping.engine.identity.ProductIdentityResolv
 import com.homestock.modules.smartshopping.engine.identity.ProductTaxonomy;
 import com.homestock.modules.smartshopping.engine.intent.ProductIntentExtractor;
 import com.homestock.modules.smartshopping.engine.intent.ProductNormalizer;
+import com.homestock.modules.smartshopping.engine.url.*;
 import com.homestock.modules.smartshopping.engine.intent.SearchIntentClassifier;
 import com.homestock.modules.smartshopping.engine.intent.SearchQueryBuilder;
 import com.homestock.modules.smartshopping.engine.matching.EvidenceScorer;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -50,10 +52,12 @@ import java.util.stream.Collectors;
  * 2. SearchQueryBuilder & QueryPlan (5-level progressive relaxation)
  * 3. MultiEngineSearchService (6 search providers, parallel dispatch, 0% mock guarantee)
  * 4. HardConstraintFilter & ProductIdentityMatcher (Hard pre-filter, multi-signal evidence, rejection tracing)
- * 5. CanonicalProductClusterer (Multi-seller grouping, price verification, anomaly detection, effective quantity cost)
- * 6. DealCacheService (TTL caching)
+ * 5. Candidate Verification (Direct Product URL Resolution, Product Page Validation, Price & Image Consistency)
+ * 6. CanonicalProductClusterer (Multi-seller grouping, price verification, anomaly detection, effective quantity cost)
+ * 7. DealCacheService (TTL caching)
  */
 @Service
+@Transactional(readOnly = true)
 public class ProductDealService {
 
     private static final Logger log = LoggerFactory.getLogger(ProductDealService.class);
@@ -64,6 +68,7 @@ public class ProductDealService {
     private final SearchQueryBuilder queryBuilder;
     private final MultiEngineSearchService multiEngineSearchService;
     private final DealCacheService cacheService;
+    private final ProductUrlResolver urlResolver;
 
     // Legacy engines & repository preserved for backward compatibility
     private final ProductIntentExtractor intentExtractor;
@@ -101,7 +106,8 @@ public class ProductDealService {
             DealCacheService cacheService,
             ProductIntentEngine legacyIntentEngine,
             AIRecommendationEngine recommendationEngine,
-            ShoppingListItemRepository listItemRepository
+            ShoppingListItemRepository listItemRepository,
+            @Autowired(required = false) ProductUrlResolver urlResolver
     ) {
         this.identityResolver = identityResolver;
         this.identityMatcher = identityMatcher;
@@ -121,6 +127,7 @@ public class ProductDealService {
         this.legacyIntentEngine = legacyIntentEngine;
         this.recommendationEngine = recommendationEngine;
         this.listItemRepository = listItemRepository;
+        this.urlResolver = urlResolver != null ? urlResolver : new DefaultProductUrlResolver(new ProductUrlValidator());
     }
 
     /**
@@ -174,6 +181,7 @@ public class ProductDealService {
         this.legacyIntentEngine = intentEngine;
         this.recommendationEngine = recommendationEngine;
         this.listItemRepository = listItemRepository;
+        this.urlResolver = new DefaultProductUrlResolver(new ProductUrlValidator());
     }
 
     /**
@@ -230,6 +238,34 @@ public class ProductDealService {
         ProductIdentityMatcher.MatchResult matchResult = identityMatcher.matchCandidates(identity, rawCandidates);
         List<ProductCandidate> validCandidates = matchResult.getValidCandidates();
         List<RejectedCandidate> rejectedCandidates = matchResult.getRejectedCandidates();
+
+        // 4.1. Product URL Resolution, Product Page Validation, Price & Image Verification (Sections 42-47, 52, 53, 56)
+        for (ProductCandidate c : validCandidates) {
+            // URL Resolution & Canonicalization
+            urlResolver.resolveProductUrl(c);
+            ProductUrlValidationResult urlRes = urlResolver.validateProductUrl(c.getProductUrl(), identity);
+            if (urlRes.isUrlVerified()) {
+                c.setUrlVerified(true);
+                c.setCanonicalProductUrl(urlRes.getCanonicalProductUrl());
+                c.setUrlConfidence(urlRes.getUrlConfidence());
+                c.setUrlType(urlRes.getUrlType());
+                c.setDirectProductUrlAvailable(true);
+            } else {
+                c.setUrlVerified(false);
+                c.setUrlConfidence(0.0);
+                c.setUrlType(urlRes.getUrlType());
+                c.setDirectProductUrlAvailable(false);
+            }
+
+            // Price Verification
+            priceVerificationService.verifyPrice(c);
+            c.setDisplayedPrice(c.getPrice());
+            c.setVerifiedPrice(c.getPrice());
+            c.setPriceVerifiedAt(Instant.now());
+
+            // Image Verification
+            imageVerificationService.verifyImage(c);
+        }
 
         // 5. Cluster candidates into canonical products, verify prices, and isolate similar products
         CanonicalProductClusterer.ClusteringResult clusteringResult = clusterer.clusterAndRank(identity, validCandidates);

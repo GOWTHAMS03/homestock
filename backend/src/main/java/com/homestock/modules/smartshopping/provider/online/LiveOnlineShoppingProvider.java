@@ -6,6 +6,7 @@ import com.homestock.modules.smartshopping.dto.ProductOfferDto;
 import com.homestock.modules.smartshopping.provider.ProductSearchRequest;
 import com.homestock.modules.smartshopping.provider.ProviderCapability;
 import com.homestock.modules.smartshopping.provider.ShoppingProvider;
+import com.homestock.modules.smartshopping.provider.real.RealMarketCatalogProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -277,10 +278,16 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
         String encodedSearch = URLEncoder.encode(searchQuery.trim(), StandardCharsets.UTF_8);
 
         // Store 1: BigBasket (Supermarket - High discount, 2-4 hr delivery)
-        BigDecimal bbPrice = mrp.multiply(new BigDecimal("0.91")).setScale(0, RoundingMode.HALF_UP);
+        Optional<RealMarketCatalogProvider.CatalogEntry> bbEntry = RealMarketCatalogProvider.findByBarcodeAndStore(barcode, "BigBasket")
+                .or(() -> RealMarketCatalogProvider.findByNameAndStore(name, "BigBasket"));
+        BigDecimal bbPrice = bbEntry.map(e -> e.price).orElseGet(() -> mrp.multiply(new BigDecimal("0.91")).setScale(0, RoundingMode.HALF_UP));
+        String bbUrl = bbEntry.map(e -> e.productUrl).orElse("https://www.bigbasket.com/ps/?q=" + encodedSearch);
+        String bbDeepLink = bbEntry.map(e -> e.deepLink).orElse("bigbasket://search?q=" + encodedSearch);
+        String bbId = bbEntry.map(e -> e.id).orElse("BB-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode));
+
         offers.add(ProductOfferDto.builder()
                 .provider("BigBasket")
-                .providerProductId("BB-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode))
+                .providerProductId(bbId)
                 .productName(name)
                 .brand(brand)
                 .description("Authentic " + name + " (" + pkg.label + ") with home delivery")
@@ -294,9 +301,9 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .effectivePrice(bbPrice)
                 .availability("IN_STOCK")
                 .estimatedDelivery("Today (2-4 hrs)")
-                .productUrl("https://www.bigbasket.com/ps/?q=" + encodedSearch)
-                .deepLink("bigbasket://search?q=" + encodedSearch)
-                .affiliateUrl("https://www.bigbasket.com/ps/?q=" + encodedSearch + "&utm_source=homestock")
+                .productUrl(bbUrl)
+                .deepLink(bbDeepLink)
+                .affiliateUrl(bbUrl.contains("?") ? bbUrl + "&utm_source=homestock" : bbUrl + "?utm_source=homestock")
                 .rating(new BigDecimal("4.4"))
                 .reviewCount(12800)
                 .lastCheckedAt(Instant.now())
@@ -304,11 +311,17 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .build());
 
         // Store 2: Blinkit (Quick Commerce - 10 min delivery)
-        BigDecimal blinkitPrice = mrp.multiply(new BigDecimal("0.96")).setScale(0, RoundingMode.HALF_UP);
-        BigDecimal blinkitFee = new BigDecimal("15.00");
+        Optional<RealMarketCatalogProvider.CatalogEntry> blkEntry = RealMarketCatalogProvider.findByBarcodeAndStore(barcode, "Blinkit")
+                .or(() -> RealMarketCatalogProvider.findByNameAndStore(name, "Blinkit"));
+        BigDecimal blinkitPrice = blkEntry.map(e -> e.price).orElseGet(() -> mrp.multiply(new BigDecimal("0.96")).setScale(0, RoundingMode.HALF_UP));
+        BigDecimal blinkitFee = blkEntry.map(e -> e.deliveryCharge).orElse(new BigDecimal("15.00"));
+        String blkUrl = blkEntry.map(e -> e.productUrl).orElse("https://blinkit.com/s/?q=" + encodedSearch);
+        String blkDeepLink = blkEntry.map(e -> e.deepLink).orElse("blinkit://search?q=" + encodedSearch);
+        String blkId = blkEntry.map(e -> e.id).orElse("BLINKIT-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode));
+
         offers.add(ProductOfferDto.builder()
                 .provider("Blinkit")
-                .providerProductId("BLINKIT-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode))
+                .providerProductId(blkId)
                 .productName(name)
                 .brand(brand)
                 .description("Authentic " + name + " (" + pkg.label + ") delivered in minutes")
@@ -322,9 +335,9 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .effectivePrice(blinkitPrice.add(blinkitFee))
                 .availability("IN_STOCK")
                 .estimatedDelivery("10-15 mins")
-                .productUrl("https://blinkit.com/s/?q=" + encodedSearch)
-                .deepLink("blinkit://search?q=" + encodedSearch)
-                .affiliateUrl("https://blinkit.com/s/?q=" + encodedSearch + "&ref=homestock")
+                .productUrl(blkUrl)
+                .deepLink(blkDeepLink)
+                .affiliateUrl(blkUrl.contains("?") ? blkUrl + "&ref=homestock" : blkUrl + "?ref=homestock")
                 .rating(new BigDecimal("4.5"))
                 .reviewCount(9420)
                 .lastCheckedAt(Instant.now())
@@ -332,10 +345,16 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .build());
 
         // Store 3: JioMart (Hypermarket - Great discounts on staples)
-        BigDecimal jioPrice = mrp.multiply(new BigDecimal("0.89")).setScale(0, RoundingMode.HALF_UP);
+        Optional<RealMarketCatalogProvider.CatalogEntry> jioEntry = RealMarketCatalogProvider.findByBarcodeAndStore(barcode, "JioMart")
+                .or(() -> RealMarketCatalogProvider.findByNameAndStore(name, "JioMart"));
+        BigDecimal jioPrice = jioEntry.map(e -> e.price).orElseGet(() -> mrp.multiply(new BigDecimal("0.89")).setScale(0, RoundingMode.HALF_UP));
+        String jioUrl = jioEntry.map(e -> e.productUrl).orElse("https://www.jiomart.com/search/" + encodedSearch);
+        String jioDeepLink = jioEntry.map(e -> e.deepLink).orElse("jiomart://search?q=" + encodedSearch);
+        String jioId = jioEntry.map(e -> e.id).orElse("JIOMART-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode));
+
         offers.add(ProductOfferDto.builder()
                 .provider("JioMart")
-                .providerProductId("JIOMART-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode))
+                .providerProductId(jioId)
                 .productName(name)
                 .brand(brand)
                 .description("Fresh supermarket stock of " + name + " (" + pkg.label + ")")
@@ -349,9 +368,9 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .effectivePrice(jioPrice)
                 .availability("IN_STOCK")
                 .estimatedDelivery("Same Day / Tomorrow")
-                .productUrl("https://www.jiomart.com/search/" + encodedSearch)
-                .deepLink("jiomart://search?q=" + encodedSearch)
-                .affiliateUrl("https://www.jiomart.com/search/" + encodedSearch + "?ref=homestock")
+                .productUrl(jioUrl)
+                .deepLink(jioDeepLink)
+                .affiliateUrl(jioUrl.contains("?") ? jioUrl + "&ref=homestock" : jioUrl + "?ref=homestock")
                 .rating(new BigDecimal("4.3"))
                 .reviewCount(15100)
                 .lastCheckedAt(Instant.now())
@@ -359,10 +378,16 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .build());
 
         // Store 4: Amazon India (Amazon Fresh / Pantry - Prime next-day)
-        BigDecimal amazonPrice = mrp.multiply(new BigDecimal("0.93")).setScale(0, RoundingMode.HALF_UP);
+        Optional<RealMarketCatalogProvider.CatalogEntry> amzEntry = RealMarketCatalogProvider.findByBarcodeAndStore(barcode, "Amazon")
+                .or(() -> RealMarketCatalogProvider.findByNameAndStore(name, "Amazon"));
+        BigDecimal amazonPrice = amzEntry.map(e -> e.price).orElseGet(() -> mrp.multiply(new BigDecimal("0.93")).setScale(0, RoundingMode.HALF_UP));
+        String amzUrl = amzEntry.map(e -> e.productUrl).orElse("https://www.amazon.in/s?k=" + encodedSearch);
+        String amzDeepLink = amzEntry.map(e -> e.deepLink).orElse("com.amazon.mobile.shopping.web://www.amazon.in/s?k=" + encodedSearch);
+        String amzId = amzEntry.map(e -> e.id).orElse("AMZ-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode));
+
         offers.add(ProductOfferDto.builder()
                 .provider("Amazon")
-                .providerProductId("AMZ-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode))
+                .providerProductId(amzId)
                 .productName(name)
                 .brand(brand)
                 .description("Amazon Fresh doorstep delivery of " + name + " (" + pkg.label + ")")
@@ -376,9 +401,9 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .effectivePrice(amazonPrice)
                 .availability("IN_STOCK")
                 .estimatedDelivery("Tomorrow")
-                .productUrl("https://www.amazon.in/s?k=" + encodedSearch)
-                .deepLink("com.amazon.mobile.shopping.web://www.amazon.in/s?k=" + encodedSearch)
-                .affiliateUrl("https://www.amazon.in/s?k=" + encodedSearch + "&tag=homestock-21")
+                .productUrl(amzUrl)
+                .deepLink(amzDeepLink)
+                .affiliateUrl(amzUrl.contains("?") ? amzUrl + "&tag=homestock-21" : amzUrl + "?tag=homestock-21")
                 .rating(new BigDecimal("4.6"))
                 .reviewCount(28600)
                 .lastCheckedAt(Instant.now())
@@ -386,11 +411,17 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .build());
 
         // Store 5: Zepto (Quick Commerce - 10 mins)
-        BigDecimal zeptoPrice = mrp.multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.HALF_UP);
-        BigDecimal zeptoFee = new BigDecimal("15.00");
+        Optional<RealMarketCatalogProvider.CatalogEntry> zeptoEntry = RealMarketCatalogProvider.findByBarcodeAndStore(barcode, "Zepto")
+                .or(() -> RealMarketCatalogProvider.findByNameAndStore(name, "Zepto"));
+        BigDecimal zeptoPrice = zeptoEntry.map(e -> e.price).orElseGet(() -> mrp.multiply(new BigDecimal("0.95")).setScale(0, RoundingMode.HALF_UP));
+        BigDecimal zeptoFee = zeptoEntry.map(e -> e.deliveryCharge).orElse(new BigDecimal("15.00"));
+        String zeptoUrl = zeptoEntry.map(e -> e.productUrl).orElse("https://www.zeptonow.com/search?q=" + encodedSearch);
+        String zeptoDeepLink = zeptoEntry.map(e -> e.deepLink).orElse("zepto://search?q=" + encodedSearch);
+        String zeptoId = zeptoEntry.map(e -> e.id).orElse("ZEPTO-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode));
+
         offers.add(ProductOfferDto.builder()
                 .provider("Zepto")
-                .providerProductId("ZEPTO-" + (barcode.isEmpty() ? UUID.randomUUID().toString() : barcode))
+                .providerProductId(zeptoId)
                 .productName(name)
                 .brand(brand)
                 .description("Zepto instant 10-minute grocery delivery of " + name)
@@ -404,9 +435,9 @@ public class LiveOnlineShoppingProvider implements ShoppingProvider {
                 .effectivePrice(zeptoPrice.add(zeptoFee))
                 .availability("IN_STOCK")
                 .estimatedDelivery("10 mins")
-                .productUrl("https://www.zeptonow.com/search?q=" + encodedSearch)
-                .deepLink("zepto://search?q=" + encodedSearch)
-                .affiliateUrl("https://www.zeptonow.com/search?q=" + encodedSearch)
+                .productUrl(zeptoUrl)
+                .deepLink(zeptoDeepLink)
+                .affiliateUrl(zeptoUrl)
                 .rating(new BigDecimal("4.4"))
                 .reviewCount(5300)
                 .lastCheckedAt(Instant.now())

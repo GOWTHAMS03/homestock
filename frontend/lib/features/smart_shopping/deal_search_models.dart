@@ -59,6 +59,10 @@ class StoreOffer {
   final String? estimatedDelivery;
   final String availability;
   final String? productUrl;
+  final String? canonicalProductUrl;
+  final String? urlType;
+  final bool urlVerified;
+  final bool directProductUrlAvailable;
   final String? affiliateUrl;
   final String? deepLink;
   final double? rating;
@@ -72,6 +76,10 @@ class StoreOffer {
     this.estimatedDelivery,
     this.availability = 'IN_STOCK',
     this.productUrl,
+    this.canonicalProductUrl,
+    this.urlType,
+    this.urlVerified = false,
+    this.directProductUrlAvailable = true,
     this.affiliateUrl,
     this.deepLink,
     this.rating,
@@ -87,6 +95,10 @@ class StoreOffer {
       estimatedDelivery: json['estimatedDelivery'] as String?,
       availability: json['availability'] as String? ?? 'IN_STOCK',
       productUrl: json['productUrl'] as String?,
+      canonicalProductUrl: json['canonicalProductUrl'] as String?,
+      urlType: json['urlType'] as String?,
+      urlVerified: json['urlVerified'] as bool? ?? false,
+      directProductUrlAvailable: json['directProductUrlAvailable'] as bool? ?? true,
       affiliateUrl: json['affiliateUrl'] as String?,
       deepLink: json['deepLink'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
@@ -113,6 +125,13 @@ class ProductDeal {
   final String? comparisonStore;
   final String? imageUrl;
   final String? productUrl;
+  final String? canonicalProductUrl;
+  final String? urlType;
+  final bool urlVerified;
+  final bool directProductUrlAvailable;
+  final double? displayedPrice;
+  final double? verifiedPrice;
+  final String? priceVerifiedAt;
   final String? deepLink;
   final double? rating;
   final int? reviewCount;
@@ -141,6 +160,13 @@ class ProductDeal {
     this.comparisonStore,
     this.imageUrl,
     this.productUrl,
+    this.canonicalProductUrl,
+    this.urlType,
+    this.urlVerified = false,
+    this.directProductUrlAvailable = true,
+    this.displayedPrice,
+    this.verifiedPrice,
+    this.priceVerifiedAt,
     this.deepLink,
     this.rating,
     this.reviewCount,
@@ -171,6 +197,13 @@ class ProductDeal {
       comparisonStore: json['comparisonStore'] as String?,
       imageUrl: json['imageUrl'] as String?,
       productUrl: json['productUrl'] as String?,
+      canonicalProductUrl: json['canonicalProductUrl'] as String?,
+      urlType: json['urlType'] as String?,
+      urlVerified: json['urlVerified'] as bool? ?? false,
+      directProductUrlAvailable: json['directProductUrlAvailable'] as bool? ?? true,
+      displayedPrice: (json['displayedPrice'] as num?)?.toDouble(),
+      verifiedPrice: (json['verifiedPrice'] as num?)?.toDouble(),
+      priceVerifiedAt: json['priceVerifiedAt'] as String?,
       deepLink: json['deepLink'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
       reviewCount: (json['reviewCount'] as num?)?.toInt(),

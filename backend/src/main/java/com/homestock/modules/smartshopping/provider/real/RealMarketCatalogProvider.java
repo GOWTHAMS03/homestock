@@ -543,28 +543,44 @@ public class RealMarketCatalogProvider implements ShoppingProvider {
         return Collections.unmodifiableList(list);
     }
 
-    private static class CatalogEntry {
-        final String id;
-        final String storeName;
-        final String productName;
-        final String brand;
-        final String category;
-        final String subtype;
-        final String description;
-        final BigDecimal price;
-        final BigDecimal deliveryCharge;
-        final String packageSize;
-        final String unit;
-        final String availability;
-        final String estimatedDelivery;
-        final BigDecimal rating;
-        final int reviewCount;
-        final String barcode;
-        final String productUrl;
-        final String deepLink;
-        final String imageUrl;
+    public static Optional<CatalogEntry> findByBarcodeAndStore(String barcode, String storeName) {
+        if (barcode == null || barcode.isBlank() || storeName == null) return Optional.empty();
+        return CATALOG.stream()
+                .filter(e -> barcode.equalsIgnoreCase(e.barcode) && storeName.equalsIgnoreCase(e.storeName))
+                .findFirst();
+    }
 
-        CatalogEntry(String id, String storeName, String productName, String brand, String category, String subtype,
+    public static Optional<CatalogEntry> findByNameAndStore(String name, String storeName) {
+        if (name == null || name.isBlank() || storeName == null) return Optional.empty();
+        String lower = name.toLowerCase().trim();
+        return CATALOG.stream()
+                .filter(e -> storeName.equalsIgnoreCase(e.storeName) &&
+                        (e.productName.toLowerCase().contains(lower) || lower.contains(e.productName.toLowerCase())))
+                .findFirst();
+    }
+
+    public static class CatalogEntry {
+        public final String id;
+        public final String storeName;
+        public final String productName;
+        public final String brand;
+        public final String category;
+        public final String subtype;
+        public final String description;
+        public final BigDecimal price;
+        public final BigDecimal deliveryCharge;
+        public final String packageSize;
+        public final String unit;
+        public final String availability;
+        public final String estimatedDelivery;
+        public final BigDecimal rating;
+        public final int reviewCount;
+        public final String barcode;
+        public final String productUrl;
+        public final String deepLink;
+        public final String imageUrl;
+
+        public CatalogEntry(String id, String storeName, String productName, String brand, String category, String subtype,
                      String description, BigDecimal price, BigDecimal deliveryCharge, String packageSize, String unit,
                      String availability, String estimatedDelivery, BigDecimal rating, int reviewCount, String barcode,
                      String productUrl, String deepLink, String imageUrl) {

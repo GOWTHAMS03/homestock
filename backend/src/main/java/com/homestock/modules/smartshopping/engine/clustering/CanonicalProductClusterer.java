@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -63,8 +64,10 @@ public class CanonicalProductClusterer {
             verifyPricesAndFilterAnomalies(group);
             if (group.isEmpty()) continue;
 
-            // Sort candidates within cluster by price ascending (cheapest verified seller first)
-            group.sort(Comparator.comparingDouble(ProductCandidate::getPriceAsDouble));
+            // Sort candidates within cluster: verified direct product detail pages first, then cheapest price
+            group.sort(Comparator
+                    .comparing((ProductCandidate c) -> c.isUrlVerified() && c.isDirectProductUrlAvailable()).reversed()
+                    .thenComparingDouble(ProductCandidate::getPriceAsDouble));
 
             ProductCandidate best = group.get(0);
             List<String> sources = group.stream()
@@ -111,6 +114,10 @@ public class CanonicalProductClusterer {
                         .estimatedDelivery(c.getEstimatedDelivery())
                         .availability(c.getAvailability())
                         .productUrl(c.getProductUrl())
+                        .canonicalProductUrl(c.getCanonicalProductUrl() != null ? c.getCanonicalProductUrl() : c.getProductUrl())
+                        .urlType(c.getUrlType())
+                        .urlVerified(c.isUrlVerified())
+                        .directProductUrlAvailable(c.isDirectProductUrlAvailable())
                         .affiliateUrl(c.getAffiliateUrl())
                         .deepLink(c.getDeepLink())
                         .rating(c.getSellerRating())
@@ -132,6 +139,7 @@ public class CanonicalProductClusterer {
             }
 
             String dealId = best.getCandidateId() != null ? best.getCandidateId() : UUID.randomUUID().toString();
+            String canonicalUrl = best.getCanonicalProductUrl() != null ? best.getCanonicalProductUrl() : best.getProductUrl();
 
             ProductDealDto deal = ProductDealDto.builder()
                     .id(dealId)
@@ -154,6 +162,17 @@ public class CanonicalProductClusterer {
                     .savingsVsHighest(BigDecimal.valueOf(savingsVsHighest))
                     .storeOffers(storeOffers)
                     .productUrl(best.getProductUrl())
+                    .canonicalProductUrl(canonicalUrl)
+                    .urlType(best.getUrlType())
+                    .urlVerified(best.isUrlVerified())
+                    .urlConfidence(best.getUrlConfidence())
+                    .directProductUrlAvailable(best.isDirectProductUrlAvailable())
+                    .displayedPrice(BigDecimal.valueOf(unitPrice))
+                    .verifiedPrice(best.getVerifiedPrice() != null ? best.getVerifiedPrice() : BigDecimal.valueOf(unitPrice))
+                    .priceVerifiedAt(best.getPriceVerifiedAt() != null ? best.getPriceVerifiedAt() : Instant.now())
+                    .discoverySource(best.getSourceUrl() != null ? best.getSourceUrl() : best.getProvider())
+                    .sku(best.getSku())
+                    .asin(best.getAsin())
                     .imageUrl(best.getImageUrl())
                     .availability(best.getAvailability() != null ? best.getAvailability() : (best.isInStock() ? "IN_STOCK" : "OUT_OF_STOCK"))
                     .rating(best.getSellerRating())

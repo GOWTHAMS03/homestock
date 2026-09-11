@@ -990,37 +990,65 @@ class _ProductDealSearchScreenState
 
                 const SizedBox(height: 12),
 
-                // View Deal Action Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 42,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      controller.launchDealUrl(deal.productUrl);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: hsColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'View Deal at $bestStore',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                // View Deal Action Button (Section 41, 49, 50, 51, 54, 55)
+                Builder(
+                  builder: (context) {
+                    final directUrl = deal.canonicalProductUrl ?? deal.productUrl;
+                    final isExplicitlyUnavailable = !deal.directProductUrlAvailable;
+
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 42,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (directUrl == null || isExplicitlyUnavailable) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: const [
+                                    Icon(Icons.info_outline, color: Colors.white, size: 16),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text('Direct retailer product page is currently unavailable for this item.'),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: const Color(0xFF1E293B),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                            return;
+                          }
+                          controller.launchDealUrl(directUrl);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isExplicitlyUnavailable ? AppColors.borderLight : hsColors.primary,
+                          foregroundColor: isExplicitlyUnavailable ? AppColors.textMuted : Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.open_in_new_rounded, size: 14),
-                      ],
-                    ),
-                  ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isExplicitlyUnavailable ? 'Direct Link Unavailable' : 'View Deal at $bestStore',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              isExplicitlyUnavailable ? Icons.link_off_rounded : Icons.open_in_new_rounded,
+                              size: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -1033,50 +1061,65 @@ class _ProductDealSearchScreenState
   Widget _buildStoreOfferRow(
       StoreOffer offer, ProductDeal deal, ProductDealController controller, HomeStockThemeColors hsColors) {
     final isCheapest = offer.price == deal.bestPrice;
+    final directStoreUrl = offer.canonicalProductUrl ?? offer.productUrl;
+    final hasDirectLink = offer.directProductUrlAvailable && directStoreUrl != null;
 
-    return InkWell(
-      onTap: () => controller.launchDealUrl(offer.productUrl ?? offer.affiliateUrl),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-        child: Row(
-          children: [
-            _buildStoreDot(offer.storeName, _getStoreColor(offer.storeName)),
-            const Spacer(),
-            if (offer.estimatedDelivery != null)
-              Text(
-                '${offer.estimatedDelivery!} • ',
-                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+    return Builder(
+      builder: (context) => InkWell(
+        onTap: () {
+          if (!hasDirectLink) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Direct product link is unavailable for ${offer.storeName}.'),
+                duration: const Duration(seconds: 2),
               ),
-            Text(
-              '₹${offer.price.toStringAsFixed(0)}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isCheapest ? FontWeight.w800 : FontWeight.w600,
-                color: isCheapest ? const Color(0xFF059669) : AppColors.textPrimary,
-              ),
-            ),
-            if (isCheapest) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(4),
+            );
+            return;
+          }
+          controller.launchDealUrl(directStoreUrl);
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+          child: Row(
+            children: [
+              _buildStoreDot(offer.storeName, _getStoreColor(offer.storeName)),
+              const Spacer(),
+              if (offer.estimatedDelivery != null)
+                Text(
+                  '${offer.estimatedDelivery!} • ',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                 ),
-                child: const Text(
-                  'LOWEST',
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF059669),
+              Text(
+                '₹${offer.price.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isCheapest ? FontWeight.w800 : FontWeight.w600,
+                  color: isCheapest ? const Color(0xFF059669) : AppColors.textPrimary,
+                ),
+              ),
+              if (isCheapest) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'LOWEST',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF059669),
+                    ),
                   ),
                 ),
-              ),
+              ],
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppColors.textMuted),
             ],
-            const SizedBox(width: 4),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppColors.textMuted),
-          ],
+          ),
         ),
       ),
     );

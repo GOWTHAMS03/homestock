@@ -47,7 +47,20 @@ public class ProductDealDto {
 
     private String imageUrl;
     private String productUrl;
+    private String canonicalProductUrl;
+    private ProductUrlType urlType;
+    private boolean urlVerified;
+    private Double urlConfidence;
+    @Builder.Default
+    private boolean directProductUrlAvailable = true;
+    private String discoverySource;
+    private String sku;
+    private String asin;
     private String deepLink;
+
+    private BigDecimal displayedPrice;
+    private BigDecimal verifiedPrice;
+    private Instant priceVerifiedAt;
 
     private Double rating;
     private Integer reviewCount;

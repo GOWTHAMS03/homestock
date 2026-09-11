@@ -19,6 +19,11 @@ public class StoreOfferDto {
     private String estimatedDelivery;
     private String availability;
     private String productUrl;
+    private String canonicalProductUrl;
+    private ProductUrlType urlType;
+    private boolean urlVerified;
+    @Builder.Default
+    private boolean directProductUrlAvailable = true;
     private String affiliateUrl;
     private String deepLink;
     private Double rating;

@@ -46,6 +46,18 @@ public class ProductCandidate {
     private String estimatedDelivery;
 
     private String productUrl;
+    private String canonicalProductUrl;
+    private String sourceUrl;
+    private ProductUrlType urlType;
+    private boolean urlVerified;
+    private Double urlConfidence;
+    @Builder.Default
+    private boolean directProductUrlAvailable = true;
+
+    private String seller;
+    private String sku;
+    private String asin;
+
     private String affiliateUrl;
     private String deepLink;
     private String imageUrl;
@@ -58,6 +70,11 @@ public class ProductCandidate {
     private PriceStatus priceStatus;
     private Double priceConfidence;
     private Instant lastVerifiedAt;
+
+    private BigDecimal displayedPrice;
+    private BigDecimal verifiedPrice;
+    private Instant priceVerifiedAt;
+
     private String imageVerificationTier; // OFFICIAL_PRODUCT_PAGE, TRUSTED_RETAILER, CATALOG, SEARCH_SNIPPET
     private Double imageConfidence;
 

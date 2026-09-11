@@ -221,6 +221,8 @@ public class MultiEngineSearchService {
                 .availability(o.getAvailability() != null ? o.getAvailability() : "IN_STOCK")
                 .estimatedDelivery(o.getEstimatedDelivery())
                 .productUrl(o.getProductUrl())
+                .sourceUrl(o.getProductUrl())
+                .seller(o.getProvider())
                 .affiliateUrl(o.getAffiliateUrl())
                 .deepLink(o.getDeepLink())
                 .imageUrl(o.getImageUrl())
