@@ -1020,6 +1020,8 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
       final result = await ref.read(notificationRepositoryProvider).sendTestNotification(
         title: title,
         message: body,
+        type: type,
+        entityId: entityId,
       );
       if (!mounted) return;
       final tokensCount = result?['tokensCount'] ?? 0;

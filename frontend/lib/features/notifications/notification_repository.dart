@@ -200,16 +200,26 @@ class NotificationRepository {
   /// Send an immediate test push notification via backend FCM.
   Future<Map<String, dynamic>?> sendTestNotification({
     String title = 'Test Alert',
-    String message = 'HomeStock Firebase push notifications are working perfectly! \uD83C\uDF89',
+    String message = 'HomeStock Firebase push notifications are working perfectly! 🎉',
+    String? type,
+    String? entityId,
   }) async {
     if (!_isOnline) return null;
     try {
+      final queryParams = <String, dynamic>{
+        'title': title,
+        'message': message,
+      };
+      if (type != null && type.isNotEmpty) {
+        queryParams['type'] = type;
+      }
+      if (entityId != null && entityId.isNotEmpty) {
+        queryParams['entityId'] = entityId;
+      }
+
       final response = await apiClient.dio.post(
         ApiEndpoints.notificationTest,
-        queryParameters: {
-          'title': title,
-          'message': message,
-        },
+        queryParameters: queryParams,
       );
       return response.data['data'] as Map<String, dynamic>?;
     } catch (e) {

@@ -57,6 +57,7 @@ class MockNotificationService implements NotificationService {
     required String body,
     String? channelId,
     String? payload,
+    String? type,
   }) async {
     displayedNotifications.add({
       'id': id,
@@ -64,6 +65,7 @@ class MockNotificationService implements NotificationService {
       'body': body,
       'channelId': channelId,
       'payload': payload,
+      'type': type,
     });
   }
 
@@ -75,6 +77,7 @@ class MockNotificationService implements NotificationService {
     required DateTime scheduledDate,
     String? channelId,
     String? payload,
+    String? type,
   }) async {}
 
   @override

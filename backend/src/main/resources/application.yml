@@ -36,12 +36,12 @@ app:
       online:
         enabled: ${ONLINE_PROVIDER_ENABLED:true}
       amazon:
-        enabled: ${AMAZON_PROVIDER_ENABLED:false}
+        enabled: ${AMAZON_PROVIDER_ENABLED:true}
         partner-tag: ${AMAZON_PARTNER_TAG:}
         access-key: ${AMAZON_ACCESS_KEY:}
         secret-key: ${AMAZON_SECRET_KEY:}
       flipkart:
-        enabled: ${FLIPKART_PROVIDER_ENABLED:false}
+        enabled: ${FLIPKART_PROVIDER_ENABLED:true}
         affiliate-id: ${FLIPKART_AFFILIATE_ID:}
         token: ${FLIPKART_AFFILIATE_TOKEN:}
   voice:

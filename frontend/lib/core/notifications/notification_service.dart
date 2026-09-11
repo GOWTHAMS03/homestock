@@ -1,16 +1,375 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+/// Style configuration for custom notification card preview in system tray
+class NotificationCardStyle {
+  final String emoji;
+  final String badgeText;
+  final Color accentColor;
+  final String groupKey;
+  final int groupSummaryId;
+  final String groupTitle;
+  final String channelId;
+  final String channelName;
+  final String channelDescription;
+  final Importance importance;
+  final Priority priority;
+  final List<AndroidNotificationAction> actions;
+
+  const NotificationCardStyle({
+    required this.emoji,
+    required this.badgeText,
+    required this.accentColor,
+    required this.groupKey,
+    required this.groupSummaryId,
+    required this.groupTitle,
+    required this.channelId,
+    required this.channelName,
+    required this.channelDescription,
+    required this.importance,
+    required this.priority,
+    required this.actions,
+  });
+}
+
+/// Helper that resolves notification card preview styling and grouping
+/// matching the signature HomeStock theme.
+class NotificationCardStyler {
+  static const String groupStockExpiry = 'homestock_group_stock_expiry';
+  static const String groupActivity = 'homestock_group_activity';
+  static const String groupInsights = 'homestock_group_insights';
+
+  static const int groupStockExpirySummaryId = 9901;
+  static const int groupActivitySummaryId = 9902;
+  static const int groupInsightsSummaryId = 9903;
+
+  /// Resolve styling, category badges, accent colors, emojis, and actions
+  static NotificationCardStyle resolve({
+    String? type,
+    required String title,
+    required String body,
+    Map<String, dynamic>? payload,
+  }) {
+    final effectiveType = (type ?? payload?['type']?.toString() ?? 'SYSTEM').toUpperCase();
+    final lowerContent = '$title $body'.toLowerCase();
+
+    // 1. Food / item emoji detection
+    String emoji = '📦';
+    if (payload?['emoji'] != null && payload!['emoji'].toString().isNotEmpty) {
+      emoji = payload['emoji'].toString();
+    } else if (lowerContent.contains('milk') || lowerContent.contains('பால்')) {
+      emoji = '🥛';
+    } else if (lowerContent.contains('egg') || lowerContent.contains('முட்டை')) {
+      emoji = '🥚';
+    } else if (lowerContent.contains('onion') || lowerContent.contains('வெங்காயம்')) {
+      emoji = '🧅';
+    } else if (lowerContent.contains('rice') || lowerContent.contains('அரிசி')) {
+      emoji = '🍚';
+    } else if (lowerContent.contains('cheese')) {
+      emoji = '🧀';
+    } else if (lowerContent.contains('bread') || lowerContent.contains('ரொட்டி')) {
+      emoji = '🍞';
+    } else if (lowerContent.contains('oil') || lowerContent.contains('எண்ணெய்')) {
+      emoji = '🌻';
+    } else if (lowerContent.contains('atta') || lowerContent.contains('flour') || lowerContent.contains('மாவு')) {
+      emoji = '🌾';
+    } else if (lowerContent.contains('tomato') || lowerContent.contains('தக்காளி')) {
+      emoji = '🍅';
+    } else if (lowerContent.contains('apple') || lowerContent.contains('fruit')) {
+      emoji = '🍎';
+    } else if (lowerContent.contains('banana')) {
+      emoji = '🍌';
+    } else if (lowerContent.contains('coffee') || lowerContent.contains('tea')) {
+      emoji = '☕';
+    } else if (lowerContent.contains('soap') || lowerContent.contains('detergent')) {
+      emoji = '🧼';
+    }
+
+    final isDigest = payload?['isDigest']?.toString().toLowerCase() == 'true' ||
+        (payload?['itemCount'] != null && int.tryParse(payload!['itemCount'].toString()) != null && int.parse(payload['itemCount'].toString()) > 1) ||
+        lowerContent.contains('items may run out') ||
+        lowerContent.contains('restock digest');
+
+    // 2. Map category, badges, colors, and actions
+    switch (effectiveType) {
+      case 'OUT_OF_STOCK':
+        return NotificationCardStyle(
+          emoji: emoji == '📦' ? '🔴' : emoji,
+          badgeText: payload?['badge']?.toString() ?? '🔴 OUT OF STOCK',
+          accentColor: const Color(0xFFDC2626),
+          groupKey: groupStockExpiry,
+          groupSummaryId: groupStockExpirySummaryId,
+          groupTitle: 'Stock & Expiry Alerts',
+          channelId: NotificationService.channelImportant,
+          channelName: 'Important Alerts',
+          channelDescription: 'Critical notifications: low stock, out of stock, expiring products',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: const [
+            AndroidNotificationAction('action_shopping', '+ Add to Shopping', showsUserInterface: true),
+            AndroidNotificationAction('action_inspect', 'Inspect Item', showsUserInterface: true),
+          ],
+        );
+
+      case 'LOW_STOCK':
+        return NotificationCardStyle(
+          emoji: emoji == '📦' ? '⚠️' : emoji,
+          badgeText: payload?['badge']?.toString() ?? '⚠️ LOW STOCK',
+          accentColor: const Color(0xFFD97706),
+          groupKey: groupStockExpiry,
+          groupSummaryId: groupStockExpirySummaryId,
+          groupTitle: 'Stock & Expiry Alerts',
+          channelId: NotificationService.channelImportant,
+          channelName: 'Important Alerts',
+          channelDescription: 'Critical notifications: low stock, out of stock, expiring products',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: const [
+            AndroidNotificationAction('action_shopping', '+ Add to Shopping', showsUserInterface: true),
+            AndroidNotificationAction('action_inspect', 'Inspect Item', showsUserInterface: true),
+          ],
+        );
+
+      case 'EXPIRING_SOON':
+      case 'EXPIRY_REMINDER':
+        return NotificationCardStyle(
+          emoji: emoji == '📦' ? '⏳' : emoji,
+          badgeText: payload?['badge']?.toString() ?? '⏳ EXPIRING SOON',
+          accentColor: const Color(0xFFEA580C),
+          groupKey: groupStockExpiry,
+          groupSummaryId: groupStockExpirySummaryId,
+          groupTitle: 'Stock & Expiry Alerts',
+          channelId: NotificationService.channelImportant,
+          channelName: 'Important Alerts',
+          channelDescription: 'Critical notifications: low stock, out of stock, expiring products',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: const [
+            AndroidNotificationAction('action_inspect', 'Inspect Item', showsUserInterface: true),
+            AndroidNotificationAction('action_shopping', '+ Add to Shopping', showsUserInterface: true),
+          ],
+        );
+
+      case 'EXPIRED':
+        return NotificationCardStyle(
+          emoji: emoji == '📦' ? '⏰' : emoji,
+          badgeText: payload?['badge']?.toString() ?? '⏰ EXPIRED',
+          accentColor: const Color(0xFFDC2626),
+          groupKey: groupStockExpiry,
+          groupSummaryId: groupStockExpirySummaryId,
+          groupTitle: 'Stock & Expiry Alerts',
+          channelId: NotificationService.channelImportant,
+          channelName: 'Important Alerts',
+          channelDescription: 'Critical notifications: low stock, out of stock, expiring products',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: const [
+            AndroidNotificationAction('action_inspect', 'Inspect Item', showsUserInterface: true),
+          ],
+        );
+
+      case 'SHOPPING_LIST_UPDATE':
+        return NotificationCardStyle(
+          emoji: '🛒',
+          badgeText: payload?['badge']?.toString() ?? '🛒 SHOPPING LIST',
+          accentColor: const Color(0xFF7C3AED),
+          groupKey: groupActivity,
+          groupSummaryId: groupActivitySummaryId,
+          groupTitle: 'Household Activity',
+          channelId: NotificationService.channelGeneral,
+          channelName: 'General Activity',
+          channelDescription: 'Family activity, shopping list updates, purchases',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          actions: const [
+            AndroidNotificationAction('action_shopping', 'View Shopping List', showsUserInterface: true),
+          ],
+        );
+
+      case 'STOCK_UPDATED':
+      case 'PURCHASE_RECORDED':
+        return NotificationCardStyle(
+          emoji: '✓',
+          badgeText: payload?['badge']?.toString() ?? '✓ RESTOCKED',
+          accentColor: const Color(0xFF16A34A),
+          groupKey: groupActivity,
+          groupSummaryId: groupActivitySummaryId,
+          groupTitle: 'Household Activity',
+          channelId: NotificationService.channelGeneral,
+          channelName: 'General Activity',
+          channelDescription: 'Family activity, shopping list updates, purchases',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          actions: const [
+            AndroidNotificationAction('action_inspect', 'View Item', showsUserInterface: true),
+          ],
+        );
+
+      case 'SYNC_COMPLETED':
+        return NotificationCardStyle(
+          emoji: '☁️',
+          badgeText: payload?['badge']?.toString() ?? '☁️ SYNCED',
+          accentColor: const Color(0xFF16A34A),
+          groupKey: groupActivity,
+          groupSummaryId: groupActivitySummaryId,
+          groupTitle: 'Household Activity',
+          channelId: NotificationService.channelGeneral,
+          channelName: 'General Activity',
+          channelDescription: 'Family activity, shopping list updates, purchases',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          actions: const [],
+        );
+
+      case 'SMART_RESTOCK_SUGGESTION':
+        if (isDigest) {
+          return NotificationCardStyle(
+            emoji: '🛒',
+            badgeText: payload?['badge']?.toString() ?? '🛒 RESTOCK DIGEST',
+            accentColor: const Color(0xFF6366F1),
+            groupKey: groupInsights,
+            groupSummaryId: groupInsightsSummaryId,
+            groupTitle: 'Smart Insights & Digests',
+            channelId: NotificationService.channelInsights,
+            channelName: 'Insights & Reports',
+            channelDescription: 'Smart restock recommendations, weekly insights, monthly reports',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+            actions: const [
+              AndroidNotificationAction('action_shopping', 'View Shopping List', showsUserInterface: true),
+            ],
+          );
+        }
+        return NotificationCardStyle(
+          emoji: '✨',
+          badgeText: payload?['badge']?.toString() ?? '✨ SMART INSIGHT',
+          accentColor: const Color(0xFF6366F1),
+          groupKey: groupInsights,
+          groupSummaryId: groupInsightsSummaryId,
+          groupTitle: 'Smart Insights & Digests',
+          channelId: NotificationService.channelInsights,
+          channelName: 'Insights & Reports',
+          channelDescription: 'Smart restock recommendations, weekly insights, monthly reports',
+          importance: Importance.low,
+          priority: Priority.low,
+          actions: const [
+            AndroidNotificationAction('action_shopping', '+ Add to Shopping', showsUserInterface: true),
+            AndroidNotificationAction('action_insights', 'View Insights', showsUserInterface: true),
+          ],
+        );
+
+      case 'WEEKLY_INSIGHT':
+      case 'MONTHLY_REPORT':
+        return NotificationCardStyle(
+          emoji: '📊',
+          badgeText: payload?['badge']?.toString() ?? '📊 REPORT',
+          accentColor: const Color(0xFF6366F1),
+          groupKey: groupInsights,
+          groupSummaryId: groupInsightsSummaryId,
+          groupTitle: 'Smart Insights & Digests',
+          channelId: NotificationService.channelInsights,
+          channelName: 'Insights & Reports',
+          channelDescription: 'Smart restock recommendations, weekly insights, monthly reports',
+          importance: Importance.low,
+          priority: Priority.low,
+          actions: const [
+            AndroidNotificationAction('action_insights', 'View Report', showsUserInterface: true),
+          ],
+        );
+
+      case 'FAMILY_ACTIVITY':
+      case 'SYSTEM':
+      default:
+        return NotificationCardStyle(
+          emoji: '🏠',
+          badgeText: payload?['badge']?.toString() ?? '🏠 HOUSEHOLD',
+          accentColor: const Color(0xFF0284C7),
+          groupKey: groupActivity,
+          groupSummaryId: groupActivitySummaryId,
+          groupTitle: 'Household Activity',
+          channelId: NotificationService.channelGeneral,
+          channelName: 'General Activity',
+          channelDescription: 'Family activity, shopping list updates, purchases',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          actions: const [
+            AndroidNotificationAction('action_open', 'Open HomeStock', showsUserInterface: true),
+          ],
+        );
+    }
+  }
+}
+
 /// Background FCM message handler (must be a top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Gracefully handle background messages
   debugPrint('[FirebaseMessaging] Background message received: ${message.messageId}');
+  try {
+    final type = message.data['type']?.toString().toUpperCase() ?? 'SYSTEM';
+    if (type == 'HOME_CHANGED' || type == 'SILENT_SYNC') {
+      return; // Silent sync handled separately
+    }
+
+    // When message is data-only (or notification not automatically shown by OS),
+    // render our signature card preview notification!
+    if (message.notification == null) {
+      final plugin = FlutterLocalNotificationsPlugin();
+      const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initializationSettingsDarwin = DarwinInitializationSettings();
+      await plugin.initialize(const InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsDarwin,
+      ));
+
+      final title = message.data['title']?.toString() ?? 'HomeStock Alert';
+      final body = message.data['body']?.toString() ?? 'Your stock was updated.';
+      final payload = jsonEncode(message.data);
+      final id = message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch;
+
+      final style = NotificationCardStyler.resolve(
+        type: type,
+        title: title,
+        body: body,
+        payload: message.data,
+      );
+
+      final styledTitle = '${style.emoji} $title';
+      final bigTextStyle = BigTextStyleInformation(
+        body,
+        contentTitle: styledTitle,
+        summaryText: style.badgeText,
+      );
+
+      final androidDetails = AndroidNotificationDetails(
+        style.channelId,
+        style.channelName,
+        channelDescription: style.channelDescription,
+        importance: style.importance,
+        priority: style.priority,
+        color: style.accentColor,
+        styleInformation: bigTextStyle,
+        groupKey: style.groupKey,
+        setAsGroupSummary: false,
+        actions: style.actions,
+      );
+
+      await plugin.show(
+        id,
+        styledTitle,
+        body,
+        NotificationDetails(android: androidDetails),
+        payload: payload,
+      );
+    }
+  } catch (e) {
+    debugPrint('[FirebaseMessaging] Background message error: $e');
+  }
 }
 
 class NotificationService {
@@ -21,6 +380,9 @@ class NotificationService {
   bool _isInitialized = false;
   bool _firebaseEnabled = false;
   String? _fcmToken;
+
+  // Track recent alert titles per group for expandable inbox group summaries
+  final Map<String, List<String>> _groupRecentLines = {};
 
   Function(String route)? onNavigate;
   Function(String token)? onTokenRegistered;
@@ -108,7 +470,7 @@ class NotificationService {
     await _localNotifications.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        _handlePayload(response.payload);
+        _handleNotificationResponse(response);
       },
     );
 
@@ -132,7 +494,6 @@ class NotificationService {
     try {
       // Check if Firebase is already initialized or can be initialized
       if (Firebase.apps.isEmpty) {
-        // Will throw if google-services / config is missing on the platform
         await Firebase.initializeApp();
       }
 
@@ -233,47 +594,64 @@ class NotificationService {
     return true;
   }
 
-  /// Display a local heads-up notification immediately.
+  /// Display a notification styled with signature notification card preview
+  /// (semantic pill badge, category accent color, food emoji, action buttons,
+  /// and expandable Android notification group summary).
   Future<void> showNotification({
     required int id,
     required String title,
     required String body,
     String? channelId,
     String? payload,
+    String? type,
   }) async {
-    final selectedChannelId = channelId ?? channelImportant;
-
-    AndroidNotificationDetails androidDetails;
-    if (selectedChannelId == channelImportant) {
-      androidDetails = const AndroidNotificationDetails(
-        channelImportant,
-        'Important Alerts',
-        importance: Importance.max,
-        priority: Priority.high,
-        showWhen: true,
-      );
-    } else if (selectedChannelId == channelInsights) {
-      androidDetails = const AndroidNotificationDetails(
-        channelInsights,
-        'Insights & Reports',
-        importance: Importance.low,
-        priority: Priority.low,
-        showWhen: true,
-      );
-    } else {
-      androidDetails = const AndroidNotificationDetails(
-        channelGeneral,
-        'General Activity',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
-        showWhen: true,
-      );
+    Map<String, dynamic>? payloadMap;
+    if (payload != null && payload.isNotEmpty) {
+      try {
+        payloadMap = jsonDecode(payload) as Map<String, dynamic>;
+      } catch (_) {}
     }
 
-    const iosDetails = DarwinNotificationDetails(
+    final style = NotificationCardStyler.resolve(
+      type: type ?? payloadMap?['type']?.toString(),
+      title: title,
+      body: body,
+      payload: payloadMap,
+    );
+
+    final styledTitle = '${style.emoji} $title';
+
+    // Rich BigTextStyle representing the in-app notification card preview
+    final bigTextStyle = BigTextStyleInformation(
+      body,
+      contentTitle: styledTitle,
+      summaryText: style.badgeText,
+      htmlFormatContentTitle: false,
+      htmlFormatBigText: false,
+      htmlFormatSummaryText: false,
+    );
+
+    final selectedChannelId = channelId ?? style.channelId;
+
+    final androidDetails = AndroidNotificationDetails(
+      selectedChannelId,
+      style.channelName,
+      channelDescription: style.channelDescription,
+      importance: style.importance,
+      priority: style.priority,
+      color: style.accentColor,
+      styleInformation: bigTextStyle,
+      groupKey: style.groupKey,
+      setAsGroupSummary: false,
+      actions: style.actions,
+      showWhen: true,
+    );
+
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      subtitle: style.badgeText,
     );
 
     final notificationDetails = NotificationDetails(
@@ -283,11 +661,52 @@ class NotificationService {
 
     await _localNotifications.show(
       id,
-      title,
+      styledTitle,
       body,
       notificationDetails,
       payload: payload,
     );
+
+    // Update active Android group summary notification with inbox stack
+    await _updateGroupSummaryNotification(style);
+  }
+
+  /// Update the active Android group summary notification with an expandable inbox stack
+  Future<void> _updateGroupSummaryNotification(NotificationCardStyle style) async {
+    try {
+      final list = _groupRecentLines.putIfAbsent(style.groupKey, () => []);
+      list.add('${style.emoji} ${style.badgeText}');
+      if (list.length > 7) {
+        list.removeAt(0);
+      }
+
+      final inboxStyle = InboxStyleInformation(
+        list,
+        contentTitle: style.groupTitle,
+        summaryText: '${list.length} active alerts',
+      );
+
+      final summaryAndroid = AndroidNotificationDetails(
+        style.channelId,
+        style.channelName,
+        channelDescription: style.channelDescription,
+        importance: style.importance,
+        priority: style.priority,
+        color: style.accentColor,
+        styleInformation: inboxStyle,
+        groupKey: style.groupKey,
+        setAsGroupSummary: true,
+      );
+
+      await _localNotifications.show(
+        style.groupSummaryId,
+        style.groupTitle,
+        '${list.length} active alerts',
+        NotificationDetails(android: summaryAndroid),
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] Group summary update notice: $e');
+    }
   }
 
   /// Schedule a local notification offline using timezone.
@@ -298,27 +717,50 @@ class NotificationService {
     required DateTime scheduledDate,
     String? channelId,
     String? payload,
+    String? type,
   }) async {
     final tzScheduled = tz.TZDateTime.from(scheduledDate, tz.local);
     if (tzScheduled.isBefore(tz.TZDateTime.now(tz.local))) return;
 
-    final selectedChannelId = channelId ?? channelGeneral;
+    Map<String, dynamic>? payloadMap;
+    if (payload != null && payload.isNotEmpty) {
+      try {
+        payloadMap = jsonDecode(payload) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+
+    final style = NotificationCardStyler.resolve(
+      type: type ?? payloadMap?['type']?.toString(),
+      title: title,
+      body: body,
+      payload: payloadMap,
+    );
+
+    final styledTitle = '${style.emoji} $title';
+    final bigTextStyle = BigTextStyleInformation(
+      body,
+      contentTitle: styledTitle,
+      summaryText: style.badgeText,
+    );
+
+    final selectedChannelId = channelId ?? style.channelId;
     final androidDetails = AndroidNotificationDetails(
       selectedChannelId,
-      selectedChannelId == channelImportant
-          ? 'Important Alerts'
-          : selectedChannelId == channelInsights
-              ? 'Insights & Reports'
-              : 'General Activity',
-      importance: selectedChannelId == channelImportant ? Importance.max : Importance.defaultImportance,
-      priority: selectedChannelId == channelImportant ? Priority.high : Priority.defaultPriority,
+      style.channelName,
+      importance: style.importance,
+      priority: style.priority,
+      color: style.accentColor,
+      styleInformation: bigTextStyle,
+      groupKey: style.groupKey,
+      setAsGroupSummary: false,
+      actions: style.actions,
     );
 
     const iosDetails = DarwinNotificationDetails();
 
     await _localNotifications.zonedSchedule(
       id,
-      title,
+      styledTitle,
       body,
       tzScheduled,
       NotificationDetails(android: androidDetails, iOS: iosDetails),
@@ -335,6 +777,7 @@ class NotificationService {
 
   /// Cancel all scheduled notifications.
   Future<void> cancelAll() async {
+    _groupRecentLines.clear();
     await _localNotifications.cancelAll();
   }
 
@@ -355,22 +798,16 @@ class NotificationService {
     final title = notification?.title ?? message.data['title'] ?? 'HomeStock';
     final body = notification?.body ?? message.data['body'] ?? 'Your household stock was updated.';
 
-    String channel = channelGeneral;
-    if (type.contains('STOCK') || type.contains('EXPIR')) {
-      channel = channelImportant;
-    } else if (type.contains('INSIGHT') || type.contains('REPORT') || type.contains('RESTOCK')) {
-      channel = channelInsights;
-    }
-
     final payload = jsonEncode(message.data);
     final id = message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch;
 
+    // Show system notification matching the signature card preview style
     showNotification(
       id: id,
       title: title,
       body: body,
-      channelId: channel,
       payload: payload,
+      type: type,
     );
 
     // Present the in-app foreground notification card matching the project theme
@@ -399,6 +836,36 @@ class NotificationService {
     _handlePayload(payload);
   }
 
+  void _handleNotificationResponse(NotificationResponse response) {
+    final payload = response.payload;
+    final actionId = response.actionId;
+
+    if (payload == null || payload.isEmpty) {
+      if (actionId == 'action_shopping') {
+        onNavigate?.call('/shopping');
+      } else {
+        onNavigate?.call('/notifications');
+      }
+      return;
+    }
+
+    try {
+      final map = jsonDecode(payload) as Map<String, dynamic>;
+      if (actionId != null && actionId.isNotEmpty) {
+        map['actionId'] = actionId;
+      }
+
+      if (onPayloadTapped != null) {
+        onPayloadTapped!(map);
+        return;
+      }
+
+      _handlePayloadMap(map, actionId);
+    } catch (_) {
+      onNavigate?.call('/notifications');
+    }
+  }
+
   void _handlePayload(String? payload) {
     if (payload == null || payload.isEmpty) {
       onNavigate?.call('/notifications');
@@ -407,27 +874,37 @@ class NotificationService {
 
     try {
       final map = jsonDecode(payload) as Map<String, dynamic>;
-
-      // Prefer structured payload routing
       if (onPayloadTapped != null) {
         onPayloadTapped!(map);
         return;
       }
-
-      // Legacy route-string fallback
-      final itemId = map['entityId']?.toString() ?? map['itemId']?.toString();
-      final screen = map['screen']?.toString();
-
-      if (itemId != null && itemId.isNotEmpty) {
-        onNavigate?.call('/inventory/detail/$itemId');
-      } else if (screen == 'shopping') {
-        onNavigate?.call('/shopping');
-      } else if (screen == 'analytics') {
-        onNavigate?.call('/analytics');
-      } else {
-        onNavigate?.call('/notifications');
-      }
+      _handlePayloadMap(map, null);
     } catch (_) {
+      onNavigate?.call('/notifications');
+    }
+  }
+
+  void _handlePayloadMap(Map<String, dynamic> map, String? actionId) {
+    final entityId = map['entityId']?.toString() ?? map['itemId']?.toString();
+    final screen = map['screen']?.toString();
+    final type = (map['type']?.toString() ?? '').toUpperCase();
+
+    if (actionId == 'action_shopping') {
+      onNavigate?.call('/shopping');
+      return;
+    } else if (actionId == 'action_inspect' && entityId != null && entityId.isNotEmpty) {
+      onNavigate?.call('/inventory/detail/$entityId');
+      return;
+    }
+
+    if (entityId != null && entityId.isNotEmpty &&
+        (type.contains('STOCK') || type.contains('EXPIR') || type == 'SMART_RESTOCK_SUGGESTION')) {
+      onNavigate?.call('/inventory/detail/$entityId');
+    } else if (screen == 'shopping' || type == 'SHOPPING_LIST_UPDATE') {
+      onNavigate?.call('/shopping');
+    } else if (screen == 'analytics' || type.contains('INSIGHT') || type.contains('REPORT')) {
+      onNavigate?.call('/analytics');
+    } else {
       onNavigate?.call('/notifications');
     }
   }

@@ -87,11 +87,22 @@ void main() async {
         }
       },
       payloadTapCallback: (payload) {
-        // Payload-based navigation will be handled by NotificationRouter
-        // at tap time within the widget tree (requires WidgetRef).
-        // This fallback uses the legacy route-string approach.
+        // Handle direct action button clicks from system notification tray
+        final actionId = payload['actionId']?.toString();
         final entityId = payload['entityId']?.toString() ?? payload['itemId']?.toString();
         final type = (payload['type']?.toString() ?? '').toUpperCase();
+
+        if (actionId == 'action_shopping') {
+          rootNavigatorKey.currentContext?.push('/shopping');
+          return;
+        } else if (actionId == 'action_inspect' && entityId != null && entityId.isNotEmpty) {
+          rootNavigatorKey.currentContext?.push('/inventory/detail/$entityId');
+          return;
+        } else if (actionId == 'action_insights') {
+          rootNavigatorKey.currentContext?.push('/analytics');
+          return;
+        }
+
         String route = '/notifications';
         if (entityId != null && entityId.isNotEmpty &&
             (type.contains('STOCK') || type.contains('EXPIR') || type == 'SMART_RESTOCK_SUGGESTION')) {

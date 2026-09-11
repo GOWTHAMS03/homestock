@@ -19,6 +19,7 @@ class InAppNotificationBanner extends StatefulWidget {
   final VoidCallback? onActionTap;
   final VoidCallback onDismiss;
   final String? actionLabel;
+  final int queuedCount;
 
   const InAppNotificationBanner({
     super.key,
@@ -31,10 +32,12 @@ class InAppNotificationBanner extends StatefulWidget {
     this.onActionTap,
     required this.onDismiss,
     this.actionLabel,
+    this.queuedCount = 1,
   });
 
   static OverlayEntry? _currentEntry;
   static Timer? _dismissTimer;
+  static int _activeAlertCount = 0;
 
   /// Show a global in-app notification banner on top of the app window
   static void show({
@@ -49,7 +52,9 @@ class InAppNotificationBanner extends StatefulWidget {
     String? actionLabel,
     Duration duration = const Duration(milliseconds: 4500),
   }) {
-    dismiss();
+    _activeAlertCount++;
+    final currentCount = _activeAlertCount;
+    dismiss(resetCount: false);
 
     final overlayState = Overlay.of(context, rootOverlay: true);
 
@@ -62,6 +67,7 @@ class InAppNotificationBanner extends StatefulWidget {
         entityId: entityId,
         payload: payload,
         actionLabel: actionLabel,
+        queuedCount: currentCount,
         onTap: () {
           dismiss();
           onTap?.call();
@@ -83,9 +89,12 @@ class InAppNotificationBanner extends StatefulWidget {
   }
 
   /// Dismiss the active in-app banner if one is showing
-  static void dismiss() {
+  static void dismiss({bool resetCount = true}) {
     _dismissTimer?.cancel();
     _dismissTimer = null;
+    if (resetCount) {
+      _activeAlertCount = 0;
+    }
     if (_currentEntry != null) {
       try {
         _currentEntry?.remove();
@@ -259,6 +268,25 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
                                           color: Color(0xFF94A3B8),
                                         ),
                                       ),
+                                      if (widget.queuedCount > 1) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEDE9FE),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFFDDD6FE), width: 0.8),
+                                          ),
+                                          child: Text(
+                                            '+${widget.queuedCount - 1} more',
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF6D28D9),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                   const SizedBox(height: 4),
@@ -400,6 +428,29 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner>
         lowerTitle.contains('rice') ||
         lowerTitle.contains('cheese') ||
         lowerTitle.contains('bread');
+
+    final isDigest = widget.payload?['isDigest']?.toString().toLowerCase() == 'true' ||
+        (widget.payload?['itemCount'] != null && int.tryParse(widget.payload!['itemCount'].toString()) != null && int.parse(widget.payload!['itemCount'].toString()) > 1) ||
+        lowerTitle.contains('items may run out') ||
+        lowerTitle.contains('restock digest') ||
+        type.toUpperCase() == 'DIGEST';
+
+    if (isDigest) {
+      return _InAppBannerStyling(
+        icon: Icons.shopping_bag_outlined,
+        iconColor: const Color(0xFF6D28D9),
+        bgColor: const Color(0xFFEDE9FE),
+        borderColor: const Color(0xFFDDD6FE),
+        badgeText: '🛒 RESTOCK DIGEST',
+        badgeBg: const Color(0xFFEDE9FE),
+        badgeTextColor: const Color(0xFF5B21B6),
+        accentColor: const Color(0xFF6366F1),
+        actionLabel: 'View Shopping List',
+        actionIcon: Icons.shopping_bag_outlined,
+        isEmoji: true,
+        emojiText: '🛒',
+      );
+    }
 
     switch (type.toUpperCase()) {
       case 'OUT_OF_STOCK':

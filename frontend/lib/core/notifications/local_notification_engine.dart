@@ -204,6 +204,7 @@ class LocalNotificationEngine {
           body: body,
           channelId: channelId,
           payload: payloadString,
+          type: type,
         );
       } catch (e) {
         debugPrint('[LocalNotificationEngine] Failed to display system notification: $e');

@@ -51,6 +51,8 @@ public class ShoppingProviderRegistry {
     public List<ShoppingProvider> getEnabledProviders() {
         return providerMap.values().stream()
                 .filter(ShoppingProvider::isEnabled)
+                .filter(p -> !p.getProviderName().toUpperCase().contains("MOCK") &&
+                             !p.getProviderName().toUpperCase().contains("DEMO"))
                 .collect(Collectors.toList());
     }
 

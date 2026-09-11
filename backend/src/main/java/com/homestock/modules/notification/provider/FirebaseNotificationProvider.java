@@ -111,19 +111,93 @@ public class FirebaseNotificationProvider {
         }
 
         try {
+            // 1. Resolve card preview styling & grouping
+            NotificationType effectiveType = type != null ? type : NotificationType.SYSTEM;
+            String groupKey = switch (effectiveType) {
+                case LOW_STOCK, OUT_OF_STOCK, EXPIRING_SOON, EXPIRY_REMINDER, EXPIRED -> "homestock_group_stock_expiry";
+                case SMART_RESTOCK_SUGGESTION, WEEKLY_INSIGHT, MONTHLY_REPORT -> "homestock_group_insights";
+                default -> "homestock_group_activity";
+            };
+
+            String groupTitle = switch (groupKey) {
+                case "homestock_group_stock_expiry" -> "Stock & Expiry Alerts";
+                case "homestock_group_insights" -> "Smart Insights & Digests";
+                default -> "Household Activity";
+            };
+
+            String badge = switch (effectiveType) {
+                case OUT_OF_STOCK -> "🔴 OUT OF STOCK";
+                case LOW_STOCK -> "⚠️ LOW STOCK";
+                case EXPIRING_SOON, EXPIRY_REMINDER -> "⏳ EXPIRING SOON";
+                case EXPIRED -> "⏰ EXPIRED";
+                case SHOPPING_LIST_UPDATE -> "🛒 SHOPPING LIST";
+                case STOCK_UPDATED, PURCHASE_RECORDED -> "✓ RESTOCKED";
+                case SMART_RESTOCK_SUGGESTION -> "✨ SMART INSIGHT";
+                case WEEKLY_INSIGHT, MONTHLY_REPORT -> "📊 INSIGHTS";
+                case SYNC_COMPLETED -> "☁️ SYNCED";
+                default -> "🏠 HOUSEHOLD";
+            };
+
+            String colorHex = switch (effectiveType) {
+                case OUT_OF_STOCK, EXPIRED -> "#DC2626";
+                case LOW_STOCK -> "#D97706";
+                case EXPIRING_SOON, EXPIRY_REMINDER -> "#EA580C";
+                case SHOPPING_LIST_UPDATE -> "#7C3AED";
+                case STOCK_UPDATED, PURCHASE_RECORDED, SYNC_COMPLETED -> "#16A34A";
+                case SMART_RESTOCK_SUGGESTION, WEEKLY_INSIGHT, MONTHLY_REPORT -> "#6366F1";
+                default -> "#0284C7";
+            };
+
+            String actionLabel = switch (effectiveType) {
+                case OUT_OF_STOCK, LOW_STOCK, SMART_RESTOCK_SUGGESTION -> "+ Add to Shopping";
+                case EXPIRING_SOON, EXPIRY_REMINDER, EXPIRED -> "Inspect Item";
+                case SHOPPING_LIST_UPDATE -> "View Shopping List";
+                case STOCK_UPDATED, PURCHASE_RECORDED -> "View Item";
+                case WEEKLY_INSIGHT, MONTHLY_REPORT -> "View Insights";
+                default -> "Open HomeStock";
+            };
+
+            String lower = ((title != null ? title : "") + " " + (body != null ? body : "")).toLowerCase();
+            String emoji = "📦";
+            if (lower.contains("milk") || lower.contains("பால்")) emoji = "🥛";
+            else if (lower.contains("egg") || lower.contains("முட்டை")) emoji = "🥚";
+            else if (lower.contains("onion") || lower.contains("வெங்காயம்")) emoji = "🧅";
+            else if (lower.contains("rice") || lower.contains("அரிசி")) emoji = "🍚";
+            else if (lower.contains("cheese")) emoji = "🧀";
+            else if (lower.contains("bread") || lower.contains("ரொட்டி")) emoji = "🍞";
+            else if (lower.contains("oil") || lower.contains("எண்ணெய்")) emoji = "🌻";
+            else if (lower.contains("atta") || lower.contains("flour") || lower.contains("மாவு")) emoji = "🌾";
+            else if (lower.contains("tomato") || lower.contains("தக்காளி")) emoji = "🍅";
+            else if (lower.contains("apple") || lower.contains("fruit")) emoji = "🍎";
+            else if (lower.contains("banana")) emoji = "🍌";
+            else if (lower.contains("coffee") || lower.contains("tea")) emoji = "☕";
+            else if (lower.contains("soap") || lower.contains("detergent")) emoji = "🧼";
+            else if (effectiveType == NotificationType.SHOPPING_LIST_UPDATE) emoji = "🛒";
+            else if (effectiveType == NotificationType.SMART_RESTOCK_SUGGESTION) emoji = "✨";
+            else if (effectiveType == NotificationType.SYNC_COMPLETED) emoji = "☁️";
+            else if (effectiveType == NotificationType.STOCK_UPDATED) emoji = "✓";
+
+            String formattedTitle = emoji + " " + (title != null ? title : "HomeStock Alert");
+
             // Build FCM MulticastMessage
             com.google.firebase.messaging.Notification fcmNotification = null;
             if (title != null && !title.isBlank()) {
                 fcmNotification = com.google.firebase.messaging.Notification.builder()
-                        .setTitle(title)
+                        .setTitle(formattedTitle)
                         .setBody(body != null ? body : "")
                         .build();
             }
 
             MulticastMessage.Builder messageBuilder = MulticastMessage.builder()
                     .addAllTokens(tokens)
-                    .putData("type", type != null ? type.name() : "SYSTEM")
-                    .putData("priority", priority != null ? priority.name() : "MEDIUM");
+                    .putData("type", effectiveType.name())
+                    .putData("priority", priority != null ? priority.name() : "MEDIUM")
+                    .putData("groupKey", groupKey)
+                    .putData("groupTitle", groupTitle)
+                    .putData("badge", badge)
+                    .putData("emoji", emoji)
+                    .putData("accentColor", colorHex)
+                    .putData("actionLabel", actionLabel);
 
             if (title != null && !title.isBlank()) {
                 messageBuilder.putData("title", title);
@@ -163,6 +237,9 @@ public class FirebaseNotificationProvider {
                             .setSound("default")
                             .setDefaultSound(true)
                             .setDefaultVibrateTimings(true)
+                            .setColor(colorHex)
+                            .setTag(groupKey)
+                            .setClickAction("FLUTTER_NOTIFICATION_CLICK")
                             .build())
                     .build();
 

@@ -175,7 +175,9 @@ public class NotificationController {
     @Operation(summary = "Send a test Firebase push notification to current user's registered devices")
     public ResponseEntity<ApiResponse<Map<String, Object>>> sendTestNotification(
             @RequestParam(defaultValue = "Test Alert") String title,
-            @RequestParam(defaultValue = "HomeStock Firebase push notifications are working perfectly! \uD83C\uDF89") String message) {
+            @RequestParam(defaultValue = "HomeStock Firebase push notifications are working perfectly! \uD83C\uDF89") String message,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String entityId) {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -191,15 +193,35 @@ public class NotificationController {
             )));
         }
 
-        Map<String, String> data = Map.of(
-                "action", "TEST",
-                "type", "SYSTEM",
-                "timestamp", java.time.Instant.now().toString()
-        );
+        com.homestock.modules.notification.entity.NotificationType resolvedType =
+                com.homestock.modules.notification.entity.NotificationType.SYSTEM;
+        if (type != null && !type.isBlank()) {
+            try {
+                resolvedType = com.homestock.modules.notification.entity.NotificationType.valueOf(type.toUpperCase());
+            } catch (Exception ignored) {}
+        } else {
+            String lower = title.toLowerCase();
+            if (lower.contains("expir")) {
+                resolvedType = com.homestock.modules.notification.entity.NotificationType.EXPIRY_REMINDER;
+            } else if (lower.contains("shopping")) {
+                resolvedType = com.homestock.modules.notification.entity.NotificationType.SHOPPING_LIST_UPDATE;
+            } else if (lower.contains("low stock") || lower.contains("out of stock") || lower.contains("stock")) {
+                resolvedType = com.homestock.modules.notification.entity.NotificationType.LOW_STOCK;
+            }
+        }
+
+        Map<String, String> data = new java.util.HashMap<>();
+        data.put("action", "TEST");
+        data.put("type", resolvedType.name());
+        data.put("timestamp", java.time.Instant.now().toString());
+        if (entityId != null && !entityId.isBlank()) {
+            data.put("entityId", entityId);
+            data.put("itemId", entityId);
+        }
 
         firebaseNotificationProvider.sendPushNotification(
                 tokens,
-                com.homestock.modules.notification.entity.NotificationType.SYSTEM,
+                resolvedType,
                 com.homestock.modules.notification.entity.NotificationPriority.HIGH,
                 title,
                 message,
