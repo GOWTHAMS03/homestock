@@ -5,9 +5,15 @@ import com.homestock.modules.home.entity.Home;
 import com.homestock.modules.home.entity.HomeMember;
 import com.homestock.modules.home.repository.HomeMemberRepository;
 import com.homestock.modules.inventory.entity.InventoryItem;
+import com.homestock.modules.inventory.repository.InventoryItemRepository;
+import com.homestock.modules.notification.dto.NotificationCandidate;
+import com.homestock.modules.notification.dto.NotificationDecision;
+import com.homestock.modules.notification.engine.NotificationDecisionEngine;
+import com.homestock.modules.notification.engine.NotificationDeduplicationService;
 import com.homestock.modules.notification.entity.*;
 import com.homestock.modules.notification.provider.FirebaseNotificationProvider;
 import com.homestock.modules.notification.repository.NotificationDeduplicationRepository;
+import com.homestock.modules.notification.repository.NotificationEventRepository;
 import com.homestock.modules.notification.repository.NotificationRepository;
 import com.homestock.modules.purchase.entity.Purchase;
 import com.homestock.modules.user.entity.User;
@@ -35,6 +41,10 @@ public class NotificationEngine {
     private final DeviceTokenService deviceTokenService;
     private final FirebaseNotificationProvider firebaseNotificationProvider;
     private final ObjectMapper objectMapper;
+    private final NotificationDecisionEngine decisionEngine;
+    private final NotificationEventRepository eventRepository;
+    private final NotificationDeduplicationService deduplicationService;
+    private final InventoryItemRepository inventoryItemRepository;
 
     @Value("${app.notifications.cooldown.stock-hours:24}")
     private long stockCooldownHours = 24;
@@ -47,6 +57,8 @@ public class NotificationEngine {
 
     /**
      * Central dispatch for notifications across home members.
+     * Integrates with NotificationDecisionEngine to enforce ML scoring,
+     * fatigue limits, timing optimization, and channel routing.
      */
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void dispatchHomeNotification(
@@ -107,21 +119,17 @@ public class NotificationEngine {
             }
         }
 
-        // 2. Prepare payload JSON
-        String payloadJson = null;
-        if (dataPayload != null) {
+        // 2. Resolve inventory item if available
+        InventoryItem resolvedItem = null;
+        if (dataPayload != null && dataPayload.containsKey("entityId")) {
             try {
-                payloadJson = objectMapper.writeValueAsString(dataPayload);
-            } catch (Exception e) {
-                log.warn("Failed to serialize notification payload: {}", e.getMessage());
-            }
+                UUID itemId = UUID.fromString(dataPayload.get("entityId"));
+                resolvedItem = inventoryItemRepository.findById(itemId).orElse(null);
+            } catch (Exception ignored) {}
         }
 
-        // 3. Resolve home members and filter
+        // 3. Resolve home members and filter through ML decision engine
         List<HomeMember> members = homeMemberRepository.findAllByHomeId(home.getId());
-        List<UUID> pushRecipientUserIds = new ArrayList<>();
-
-        LocalTime currentTime = LocalTime.now();
 
         for (HomeMember member : members) {
             User targetUser = member.getUser();
@@ -143,15 +151,59 @@ public class NotificationEngine {
                 continue;
             }
 
+            // Build ML Notification Candidate
+            NotificationCandidate candidate = NotificationCandidate.builder()
+                    .home(home)
+                    .recipientUser(targetUser)
+                    .triggerUser(excludedUser)
+                    .inventoryItem(resolvedItem)
+                    .type(type)
+                    .basePriority(priority)
+                    .proposedTitle(title)
+                    .proposedBody(body)
+                    .currentStock(currentQuantity != null ? currentQuantity : (resolvedItem != null ? resolvedItem.getQuantity() : null))
+                    .unit(resolvedItem != null ? resolvedItem.getUnit() : null)
+                    .dedupKey(dedupKey)
+                    .candidateTimestamp(Instant.now())
+                    .build();
+
+            // Run through ML Smart Notification Decision Engine
+            NotificationDecision decision = null;
+            if (decisionEngine != null) {
+                try {
+                    decision = decisionEngine.evaluateCandidate(candidate);
+                } catch (Exception e) {
+                    log.warn("Decision engine evaluation failed, falling back to rule defaults: {}", e.getMessage());
+                }
+            }
+
+            // Record Decision Event in Audit / Learning Dataset
+            if (decision != null) {
+                recordNotificationEvent(candidate, decision);
+
+                // If Decision is SUPPRESS, suppress completely
+                if (decision.getDecisionType() == NotificationDecisionType.SUPPRESS) {
+                    log.info("[MLNotificationEngine] Suppressed notification '{}' for user {}: {}",
+                            title, targetUser.getId(), decision.getRationale());
+                    continue;
+                }
+            }
+
+            String finalTitle = (decision != null && decision.getFinalTitle() != null) ? decision.getFinalTitle() : title;
+            String finalBody = (decision != null && decision.getFinalBody() != null) ? decision.getFinalBody() : body;
+            NotificationPriority resolvedPriority = (decision != null && decision.getResolvedPriority() != null)
+                    ? decision.getResolvedPriority() : priority;
+            String payloadJson = serializePayload(dataPayload, decision);
+
             // Save in-app notification record in Database safely
             try {
                 Notification notification = Notification.builder()
                         .home(home)
                         .user(targetUser)
                         .type(type)
-                        .priority(priority)
-                        .title(title)
-                        .body(body)
+                        .priority(resolvedPriority)
+                        .title(finalTitle)
+                        .body(finalBody)
                         .payloadJson(payloadJson)
                         .dedupKey(dedupKey)
                         .isRead(false)
@@ -161,29 +213,38 @@ public class NotificationEngine {
                 log.error("Failed to persist in-app notification for user {}: {}", targetUser.getId(), e.getMessage());
             }
 
-            // Check Quiet Hours for push notification dispatch
-            if (pref != null && pref.isInsideQuietHours(currentTime) && priority != NotificationPriority.CRITICAL && priority != NotificationPriority.HIGH) {
-                log.debug("Quiet hours active for user {}. In-app notification saved; push deferred/suppressed.", targetUser.getId());
-                continue;
-            }
+            // Push Notification Dispatch Decision Check:
+            // Only send Firebase Push if:
+            // 1. Decision is SEND_NOW and Channel is PUSH (or decision is null default fallback)
+            // 2. Not inside quiet hours (unless CRITICAL/HIGH priority)
+            boolean isPushAllowedByML = decision == null ||
+                    (decision.getDecisionType() == NotificationDecisionType.SEND_NOW && decision.getChannel() == NotificationChannel.PUSH);
 
-            pushRecipientUserIds.add(targetUser.getId());
-        }
+            boolean isQuietHours = pref != null && pref.isInsideQuietHours(LocalTime.now())
+                    && resolvedPriority != NotificationPriority.CRITICAL && resolvedPriority != NotificationPriority.HIGH;
 
-        // 4. Send FCM Push Notification to eligible device tokens
-        if (!pushRecipientUserIds.isEmpty()) {
-            try {
-                List<DeviceToken> activeTokens = deviceTokenService.getActiveTokensForUsers(pushRecipientUserIds);
-                firebaseNotificationProvider.sendPushNotification(
-                        activeTokens,
-                        type,
-                        priority,
-                        title,
-                        body,
-                        dataPayload
-                );
-            } catch (Exception e) {
-                log.warn("Failed to dispatch push notifications: {}", e.getMessage());
+            if (isPushAllowedByML && !isQuietHours) {
+                try {
+                    List<DeviceToken> tokens = deviceTokenService.getActiveTokensForUser(targetUser.getId());
+                    if (!tokens.isEmpty()) {
+                        firebaseNotificationProvider.sendPushNotification(
+                                tokens,
+                                type,
+                                resolvedPriority,
+                                finalTitle,
+                                finalBody,
+                                dataPayload
+                        );
+                    }
+                    if (deduplicationService != null) {
+                        deduplicationService.recordDispatch(candidate);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to dispatch push notification for user {}: {}", targetUser.getId(), e.getMessage());
+                }
+            } else {
+                log.info("[MLNotificationEngine] Push omitted for user {} (MLAllowed: {}, QuietHours: {}, Score: {})",
+                        targetUser.getId(), isPushAllowedByML, isQuietHours, decision != null ? decision.getFinalScore() : "N/A");
             }
         }
     }
@@ -210,21 +271,60 @@ public class NotificationEngine {
             return;
         }
 
-        String payloadJson = null;
-        if (dataPayload != null) {
+        InventoryItem resolvedItem = null;
+        if (dataPayload != null && dataPayload.containsKey("entityId")) {
             try {
-                payloadJson = objectMapper.writeValueAsString(dataPayload);
+                UUID itemId = UUID.fromString(dataPayload.get("entityId"));
+                resolvedItem = inventoryItemRepository.findById(itemId).orElse(null);
             } catch (Exception ignored) {}
         }
+
+        NotificationCandidate candidate = NotificationCandidate.builder()
+                .home(home)
+                .recipientUser(targetUser)
+                .inventoryItem(resolvedItem)
+                .type(type)
+                .basePriority(priority)
+                .proposedTitle(title)
+                .proposedBody(body)
+                .currentStock(resolvedItem != null ? resolvedItem.getQuantity() : null)
+                .unit(resolvedItem != null ? resolvedItem.getUnit() : null)
+                .dedupKey(dedupKey)
+                .candidateTimestamp(Instant.now())
+                .build();
+
+        NotificationDecision decision = null;
+        if (decisionEngine != null) {
+            try {
+                decision = decisionEngine.evaluateCandidate(candidate);
+            } catch (Exception e) {
+                log.warn("Decision engine evaluation failed for direct user notification: {}", e.getMessage());
+            }
+        }
+
+        if (decision != null) {
+            recordNotificationEvent(candidate, decision);
+            if (decision.getDecisionType() == NotificationDecisionType.SUPPRESS) {
+                log.info("[MLNotificationEngine] Suppressed direct notification '{}' for user {}: {}",
+                        title, targetUser.getId(), decision.getRationale());
+                return;
+            }
+        }
+
+        String finalTitle = (decision != null && decision.getFinalTitle() != null) ? decision.getFinalTitle() : title;
+        String finalBody = (decision != null && decision.getFinalBody() != null) ? decision.getFinalBody() : body;
+        NotificationPriority resolvedPriority = (decision != null && decision.getResolvedPriority() != null)
+                ? decision.getResolvedPriority() : priority;
+        String payloadJson = serializePayload(dataPayload, decision);
 
         try {
             Notification notification = Notification.builder()
                     .home(home)
                     .user(targetUser)
                     .type(type)
-                    .priority(priority)
-                    .title(title)
-                    .body(body)
+                    .priority(resolvedPriority)
+                    .title(finalTitle)
+                    .body(finalBody)
                     .payloadJson(payloadJson)
                     .dedupKey(dedupKey)
                     .isRead(false)
@@ -234,13 +334,84 @@ public class NotificationEngine {
             log.error("Failed to persist notification for user {}: {}", targetUser.getId(), e.getMessage());
         }
 
-        if (pref != null && pref.isInsideQuietHours(LocalTime.now()) && priority != NotificationPriority.HIGH) {
-            return;
-        }
+        boolean isPushAllowedByML = decision == null ||
+                (decision.getDecisionType() == NotificationDecisionType.SEND_NOW && decision.getChannel() == NotificationChannel.PUSH);
 
-        List<DeviceToken> tokens = deviceTokenService.getActiveTokensForUser(targetUser.getId());
-        firebaseNotificationProvider.sendPushNotification(tokens, type, priority, title, body, dataPayload);
+        boolean isQuietHours = pref != null && pref.isInsideQuietHours(LocalTime.now())
+                && resolvedPriority != NotificationPriority.CRITICAL && resolvedPriority != NotificationPriority.HIGH;
+
+        if (isPushAllowedByML && !isQuietHours) {
+            try {
+                List<DeviceToken> tokens = deviceTokenService.getActiveTokensForUser(targetUser.getId());
+                if (!tokens.isEmpty()) {
+                    firebaseNotificationProvider.sendPushNotification(tokens, type, resolvedPriority, finalTitle, finalBody, dataPayload);
+                }
+                if (deduplicationService != null) {
+                    deduplicationService.recordDispatch(candidate);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to dispatch push notification for user {}: {}", targetUser.getId(), e.getMessage());
+            }
+        }
     }
+
+    private void recordNotificationEvent(NotificationCandidate candidate, NotificationDecision decision) {
+        if (eventRepository == null || candidate == null || decision == null || decision.getDecisionType() == null) return;
+        try {
+            NotificationEventType eventType = switch (decision.getDecisionType()) {
+                case SUPPRESS -> NotificationEventType.SUPPRESSED;
+                case SEND_NOW, IN_APP_ONLY -> NotificationEventType.SENT;
+                case SCHEDULE, GROUP -> NotificationEventType.GENERATED;
+                default -> NotificationEventType.GENERATED;
+            };
+
+            NotificationEvent event = NotificationEvent.builder()
+                    .user(candidate.getRecipientUser())
+                    .home(candidate.getHome())
+                    .inventoryItem(candidate.getInventoryItem())
+                    .notificationType(candidate.getType() != null ? candidate.getType() : NotificationType.SYSTEM)
+                    .priority(decision.getResolvedPriority())
+                    .channel(decision.getChannel())
+                    .decision(decision.getDecisionType())
+                    .eventType(eventType)
+                    .urgencyScore(decision.getUrgencyScore())
+                    .relevanceScore(decision.getRelevanceScore())
+                    .confidenceScore(decision.getConfidenceScore())
+                    .actionProbability(decision.getActionProbability())
+                    .fatigueScore(decision.getFatigueScore())
+                    .finalScore(decision.getFinalScore())
+                    .predictedDaysRemaining(candidate.getPredictedDaysRemaining())
+                    .dedupKey(candidate.getDedupKey())
+                    .scheduledFor(decision.getScheduledFor())
+                    .occurredAt(Instant.now())
+                    .build();
+
+            eventRepository.save(event);
+        } catch (Exception e) {
+            log.warn("Failed to record notification event: {}", e.getMessage());
+        }
+    }
+
+    private String serializePayload(Map<String, String> dataPayload, NotificationDecision decision) {
+        Map<String, String> map = new HashMap<>();
+        if (dataPayload != null) {
+            map.putAll(dataPayload);
+        }
+        if (decision != null) {
+            if (decision.getActionLabel() != null && !map.containsKey("actionLabel")) {
+                map.put("actionLabel", decision.getActionLabel());
+            }
+            if (decision.getActionDeepLink() != null && !map.containsKey("actionRoute")) {
+                map.put("actionRoute", decision.getActionDeepLink());
+            }
+        }
+        try {
+            return objectMapper.writeValueAsString(map);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 
     // ==========================================
     // Specific Domain Event Notification Hooks
@@ -458,6 +629,7 @@ public class NotificationEngine {
     /**
      * Broadcast a lightweight realtime event to all other members of the home
      * so their devices trigger an incremental sync.
+     * Silent data-only push (title=null, body=null), sent ONLY to other members.
      */
     public void notifyHomeChanged(Home home, UUID actorUserId) {
         if (home == null) return;
@@ -465,25 +637,26 @@ public class NotificationEngine {
         List<UUID> recipientIds = new ArrayList<>();
         for (HomeMember member : members) {
             User u = member.getUser();
-            if (u != null && (actorUserId == null || !u.getId().equals(actorUserId) || members.size() == 1)) {
+            // ONLY notify other members of the household; never notify the person who triggered the sync
+            if (u != null && actorUserId != null && !u.getId().equals(actorUserId)) {
                 recipientIds.add(u.getId());
             }
         }
         if (!recipientIds.isEmpty()) {
             List<DeviceToken> activeTokens = deviceTokenService.getActiveTokensForUsers(recipientIds);
             if (!activeTokens.isEmpty()) {
-                String homeName = (home.getName() != null && !home.getName().isBlank()) ? home.getName() : "Household";
                 Map<String, String> data = Map.of(
                         "type", "HOME_CHANGED",
                         "homeId", home.getId().toString(),
                         "action", "SYNC_HOME"
                 );
+                // Silent data-only push: title and body MUST be null so no UI alert or popup is shown
                 firebaseNotificationProvider.sendPushNotification(
                         activeTokens,
                         NotificationType.SYSTEM,
-                        NotificationPriority.MEDIUM,
-                        "Pantry Updated",
-                        "Changes were synced for " + homeName + ".",
+                        NotificationPriority.LOW,
+                        null,
+                        null,
                         data
                 );
             }

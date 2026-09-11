@@ -177,7 +177,10 @@ class _HomeStockAppState extends ConsumerState<HomeStockApp> {
       await ref.read(homeControllerProvider.notifier).loadHomes();
       final activeHome = ref.read(homeControllerProvider).activeHome;
       if (activeHome != null) {
-        await ref.read(localNotificationEngineProvider).scanInventory(activeHome.id);
+        await ref.read(localNotificationEngineProvider).scanInventory(
+          activeHome.id,
+          showSystemNotification: false,
+        );
       }
       ref.read(notificationControllerProvider.notifier).loadNotifications();
     });

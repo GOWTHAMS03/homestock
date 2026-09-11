@@ -36,6 +36,10 @@ class NotificationEngineTest {
     private NotificationPreferenceService preferenceService;
     private DeviceTokenService deviceTokenService;
     private FirebaseNotificationProvider firebaseProvider;
+    private com.homestock.modules.notification.engine.NotificationDecisionEngine decisionEngine;
+    private com.homestock.modules.notification.repository.NotificationEventRepository eventRepository;
+    private com.homestock.modules.notification.engine.NotificationDeduplicationService deduplicationService;
+    private com.homestock.modules.inventory.repository.InventoryItemRepository inventoryItemRepository;
     private NotificationEngine engine;
 
     private Home testHome;
@@ -53,6 +57,10 @@ class NotificationEngineTest {
         preferenceService = mock(NotificationPreferenceService.class);
         deviceTokenService = mock(DeviceTokenService.class);
         firebaseProvider = mock(FirebaseNotificationProvider.class);
+        decisionEngine = mock(com.homestock.modules.notification.engine.NotificationDecisionEngine.class);
+        eventRepository = mock(com.homestock.modules.notification.repository.NotificationEventRepository.class);
+        deduplicationService = mock(com.homestock.modules.notification.engine.NotificationDeduplicationService.class);
+        inventoryItemRepository = mock(com.homestock.modules.inventory.repository.InventoryItemRepository.class);
         ObjectMapper objectMapper = new ObjectMapper();
 
         engine = new NotificationEngine(
@@ -62,8 +70,34 @@ class NotificationEngineTest {
                 preferenceService,
                 deviceTokenService,
                 firebaseProvider,
-                objectMapper
+                objectMapper,
+                decisionEngine,
+                eventRepository,
+                deduplicationService,
+                inventoryItemRepository
         );
+
+        when(decisionEngine.evaluateCandidate(any())).thenAnswer(invocation -> {
+            com.homestock.modules.notification.dto.NotificationCandidate c = invocation.getArgument(0);
+            if (c == null) {
+                return com.homestock.modules.notification.dto.NotificationDecision.builder()
+                        .decisionType(com.homestock.modules.notification.entity.NotificationDecisionType.SEND_NOW)
+                        .channel(com.homestock.modules.notification.entity.NotificationChannel.PUSH)
+                        .resolvedPriority(NotificationPriority.MEDIUM)
+                        .finalTitle("Test")
+                        .finalBody("Test")
+                        .build();
+            }
+            return com.homestock.modules.notification.dto.NotificationDecision.builder()
+                    .candidate(c)
+                    .decisionType(com.homestock.modules.notification.entity.NotificationDecisionType.SEND_NOW)
+                    .channel(com.homestock.modules.notification.entity.NotificationChannel.PUSH)
+                    .resolvedPriority(c.getBasePriority() != null ? c.getBasePriority() : NotificationPriority.MEDIUM)
+                    .finalTitle(c.getProposedTitle())
+                    .finalBody(c.getProposedBody())
+                    .finalScore(BigDecimal.ONE)
+                    .build();
+        });
 
         user1 = User.builder()
                 .email("user1@example.com")
@@ -173,6 +207,75 @@ class NotificationEngineTest {
 
         // Target user must be user2, not user1
         assertThat(notifCaptor.getValue().getUser().getId()).isEqualTo(user2.getId());
+    }
+
+    @Test
+    @DisplayName("notifyHomeChanged sends silent data-only push to OTHER members and never to actor")
+    void testNotifyHomeChangedSendsSilentDataOnlyPushToOtherMembersOnly() {
+        DeviceToken user2Token = DeviceToken.builder()
+                .user(user2)
+                .deviceToken("token-user2")
+                .isActive(true)
+                .build();
+
+        when(deviceTokenService.getActiveTokensForUsers(List.of(user2.getId()))).thenReturn(List.of(user2Token));
+
+        // user1 triggers sync
+        engine.notifyHomeChanged(testHome, user1.getId());
+
+        // Verify push sent ONLY to user2 and with NULL title and body (pure silent push!)
+        ArgumentCaptor<String> titleCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, String>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+
+        verify(firebaseProvider).sendPushNotification(
+                eq(List.of(user2Token)),
+                eq(NotificationType.SYSTEM),
+                eq(NotificationPriority.LOW),
+                titleCaptor.capture(),
+                bodyCaptor.capture(),
+                dataCaptor.capture()
+        );
+
+        assertThat(titleCaptor.getValue()).isNull();
+        assertThat(bodyCaptor.getValue()).isNull();
+        assertThat(dataCaptor.getValue().get("type")).isEqualTo("HOME_CHANGED");
+        assertThat(dataCaptor.getValue().get("action")).isEqualTo("SYNC_HOME");
+    }
+
+    @Test
+    @DisplayName("notifyHomeChanged sends NO push when single user syncs own home")
+    void testNotifyHomeChangedDoesNotNotifySingleUserHousehold() {
+        Home singleHome = Home.builder().name("Solo Home").build();
+        singleHome.setId(UUID.randomUUID());
+        HomeMember soloMember = HomeMember.builder().home(singleHome).user(user1).role(HomeRole.OWNER).build();
+
+        when(homeMemberRepository.findAllByHomeId(singleHome.getId())).thenReturn(List.of(soloMember));
+
+        // user1 is the only member and triggers sync
+        engine.notifyHomeChanged(singleHome, user1.getId());
+
+        // Zero push notifications sent
+        verify(firebaseProvider, never()).sendPushNotification(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Decision engine SUPPRESS decision prevents push and in-app persistence")
+    void testDecisionEngineSuppressionPreventsPushAndPersistence() {
+        when(deduplicationRepository.findByDedupKey(anyString())).thenReturn(Optional.empty());
+        org.mockito.Mockito.doReturn(
+                com.homestock.modules.notification.dto.NotificationDecision.builder()
+                        .decisionType(com.homestock.modules.notification.entity.NotificationDecisionType.SUPPRESS)
+                        .channel(com.homestock.modules.notification.entity.NotificationChannel.SILENT)
+                        .rationale("Fatigue push limit exceeded")
+                        .build()
+        ).when(decisionEngine).evaluateCandidate(any());
+
+        engine.notifyLowStock(testHome, testItem, null);
+
+        // Neither saved to DB nor pushed to Firebase
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(firebaseProvider, never()).sendPushNotification(any(), any(), any(), any(), any(), any());
     }
 }
 

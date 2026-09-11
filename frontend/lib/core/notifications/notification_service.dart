@@ -343,18 +343,13 @@ class NotificationService {
     final type = message.data['type']?.toString().toUpperCase() ?? 'SYSTEM';
     final homeId = message.data['homeId']?.toString();
 
-    // Trigger sync for home change events
-    if (homeId != null && homeId.isNotEmpty && (type == 'HOME_CHANGED' || type == 'SILENT_SYNC')) {
-      debugPrint('[NotificationService] Sync trigger for home: $homeId');
-      onSilentSyncTriggered?.call(homeId);
-    }
-
-    // Only skip showing notification banner if message has no visible title at all
-    final hasTitle = (notification?.title != null && notification!.title!.isNotEmpty) ||
-        (message.data['title'] != null && message.data['title']!.toString().isNotEmpty);
-
-    if (!hasTitle && (type == 'HOME_CHANGED' || type == 'SILENT_SYNC')) {
-      return;
+    // Trigger sync for home change events (strictly silent background event)
+    if (type == 'HOME_CHANGED' || type == 'SILENT_SYNC') {
+      if (homeId != null && homeId.isNotEmpty) {
+        debugPrint('[NotificationService] Silent background sync triggered for home: $homeId');
+        onSilentSyncTriggered?.call(homeId);
+      }
+      return; // NEVER show a notification banner or card for background sync
     }
 
     final title = notification?.title ?? message.data['title'] ?? 'HomeStock';

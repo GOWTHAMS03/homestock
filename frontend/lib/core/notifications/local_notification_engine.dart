@@ -32,7 +32,13 @@ class LocalNotificationEngine {
         _notificationService = notificationService ?? NotificationService.instance;
 
   /// Trigger an offline scan for a specific home.
-  Future<void> scanInventory(String homeId, {String? userId}) async {
+  /// When showSystemNotification is false (e.g. app startup / open),
+  /// updates the local notification store without firing heads-up banners.
+  Future<void> scanInventory(
+    String homeId, {
+    String? userId,
+    bool showSystemNotification = true,
+  }) async {
     try {
       final items = await _inventoryDao.getAllItems(homeId);
       final now = DateTime.now();
@@ -52,6 +58,7 @@ class LocalNotificationEngine {
             itemId: item.id,
             homeId: homeId,
             userId: userId ?? 'local_user',
+            showSystemNotification: showSystemNotification,
           );
           continue; // Don't also fire low stock
         }
@@ -68,6 +75,7 @@ class LocalNotificationEngine {
             itemId: item.id,
             homeId: homeId,
             userId: userId ?? 'local_user',
+            showSystemNotification: showSystemNotification,
           );
         }
 
@@ -87,6 +95,7 @@ class LocalNotificationEngine {
                 itemId: item.id,
                 homeId: homeId,
                 userId: userId ?? 'local_user',
+                showSystemNotification: showSystemNotification,
               );
             } else if (daysUntil <= 3) {
               final daysLabel = daysUntil == 0 ? 'today' : (daysUntil == 1 ? 'tomorrow' : 'in $daysUntil days');
@@ -100,6 +109,7 @@ class LocalNotificationEngine {
                 itemId: item.id,
                 homeId: homeId,
                 userId: userId ?? 'local_user',
+                showSystemNotification: showSystemNotification,
               );
             }
           }
@@ -119,6 +129,7 @@ class LocalNotificationEngine {
             itemId: item.id,
             homeId: homeId,
             userId: userId ?? 'local_user',
+            showSystemNotification: showSystemNotification,
           );
         }
       }
@@ -137,6 +148,7 @@ class LocalNotificationEngine {
     required String itemId,
     required String homeId,
     required String userId,
+    bool showSystemNotification = true,
   }) async {
     final now = DateTime.now();
     final lastAlert = _cooldowns[dedupKey];
@@ -183,17 +195,19 @@ class LocalNotificationEngine {
       debugPrint('[LocalNotificationEngine] Failed to persist local notification: $e');
     }
 
-    // 2. Show heads-up system notification
-    try {
-      await _notificationService.showNotification(
-        id: intNotificationId,
-        title: title,
-        body: body,
-        channelId: channelId,
-        payload: payloadString,
-      );
-    } catch (e) {
-      debugPrint('[LocalNotificationEngine] Failed to display system notification: $e');
+    // 2. Show heads-up system notification ONLY IF showSystemNotification is true
+    if (showSystemNotification) {
+      try {
+        await _notificationService.showNotification(
+          id: intNotificationId,
+          title: title,
+          body: body,
+          channelId: channelId,
+          payload: payloadString,
+        );
+      } catch (e) {
+        debugPrint('[LocalNotificationEngine] Failed to display system notification: $e');
+      }
     }
   }
 
