@@ -30,8 +30,10 @@ public class NotificationMLAdminController {
     private final FeatureExtractor featureExtractor;
     private final InventoryItemRepository inventoryItemRepository;
     private final NotificationAnalyticsService analyticsService;
+    private final com.homestock.core.security.HomeSecurityService homeSecurityService;
 
     @GetMapping("/predictions/{homeId}")
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
     @Operation(summary = "Get ML depletion predictions for all inventory items in a household")
     public ResponseEntity<ApiResponse<List<MLPredictionDto>>> getPredictionsForHome(@PathVariable UUID homeId) {
         List<InventoryItem> items = inventoryItemRepository.findAllByHomeIdOrderByNameAsc(homeId);
@@ -50,11 +52,16 @@ public class NotificationMLAdminController {
         InventoryItem item = inventoryItemRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("Inventory item not found: " + itemId));
 
+        if (!homeSecurityService.isMember(item.getHome().getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied to inventory item features");
+        }
+
         MLFeatureVectorDto features = featureExtractor.extractFeatures(item, null);
         return ResponseEntity.ok(ApiResponse.success(features));
     }
 
     @GetMapping("/analytics/{homeId}")
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
     @Operation(summary = "Get household notification effectiveness, action rates, and suppression metrics")
     public ResponseEntity<ApiResponse<NotificationAnalyticsDto>> getAnalyticsForHome(@PathVariable UUID homeId) {
         NotificationAnalyticsDto analytics = analyticsService.getAnalytics(homeId);

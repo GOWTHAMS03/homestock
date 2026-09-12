@@ -26,6 +26,7 @@ public class VoiceController {
      * Transcribe an audio file to text using Whisper.
      */
     @PostMapping(value = "/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_transcribe", limit = 10, windowSeconds = 60)
     public ResponseEntity<ApiResponse<TranscriptionResult>> transcribe(
             @RequestPart("file") MultipartFile file,
             @RequestParam(value = "language", required = false) String language) {
@@ -39,6 +40,7 @@ public class VoiceController {
      * Parse text transcript into an intent and extracted entities.
      */
     @PostMapping("/command")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_command", limit = 20, windowSeconds = 60)
     @PreAuthorize("#request.homeId == null or @homeSecurity.isMember(#request.homeId)")
     public ResponseEntity<ApiResponse<VoiceCommandResult>> parseCommand(
             @Valid @RequestBody ParseCommandRequest request) {
@@ -51,6 +53,7 @@ public class VoiceController {
      * End-to-end audio processing: transcribes audio and parses it for a home in one request.
      */
     @PostMapping(value = "/process-audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_process_audio", limit = 10, windowSeconds = 60)
     @PreAuthorize("@homeSecurity.isMember(#homeId)")
     public ResponseEntity<ApiResponse<VoiceCommandResult>> processAudio(
             @RequestPart("file") MultipartFile file,

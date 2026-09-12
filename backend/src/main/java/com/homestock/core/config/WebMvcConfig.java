@@ -22,12 +22,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addResourceLocations("file:" + uploadPath.toString() + "/");
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.homestock.core.redis.RateLimitInterceptor rateLimitInterceptor;
+
     @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOrigins("*")
-                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .maxAge(3600);
+    public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+        registry.addInterceptor(rateLimitInterceptor);
     }
 }

@@ -10,6 +10,8 @@ import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../../core/widgets/sync_status_bar.dart';
 import '../shopping/processed_products_screen.dart';
+import '../bill/screens/bill_scanner_screen.dart';
+import '../bill/screens/expense_intelligence_screen.dart';
 import 'add_purchase_screen.dart';
 import 'purchase_controller.dart';
 import 'purchase_model.dart';
@@ -27,6 +29,22 @@ class PurchasesScreen extends ConsumerWidget {
       appBar: HomeStockAppBar(
         title: 'Household Purchases',
         subtitle: '${purchases.length} receipts recorded & restocked',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.insights, color: AppColors.primary),
+            tooltip: 'Expense Intelligence',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ExpenseIntelligenceScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.document_scanner, color: AppColors.primary),
+            tooltip: 'Scan Bill',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BillScannerScreen()),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [

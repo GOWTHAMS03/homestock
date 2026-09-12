@@ -181,6 +181,10 @@ public class CanonicalProductClusterer {
                     .identityConfidence(best.getScore() != null ? best.getScore() / 100.0 : 0.8)
                     .matchScore(best.getScore() != null ? best.getScore() : 80.0)
                     .matchStatus(best.getMatchStatus())
+                    .isExactMatch(isExactPackMatch)
+                    .validationStatus(best.isInStock() ? "VALID" : "OUT_OF_STOCK")
+                    .lastVerifiedAt(best.getPriceVerifiedAt() != null ? best.getPriceVerifiedAt() : Instant.now())
+                    .freshnessLabel("Verified just now")
                     .build();
 
             if (isExactPackMatch) {

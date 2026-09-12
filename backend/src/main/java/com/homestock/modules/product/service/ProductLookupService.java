@@ -33,38 +33,51 @@ public class ProductLookupService {
     private final BarcodeValidationService barcodeValidationService;
     private final InventoryItemRepository inventoryItemRepository;
     private final ShoppingListItemRepository shoppingListItemRepository;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public ProductLookupResponse lookupByBarcode(String rawBarcode, UUID homeId) {
         String normalizedBarcode = barcodeValidationService.normalizeBarcode(rawBarcode);
         String detectedType = barcodeValidationService.detectBarcodeType(normalizedBarcode);
 
-        // Sort providers by priority (lowest int = highest priority)
-        List<ProductDataProvider> sortedProviders = providers.stream()
-                .sorted(Comparator.comparingInt(ProductDataProvider::getPriority))
-                .toList();
+        // 1. Check Redis cache first
+        Optional<ProductDto> cachedDto = productCacheService != null
+                ? productCacheService.getByBarcode(normalizedBarcode)
+                : Optional.empty();
+        ProductDto foundDto = cachedDto.orElse(null);
 
-        ProductDto foundDto = null;
-        for (ProductDataProvider provider : sortedProviders) {
-            try {
-                Optional<ProductDto> result = provider.findByBarcode(normalizedBarcode);
-                if (result.isPresent()) {
-                    foundDto = result.get();
-                    log.info("Barcode {} resolved via provider {}", normalizedBarcode, provider.getProviderName());
-                    break;
+        // 2. If cache miss, sort providers by priority and query
+        if (foundDto == null) {
+            List<ProductDataProvider> sortedProviders = providers.stream()
+                    .sorted(Comparator.comparingInt(ProductDataProvider::getPriority))
+                    .toList();
+
+            for (ProductDataProvider provider : sortedProviders) {
+                try {
+                    Optional<ProductDto> result = provider.findByBarcode(normalizedBarcode);
+                    if (result.isPresent()) {
+                        foundDto = result.get();
+                        log.info("Barcode {} resolved via provider {}", normalizedBarcode, provider.getProviderName());
+                        break;
+                    }
+                } catch (Exception e) {
+                    log.warn("Error looking up barcode {} with provider {}: {}", normalizedBarcode, provider.getProviderName(), e.getMessage());
                 }
-            } catch (Exception e) {
-                log.warn("Error looking up barcode {} with provider {}: {}", normalizedBarcode, provider.getProviderName(), e.getMessage());
             }
-        }
 
-        // If found externally and not yet in PostgreSQL, persist to local catalog
-        if (foundDto != null && (foundDto.getId() == null || !productRepository.existsByBarcode(normalizedBarcode))) {
-            try {
-                Product savedProduct = saveOrUpdateCatalogProduct(foundDto);
-                foundDto.setId(savedProduct.getId());
-            } catch (Exception e) {
-                log.warn("Could not cache product to database: {}", e.getMessage());
+            // If found externally and not yet in PostgreSQL, persist to local catalog
+            if (foundDto != null && (foundDto.getId() == null || !productRepository.existsByBarcode(normalizedBarcode))) {
+                try {
+                    Product savedProduct = saveOrUpdateCatalogProduct(foundDto);
+                    foundDto.setId(savedProduct.getId());
+                } catch (Exception e) {
+                    log.warn("Could not cache product to database: {}", e.getMessage());
+                }
+            }
+
+            // Cache to Redis on successful retrieval
+            if (foundDto != null && productCacheService != null) {
+                productCacheService.put(foundDto);
             }
         }
 

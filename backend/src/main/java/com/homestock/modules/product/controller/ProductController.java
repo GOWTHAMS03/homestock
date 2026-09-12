@@ -29,6 +29,7 @@ public class ProductController {
     private final ProductCatalogService productCatalogService;
 
     @GetMapping("/products/barcode/{barcode}")
+    @PreAuthorize("#homeId == null or @homeSecurity.isMember(#homeId)")
     @Operation(summary = "Lookup product metadata by barcode with optional home inventory context")
     public ResponseEntity<ApiResponse<ProductLookupResponse>> lookupProduct(
             @PathVariable String barcode,

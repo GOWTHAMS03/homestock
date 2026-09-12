@@ -784,43 +784,77 @@ class _ProductDealSearchScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Badge Bar
-          if (deal.isBestValue || deal.isLowestPrice || deal.isPopular || (deal.savingsVsHighest != null && deal.savingsVsHighest! > 0))
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: deal.isBestValue
-                    ? const Color(0xFFECFDF5)
-                    : deal.isLowestPrice
-                        ? const Color(0xFFFFFBEB)
-                        : hsColors.surfaceVariant,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(15),
-                  topRight: Radius.circular(15),
-                ),
-              ),
-              child: Row(
-                children: [
-                  if (deal.isBestValue)
-                    _buildPillBadge('⭐ BEST VALUE', const Color(0xFF059669), Colors.transparent),
-                  if (deal.isLowestPrice)
-                    _buildPillBadge('🏆 LOWEST PRICE', const Color(0xFFD97706), Colors.transparent),
-                  if (deal.isPopular)
-                    _buildPillBadge('🔥 POPULAR', hsColors.primary, Colors.transparent),
-                  const Spacer(),
-                  if (deal.savingsVsHighest != null &&
-                      deal.savingsVsHighest! > 0 &&
-                      deal.comparisonStore != null)
-                    Text(
-                      'Save ₹${deal.savingsVsHighest!.toStringAsFixed(0)} vs ${deal.comparisonStore}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF059669),
-                      ),
-                    ),
-                ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: deal.isBestValue
+                  ? const Color(0xFFECFDF5)
+                  : deal.isLowestPrice
+                      ? const Color(0xFFFFFBEB)
+                      : hsColors.surfaceVariant,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
               ),
             ),
+            child: Row(
+              children: [
+                if (deal.isExactMatch)
+                  _buildPillBadge('✓ EXACT MATCH', const Color(0xFF047857), const Color(0xFFD1FAE5))
+                else
+                  _buildPillBadge('SIMILAR', const Color(0xFF4B5563), const Color(0xFFF3F4F6)),
+                if (deal.isLowestPrice || deal.isBestValue)
+                  _buildPillBadge('✓ BEST PRICE', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+                if (deal.validationStatus == 'PRICE_CHANGED')
+                  _buildPillBadge('PRICE CHANGED', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+                if (deal.isOutOfStock)
+                  _buildPillBadge('OUT OF STOCK', const Color(0xFFDC2626), const Color(0xFFFEE2E2))
+                else
+                  _buildPillBadge('✓ IN STOCK', const Color(0xFF059669), Colors.transparent),
+                const Spacer(),
+                if (deal.isStale)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFFD97706)),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Checking latest price...',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFD97706),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (deal.freshnessLabel != null)
+                  Text(
+                    deal.freshnessLabel!,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMuted,
+                    ),
+                  )
+                else if (deal.savingsVsHighest != null &&
+                    deal.savingsVsHighest! > 0 &&
+                    deal.comparisonStore != null)
+                  Text(
+                    'Save ₹${deal.savingsVsHighest!.toStringAsFixed(0)} vs ${deal.comparisonStore}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+              ],
+            ),
+          ),
 
           // Main Details
           Padding(
@@ -976,13 +1010,35 @@ class _ProductDealSearchScreenState
                 if (storeOffers.isNotEmpty) ...[
                   const Divider(height: 1, thickness: 0.8),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Cross-Store Availability:',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textMuted,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'Cross-Store Availability:',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      if (storeOffers.length > 1) ...[
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: hsColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${storeOffers.length - 1} other store${storeOffers.length > 2 ? 's' : ''}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 6),
                   ...storeOffers.map((offer) => _buildStoreOfferRow(offer, deal, controller, hsColors)),

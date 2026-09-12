@@ -42,6 +42,7 @@ class SyncEngine with WidgetsBindingObserver {
   Timer? _retryTimer;
   Completer<void>? _activeSyncAllCompleter;
   final Set<String> _activeHomeSyncs = {};
+  final Set<String> _inaccessibleHomes = {};
   bool _isAutoSyncStarted = false;
 
   SyncEngine({
@@ -61,6 +62,16 @@ class SyncEngine with WidgetsBindingObserver {
   /// Current sync state.
   SyncState get currentState => _currentState;
 
+  /// Mark a home/room as inaccessible (e.g. membership removed)
+  void markHomeInaccessible(String homeId) {
+    _inaccessibleHomes.add(homeId);
+  }
+
+  /// Check if a home/room is marked inaccessible
+  bool isHomeInaccessible(String homeId) {
+    return _inaccessibleHomes.contains(homeId);
+  }
+
   /// Start automatic synchronization.
   /// Listens for connectivity changes and triggers sync on restoration.
   void startAutoSync() {
@@ -70,6 +81,9 @@ class SyncEngine with WidgetsBindingObserver {
     try {
       WidgetsBinding.instance.addObserver(this);
     } catch (_) {}
+
+    // Recover any in-flight operations that were left stranded by an app kill or crash
+    _syncDao.recoverIncompleteSyncingOperations();
 
     _connectivity.start();
     _connectivity.onConnectivityRestored = () {
@@ -112,6 +126,23 @@ class SyncEngine with WidgetsBindingObserver {
     return false;
   }
 
+  Future<bool> _verifyUserExistence() async {
+    try {
+      final response = await _apiClient.dio.get('/users/me');
+      return response.statusCode == 200 && response.data != null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        final data = e.response?.data;
+        if (data is Map && data['code'] == 'USER_NOT_FOUND') {
+          return false;
+        }
+      }
+      return e.type != DioExceptionType.badResponse;
+    } catch (_) {
+      return true;
+    }
+  }
+
   /// Full sync cycle for all homes the user belongs to.
   Future<void> syncAll() async {
     if (_isSyncing) {
@@ -136,7 +167,30 @@ class SyncEngine with WidgetsBindingObserver {
     ));
 
     try {
-      // 1. Push pending local operations first
+      // Step 2 & 3: Verify authentication & user existence before pushing/pulling mutations
+      final token = await _apiClient.secureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        if (kDebugMode) print('[SyncEngine] No access token available — sync paused');
+        _updateState(_currentState.copyWith(
+          syncStatus: SyncStatus.authRequired,
+          isSyncInProgress: false,
+          lastError: 'Authentication required. Please sign in.',
+        ));
+        return;
+      }
+
+      final userExists = await _verifyUserExistence();
+      if (!userExists) {
+        if (kDebugMode) print('[SyncEngine] User verification failed — stopping sync to protect local data');
+        _updateState(_currentState.copyWith(
+          syncStatus: SyncStatus.authRequired,
+          isSyncInProgress: false,
+          lastError: 'This HomeStock account could not be verified. Please sign in again.',
+        ));
+        return;
+      }
+
+      // Step 5: Push pending local operations first
       await _pushPendingOperations();
 
       // 2. Transition to pulling remote changes
@@ -263,9 +317,6 @@ class SyncEngine with WidgetsBindingObserver {
 
   Future<void> _pushPendingOperations() async {
     final pending = await _syncDao.getPendingOperations();
-    if (pending.isEmpty) return;
-
-    // Also grab failed operations for retry
     final failed = await _syncDao.getFailedOperations();
     final allOps = [...pending, ...failed];
 
@@ -280,7 +331,9 @@ class SyncEngine with WidgetsBindingObserver {
     }
 
     for (final entry in byHome.entries) {
-      await _pushBatch(entry.value);
+      if (!_inaccessibleHomes.contains(entry.key)) {
+        await _pushBatch(entry.value);
+      }
     }
   }
 
@@ -433,6 +486,14 @@ class SyncEngine with WidgetsBindingObserver {
 
         hasMore = pullResponse.hasMore;
       } catch (e) {
+        if (e is DioException) {
+          final data = e.response?.data;
+          if (data is Map && (data['code'] == 'MEMBERSHIP_REMOVED' || data['code'] == 'ROOM_ACCESS_DENIED')) {
+            if (kDebugMode) print('[SyncEngine] Membership removed for home $homeId — halting pull');
+            _inaccessibleHomes.add(homeId);
+            break;
+          }
+        }
         if (kDebugMode) print('[SyncEngine] Pull failed for home $homeId: $e');
         break;
       }
@@ -441,7 +502,17 @@ class SyncEngine with WidgetsBindingObserver {
 
   Future<void> _applyPullResponse(
       String homeId, SyncPullResponse pullResponse) async {
-    if (pullResponse.isEmpty) return;
+    final serverTimestamp = DateTime.tryParse(pullResponse.serverTimestamp) ?? DateTime.now();
+    final nextVersion = pullResponse.nextServerVersion ?? pullResponse.serverVersion;
+
+    if (pullResponse.isEmpty) {
+      // Even if no data changed, update cursor metadata so subsequent syncs do not re-scan from stale cursor
+      await _syncDao.updateLastSyncedAt(homeId, serverTimestamp);
+      if (nextVersion != null && nextVersion > 0) {
+        await _syncDao.updateSyncVersion(homeId, nextVersion);
+      }
+      return;
+    }
 
     // Build categories
     final categories = pullResponse.categories.map((json) {
@@ -715,19 +786,44 @@ class SyncEngine with WidgetsBindingObserver {
   /// Exponential backoff: 2s, 5s, 15s, 30s, 60s
   static const _retryDelays = [2, 5, 15, 30, 60];
 
-  void _scheduleRetry() {
+  void _scheduleRetry() async {
     _retryTimer?.cancel();
-    final pendingCount = _currentState.pendingOperationsCount;
-    if (pendingCount == 0) return;
+    final failed = await _syncDao.getFailedOperations();
+    final pendingCount = await _syncDao.getPendingCount();
+    if (failed.isEmpty && pendingCount == 0) return;
 
-    final retryIndex = min(pendingCount - 1, _retryDelays.length - 1);
+    int maxRetries = 0;
+    for (final op in failed) {
+      if (op.retryCount > maxRetries) {
+        maxRetries = op.retryCount;
+      }
+    }
+
+    final retryIndex = min(maxRetries, _retryDelays.length - 1);
     final delay = Duration(seconds: _retryDelays[retryIndex]);
+
+    if (kDebugMode) {
+      print('[SyncEngine] Scheduling retry in ${delay.inSeconds}s (max retry count: $maxRetries)');
+    }
 
     _retryTimer = Timer(delay, () {
       if (_connectivity.isOnline && !_isSyncing) {
         syncAll();
       }
     });
+  }
+
+  /// Trigger an immediate manual retry for all failed and conflict operations.
+  Future<void> retryFailedOperations() async {
+    await _syncDao.retryAllFailedOperations();
+    if (_connectivity.isOnline) {
+      await syncAll();
+    }
+  }
+
+  /// Clear all acknowledged synced operations from the queue.
+  Future<void> clearSyncedHistory() async {
+    await _syncDao.clearSyncedHistory();
   }
 
   void _updateState(SyncState newState) {

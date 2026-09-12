@@ -42,7 +42,9 @@ public class PurchaseController {
             @PathVariable UUID homeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        PagedResponse<PurchaseDto> purchases = purchaseService.getPurchases(homeId, page, size);
+        int safePage = com.homestock.core.util.PaginationUtils.clampPage(page);
+        int safeSize = com.homestock.core.util.PaginationUtils.clampSize(size);
+        PagedResponse<PurchaseDto> purchases = purchaseService.getPurchases(homeId, safePage, safeSize);
         return ResponseEntity.ok(ApiResponse.success(purchases));
     }
 
@@ -54,5 +56,15 @@ public class PurchaseController {
             @PathVariable UUID purchaseId) {
         PurchaseDto purchase = purchaseService.getPurchaseById(homeId, purchaseId);
         return ResponseEntity.ok(ApiResponse.success(purchase));
+    }
+
+    @GetMapping("/item/{itemId}")
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
+    @Operation(summary = "Get purchase history for a specific inventory item")
+    public ResponseEntity<ApiResponse<java.util.List<com.homestock.modules.purchase.dto.PurchaseItemDto>>> getPurchasesByItem(
+            @PathVariable UUID homeId,
+            @PathVariable UUID itemId) {
+        java.util.List<com.homestock.modules.purchase.dto.PurchaseItemDto> items = purchaseService.getPurchasesByInventoryItemId(homeId, itemId);
+        return ResponseEntity.ok(ApiResponse.success(items));
     }
 }

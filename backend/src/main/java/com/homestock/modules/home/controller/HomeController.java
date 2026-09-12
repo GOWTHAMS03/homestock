@@ -83,7 +83,7 @@ public class HomeController {
     }
 
     @DeleteMapping("/{homeId}/members/{userId}")
-    @PreAuthorize("@homeSecurity.isMember(#homeId)")
+    @PreAuthorize("@homeSecurity.canRemoveMember(#homeId, #userId)")
     @Operation(summary = "Remove a member or leave home")
     public ResponseEntity<ApiResponse<Void>> removeMember(
             @PathVariable UUID homeId,

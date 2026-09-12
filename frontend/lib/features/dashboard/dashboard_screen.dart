@@ -8,9 +8,9 @@ import '../../core/constants/household_staples.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/sync/sync_providers.dart';
 import '../../core/sync/sync_status.dart';
-import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../auth/auth_controller.dart';
+import '../auth/auth_state.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../home_switcher/create_home_dialog.dart';
 import '../home_switcher/home_controller.dart';
@@ -114,27 +114,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     // 2. Empty Home Configuration State
     if (homeState.homes.isEmpty) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF9FAFB),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          title: const Text(
-            'HomeStock',
-            style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-          ),
-        ),
-        body: EmptyStateView(
-          icon: Icons.cottage_outlined,
-          title: 'No Home Configured',
-          message: 'Create a new household inventory or join an existing home using an invite code.',
-          actionLabel: 'Create a Home',
-          onAction: () => showDialog(
-            context: context,
-            builder: (_) => const CreateHomeDialog(),
-          ),
-        ),
-      );
+      return _buildNoHomeView(context, ref, authState, notifState);
     }
 
     final attentionItems = summary?.needsAttention ?? [];
@@ -224,6 +204,586 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ==================================================
+  // EMPTY HOME ONBOARDING VIEW
+  // ==================================================
+  Widget _buildNoHomeView(
+    BuildContext context,
+    WidgetRef ref,
+    AuthState authState,
+    NotificationState notifState,
+  ) {
+    final syncState = ref.watch(syncStateProvider).valueOrNull;
+    final fullName = authState.user?.fullName;
+    final firstName = (fullName != null && fullName.trim().isNotEmpty)
+        ? fullName.trim().split(' ').first
+        : 'Family';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        titleSpacing: AppSpacing.lg,
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7C3AED), Color(0xFF6366F1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.home_work_rounded, size: 20, color: Colors.white),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'HomeStock',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                Text(
+                  'Household & Inventory',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textMuted,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          _buildSyncStatusIndicator(syncState),
+          const SizedBox(width: 4),
+          _AnimatedNotificationBell(
+            unreadCount: notifState.unreadCount,
+            onTap: () => context.push('/notifications'),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: () => context.go('/profile'),
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFEDE9FE),
+                border: Border.all(color: const Color(0xFFDDD6FE), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: (authState.user?.avatarUrl != null && authState.user!.avatarUrl!.isNotEmpty)
+                  ? Image.network(
+                      authState.user!.avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _buildInitialAvatar(firstName),
+                    )
+                  : _buildInitialAvatar(firstName),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+        ],
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: const Color(0xFF6366F1),
+          onRefresh: () async {
+            await ref.read(homeControllerProvider.notifier).loadHomes();
+            await ref.read(dashboardControllerProvider.notifier).loadDashboard();
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            children: [
+              // Hero Illustration & Welcome Message
+              Center(
+                child: Column(
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Outer ambient ring
+                        Container(
+                          width: 110,
+                          height: 110,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF7C3AED).withValues(alpha: 0.07),
+                          ),
+                        ),
+                        // Middle soft ring
+                        Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                          ),
+                        ),
+                        // Center gradient emblem
+                        Container(
+                          width: 68,
+                          height: 68,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF7C3AED), Color(0xFF6366F1)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.cottage_rounded,
+                              size: 34,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        // Floating sparkle badge on corner
+                        Positioned(
+                          right: 18,
+                          bottom: 18,
+                          child: Container(
+                            padding: const EdgeInsets.all(4.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Welcome to HomeStock',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Start managing your household inventory, track groceries, and sync shopping with your family.',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w400,
+                          color: Color(0xFF64748B),
+                          height: 1.45,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 1. Primary Action: Create New Household (Gradient Card)
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => const CreateHomeDialog(),
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF7C3AED), Color(0xFF6366F1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.28),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.add_home_work_rounded,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Create a New Home',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                'Set up a fresh kitchen inventory & invite family members.',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w400,
+                                  color: Color(0xFFE0E7FF),
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.22),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 2. Secondary Action: Join Existing Household (Elevated Crisp Card)
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => const JoinHomeDialog(),
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.group_add_rounded,
+                              color: Color(0xFF475569),
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Join Existing Home',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                'Scan a QR code or type an invite key from a roommate.',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w400,
+                                  color: Color(0xFF64748B),
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEDE9FE),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.qr_code_scanner_rounded, size: 14, color: Color(0xFF7C3AED)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Code / QR',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF7C3AED),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              // Bento Feature Highlights Header
+              Row(
+                children: const [
+                  Icon(Icons.stars_rounded, size: 17, color: Color(0xFF7C3AED)),
+                  SizedBox(width: 6),
+                  Text(
+                    'HOW HOMESTOCK HELPS YOUR KITCHEN',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF64748B),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              _buildFeatureHighlightCard(
+                icon: Icons.kitchen_rounded,
+                iconBg: const Color(0xFFFEF3C7),
+                iconColor: const Color(0xFFD97706),
+                title: 'Smart Pantry & Expiration Tracking',
+                description: 'Auto-track quantities, receive low-stock alerts, and never let groceries spoil.',
+              ),
+              const SizedBox(height: 10),
+              _buildFeatureHighlightCard(
+                icon: Icons.shopping_bag_rounded,
+                iconBg: const Color(0xFFD1FAE5),
+                iconColor: const Color(0xFF059669),
+                title: 'Real-Time Shared Shopping List',
+                description: 'Instant synchronization across family members with verified store pricing.',
+              ),
+              const SizedBox(height: 10),
+              _buildFeatureHighlightCard(
+                icon: Icons.offline_bolt_rounded,
+                iconBg: const Color(0xFFEDE9FE),
+                iconColor: const Color(0xFF7C3AED),
+                title: '100% Offline-First Architecture',
+                description: 'Works seamlessly without internet; syncs automatically when reconnected.',
+              ),
+
+              const SizedBox(height: 24),
+
+              // Check Invitations / Status Refresh action
+              Center(
+                child: TextButton.icon(
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Checking for household invitations...'),
+                        duration: Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    await ref.read(homeControllerProvider.notifier).loadHomes();
+                    await ref.read(dashboardControllerProvider.notifier).loadDashboard();
+                  },
+                  icon: const Icon(Icons.sync_rounded, size: 16, color: Color(0xFF7C3AED)),
+                  label: const Text(
+                    'Already invited? Refresh status',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF7C3AED),
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    backgroundColor: const Color(0xFFEDE9FE).withValues(alpha: 0.6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 36),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureHighlightCard({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Center(
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF64748B),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

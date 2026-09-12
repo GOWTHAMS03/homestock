@@ -9,6 +9,7 @@ import '../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../purchase/add_purchase_screen.dart';
+import '../bill/screens/expense_intelligence_screen.dart';
 import 'analytics_controller.dart';
 
 class AnalyticsScreen extends ConsumerWidget {
@@ -30,9 +31,18 @@ class _AnalyticsContent extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
-      appBar: const HomeStockAppBar(
+      appBar: HomeStockAppBar(
         title: 'Spending & Analytics',
         subtitle: 'Household budget trends & breakdown',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long, color: AppColors.primary),
+            tooltip: 'Expense Intelligence',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ExpenseIntelligenceScreen()),
+            ),
+          ),
+        ],
       ),
       body: analyticsState.isLoading
           ? ListView(

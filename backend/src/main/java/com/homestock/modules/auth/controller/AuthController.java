@@ -23,6 +23,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "auth_register", limit = 15, windowSeconds = 60)
     @Operation(summary = "Register a new user account")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
         AuthResponse response = authService.register(request);
@@ -31,10 +32,31 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Login with email and password")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "auth_login", limit = 15, windowSeconds = 60)
+    @Operation(summary = "Login with email or username and password")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Login successful", response));
+    }
+
+    @PostMapping("/google")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "auth_google", limit = 15, windowSeconds = 60)
+    @Operation(summary = "Sign in or register using Google credentials")
+    public ResponseEntity<ApiResponse<AuthResponse>> loginWithGoogle(@Valid @RequestBody com.homestock.modules.auth.dto.GoogleAuthRequest request) {
+        AuthResponse response = authService.loginWithGoogle(request);
+        return ResponseEntity.ok(ApiResponse.success("Google authentication successful", response));
+    }
+
+    @PostMapping("/link-google")
+    @Operation(summary = "Link Google identity to current authenticated HomeStock user")
+    public ResponseEntity<ApiResponse<Void>> linkGoogle(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.homestock.core.security.UserPrincipal principal,
+            @Valid @RequestBody com.homestock.modules.auth.dto.GoogleAuthRequest request) {
+        if (principal == null) {
+            throw new com.homestock.core.exception.UnauthorizedException("Authentication required to link account");
+        }
+        authService.linkGoogle(principal.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Google account linked successfully", null));
     }
 
     @PostMapping("/invite-login")

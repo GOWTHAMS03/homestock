@@ -16,6 +16,7 @@ import java.util.UUID;
 
 @Repository
 public interface PurchaseRepository extends JpaRepository<Purchase, UUID> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"store", "recordedBy"})
     Page<Purchase> findAllByHomeIdOrderByPurchaseDateDescCreatedAtDesc(UUID homeId, Pageable pageable);
     Optional<Purchase> findByIdAndHomeId(UUID id, UUID homeId);
     List<Purchase> findAllByHomeIdAndPurchaseDateBetween(UUID homeId, LocalDate startDate, LocalDate endDate);

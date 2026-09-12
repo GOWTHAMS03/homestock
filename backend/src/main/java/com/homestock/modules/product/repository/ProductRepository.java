@@ -17,10 +17,15 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     boolean existsByBarcode(String barcode);
 
+    Optional<Product> findByNormalizedName(String normalizedName);
+
     List<Product> findByNameContainingIgnoreCase(String name);
 
     @Query("SELECT p FROM Product p WHERE LOWER(p.normalizedName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<Product> searchProducts(@Param("query") String query);
+
+    @Query("SELECT p FROM Product p WHERE LOWER(p.normalizedName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :query, '%'))")
+    org.springframework.data.domain.Page<Product> searchProducts(@Param("query") String query, org.springframework.data.domain.Pageable pageable);
 
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN p.identifiers i WHERE p.barcode = :val OR i.identifierValue = :val")
     List<Product> findByBarcodeOrIdentifierList(@Param("val") String val);

@@ -46,8 +46,6 @@ public class ShoppingService {
     private final CategoryRepository categoryRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final NotificationService notificationService;
-    private final com.homestock.modules.notification.service.NotificationEngine notificationEngine;
-    private final com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
 
     @Transactional
     public ShoppingList getOrCreateDefaultListEntity(Home home) {
@@ -114,8 +112,6 @@ public class ShoppingService {
                 .build();
 
         ShoppingListItem saved = shoppingListItemRepository.save(item);
-        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", saved.getId(), "INSERT", null, null);
-        notificationEngine.notifyHomeChanged(list.getHome(), currentUserId);
 
         // Notify family members
         notificationService.notifyHomeMembers(
@@ -132,7 +128,6 @@ public class ShoppingService {
 
     @Transactional
     public ShoppingListItemDto updateItem(UUID homeId, UUID listId, UUID itemId, UpdateShoppingItemRequest request) {
-        UUID currentUserId = SecurityUtils.getCurrentUserId();
         ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
 
@@ -152,10 +147,7 @@ public class ShoppingService {
             categoryRepository.findById(request.getCategoryId()).ifPresent(item::setCategory);
         }
 
-        ShoppingListItem updated = shoppingListItemRepository.save(item);
-        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", updated.getId(), "UPDATE", null, null);
-        notificationEngine.notifyHomeChanged(list.getHome(), currentUserId);
-        return ShoppingListItemDto.fromEntity(updated);
+        return ShoppingListItemDto.fromEntity(shoppingListItemRepository.save(item));
     }
 
     @Transactional
@@ -184,15 +176,11 @@ public class ShoppingService {
             item.setCompletedAt(null);
         }
 
-        ShoppingListItem updated = shoppingListItemRepository.save(item);
-        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", updated.getId(), "UPDATE", null, null);
-        notificationEngine.notifyHomeChanged(list.getHome(), currentUserId);
-        return ShoppingListItemDto.fromEntity(updated);
+        return ShoppingListItemDto.fromEntity(shoppingListItemRepository.save(item));
     }
 
     @Transactional
     public void deleteItem(UUID homeId, UUID listId, UUID itemId) {
-        UUID currentUserId = SecurityUtils.getCurrentUserId();
         ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
 
@@ -203,24 +191,15 @@ public class ShoppingService {
             throw new ResourceNotFoundException("Shopping item does not belong to this list");
         }
 
-        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", itemId, "DELETE", null, null);
         shoppingListItemRepository.delete(item);
-        notificationEngine.notifyHomeChanged(list.getHome(), currentUserId);
     }
 
     @Transactional
     public void clearCompleted(UUID homeId, UUID listId) {
-        UUID currentUserId = SecurityUtils.getCurrentUserId();
-        ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
+        shoppingListRepository.findByIdAndHomeId(listId, homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
 
-        List<ShoppingListItem> completed = shoppingListItemRepository.findAllCompletedByShoppingListId(listId);
-        for (ShoppingListItem item : completed) {
-            homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", item.getId(), "DELETE", null, null);
-        }
-
         shoppingListItemRepository.deleteAllCompletedByShoppingListId(listId);
-        notificationEngine.notifyHomeChanged(list.getHome(), currentUserId);
     }
 
     /**
@@ -263,10 +242,7 @@ public class ShoppingService {
                 .notes("Auto-added: Low stock threshold reached")
                 .build();
 
-        ShoppingListItem savedAutoItem = shoppingListItemRepository.save(autoItem);
-        homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", savedAutoItem.getId(), "INSERT", null, null);
-        notificationEngine.notifyHomeChanged(home, actor != null ? actor.getId() : null);
-
+        shoppingListItemRepository.save(autoItem);
         log.info("Auto-added low stock item '{}' to shopping list for home '{}'", inventoryItem.getName(), home.getName());
 
         // Send Low Stock Notification

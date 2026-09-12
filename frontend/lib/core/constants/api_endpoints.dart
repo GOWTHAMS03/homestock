@@ -80,8 +80,17 @@ class ApiEndpoints {
   static const String searchProducts = '/products/search';
   static String productFromBarcode(String homeId) => '/homes/$homeId/inventory/from-barcode';
 
-  // Analytics
+  // Analytics & Expense Intelligence
   static String analytics(String homeId) => '/homes/$homeId/analytics';
+  static String monthlyExpenseReport(String homeId) => '/homes/$homeId/analytics/expenses/monthly';
+  static String storePriceComparison(String homeId) => '/homes/$homeId/analytics/expenses/stores';
+  static String productPriceHistory(String homeId, String productId) => '/homes/$homeId/analytics/expenses/price-history/$productId';
+
+  // Smart Bill Scanner
+  static String bills(String homeId) => '/homes/$homeId/bills';
+  static String billById(String homeId, String billId) => '/homes/$homeId/bills/$billId';
+  static String billScan(String homeId) => '/homes/$homeId/bills/scan';
+  static String billConfirm(String homeId) => '/homes/$homeId/bills/confirm';
 
   // Notifications
   static const String notifications = '/notifications';

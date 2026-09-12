@@ -42,6 +42,9 @@ class ProductLookupServiceTest {
     @Mock
     private ShoppingListItemRepository shoppingListItemRepository;
 
+    @Mock
+    private ProductCacheService productCacheService;
+
     private BarcodeValidationService barcodeValidationService;
     private MockGroceryProductProvider mockProvider;
     private InternalProductProvider internalProvider;
@@ -60,7 +63,8 @@ class ProductLookupServiceTest {
                 productRepository,
                 barcodeValidationService,
                 inventoryItemRepository,
-                shoppingListItemRepository
+                shoppingListItemRepository,
+                productCacheService
         );
     }
 

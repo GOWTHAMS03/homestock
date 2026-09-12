@@ -79,6 +79,8 @@ public class ProductDealDto {
     private Double priceConfidence;
     private PriceStatus priceStatus;
     private Instant lastVerifiedAt;
+    private String validationStatus;
+    private String freshnessLabel;
 
     private Double dealScore; // Combined weighted ranking score
     private int sourceCount; // Number of search engines confirming this product

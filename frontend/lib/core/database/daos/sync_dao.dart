@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import '../app_database.dart';
+import '../../sync/sync_status.dart';
 
 /// Data access object for the sync queue and sync metadata.
 /// Manages all pending synchronization operations and tracking.
@@ -9,6 +10,16 @@ class SyncDao {
   SyncDao(this._db);
 
   // ──── SYNC QUEUE ────
+
+  /// Recover from unexpected crashes or app terminations while operations were in-flight.
+  /// Resets any operations with status 'SYNCING' back to 'PENDING' so they can be processed.
+  Future<int> recoverIncompleteSyncingOperations() {
+    return (_db.update(_db.syncQueueEntries)
+          ..where((t) => t.status.equals('SYNCING')))
+        .write(const SyncQueueEntriesCompanion(
+      status: Value('PENDING'),
+    ));
+  }
 
   /// Get all pending operations, ordered by creation time (FIFO).
   Future<List<SyncQueueEntry>> getPendingOperations() {
@@ -25,6 +36,140 @@ class SyncDao {
               (t) => t.status.equals('PENDING') & t.homeId.equals(homeId))
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
         .get();
+  }
+
+  /// Get in-flight syncing operations.
+  Future<List<SyncQueueEntry>> getSyncingOperations() {
+    return (_db.select(_db.syncQueueEntries)
+          ..where((t) => t.status.equals('SYNCING'))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .get();
+  }
+
+  /// Get successfully synced operations (most recent first).
+  Future<List<SyncQueueEntry>> getSyncedOperations({int limit = 50}) {
+    return (_db.select(_db.syncQueueEntries)
+          ..where((t) => t.status.equals('SYNCED'))
+          ..orderBy([(t) => OrderingTerm.desc(t.serverAcknowledgedAt)])
+          ..limit(limit))
+        .get();
+  }
+
+  /// Get operations marked as having conflict.
+  Future<List<SyncQueueEntry>> getConflictOperations() {
+    return (_db.select(_db.syncQueueEntries)
+          ..where((t) => t.status.equals('CONFLICT'))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+  }
+
+  /// Get operations filtered by status.
+  Future<List<SyncQueueEntry>> getOperationsByStatus(String status, {int? limit}) {
+    final query = _db.select(_db.syncQueueEntries)
+      ..where((t) => t.status.equals(status))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
+    if (limit != null && limit > 0) {
+      query.limit(limit);
+    }
+    return query.get();
+  }
+
+  /// Watch operations filtered by status.
+  Stream<List<SyncQueueEntry>> watchOperationsByStatus(String status) {
+    return (_db.select(_db.syncQueueEntries)
+          ..where((t) => t.status.equals(status))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .watch();
+  }
+
+  /// Get summary breakdown across all queue states: pending, syncing, synced, failed, conflict.
+  Future<SyncQueueSummary> getQueueSummary() async {
+    final all = await _db.select(_db.syncQueueEntries).get();
+    int pending = 0;
+    int syncing = 0;
+    int synced = 0;
+    int failed = 0;
+    int conflict = 0;
+    for (final op in all) {
+      switch (op.status) {
+        case 'PENDING':
+          pending++;
+          break;
+        case 'SYNCING':
+          syncing++;
+          break;
+        case 'SYNCED':
+          synced++;
+          break;
+        case 'FAILED':
+          failed++;
+          break;
+        case 'CONFLICT':
+          conflict++;
+          break;
+      }
+    }
+    return SyncQueueSummary(
+      pending: pending,
+      syncing: syncing,
+      synced: synced,
+      failed: failed,
+      conflict: conflict,
+    );
+  }
+
+  /// Watch live summary breakdown across all queue states.
+  Stream<SyncQueueSummary> watchQueueSummary() {
+    return _db.select(_db.syncQueueEntries).watch().map((all) {
+      int pending = 0;
+      int syncing = 0;
+      int synced = 0;
+      int failed = 0;
+      int conflict = 0;
+      for (final op in all) {
+        switch (op.status) {
+          case 'PENDING':
+            pending++;
+            break;
+          case 'SYNCING':
+            syncing++;
+            break;
+          case 'SYNCED':
+            synced++;
+            break;
+          case 'FAILED':
+            failed++;
+            break;
+          case 'CONFLICT':
+            conflict++;
+            break;
+        }
+      }
+      return SyncQueueSummary(
+        pending: pending,
+        syncing: syncing,
+        synced: synced,
+        failed: failed,
+        conflict: conflict,
+      );
+    });
+  }
+
+  /// Reset all failed and conflict operations back to PENDING for immediate re-attempt.
+  Future<int> retryAllFailedOperations() {
+    return (_db.update(_db.syncQueueEntries)
+          ..where((t) => t.status.equals('FAILED') | t.status.equals('CONFLICT')))
+        .write(const SyncQueueEntriesCompanion(
+      status: Value('PENDING'),
+      lastError: Value(null),
+    ));
+  }
+
+  /// Clear all acknowledged SYNCED operations from local storage.
+  Future<int> clearSyncedHistory() {
+    return (_db.delete(_db.syncQueueEntries)
+          ..where((t) => t.status.equals('SYNCED')))
+        .go();
   }
 
   /// Get failed operations that should be retried.
@@ -123,7 +268,9 @@ class SyncDao {
   Stream<int> watchPendingCount() {
     final query = _db.select(_db.syncQueueEntries)
       ..where((t) =>
-          t.status.equals('PENDING') | t.status.equals('SYNCING'));
+          t.status.equals('PENDING') |
+          t.status.equals('SYNCING') |
+          (t.status.equals('FAILED') & t.retryCount.isSmallerThanValue(5)));
     return query.watch().map((ops) => ops.length);
   }
 

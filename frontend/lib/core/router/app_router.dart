@@ -14,6 +14,9 @@ import '../../features/notifications/notifications_screen.dart';
 import '../../features/notifications/notification_preferences_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/shopping/shopping_screen.dart';
+import '../../features/bill/screens/bill_scanner_screen.dart';
+import '../../features/bill/screens/bill_confirmation_screen.dart';
+import '../../features/bill/screens/expense_intelligence_screen.dart';
 import '../widgets/splash_screen.dart';
 import 'main_scaffold.dart';
 
@@ -96,6 +99,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/analytics',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/analytics/expenses',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ExpenseIntelligenceScreen(),
+      ),
+      GoRoute(
+        path: '/bills/scan',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const BillScannerScreen(),
+      ),
+      GoRoute(
+        path: '/bills/confirm',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const BillConfirmationScreen(),
       ),
       GoRoute(
         path: '/attention',

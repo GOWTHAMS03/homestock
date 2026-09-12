@@ -555,20 +555,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
         ),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 75),
-        child: FloatingActionButton.extended(
-          onPressed: () => _showAddItemMenu(context, invState.items),
-          icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
-          label: const Text(
-            'Add Item',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: Colors.white),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-        ),
-      ),
+      floatingActionButton: displayedItems.isEmpty
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 75),
+              child: FloatingActionButton.extended(
+                onPressed: () => _showAddItemMenu(context, invState.items),
+                icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                label: const Text(
+                  'Add Item',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: Colors.white),
+                ),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+              ),
+            ),
       bottomNavigationBar: _isSelectionMode
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1185,12 +1187,26 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   // SECTION 5: QUICK ADD STAPLES CARD
   // ==========================================
   Widget _buildQuickAddStaplesCard(BuildContext context, List<InventoryItemModel> existingItems) {
-    final topStaples = [
-      kHouseholdStaples.firstWhere((s) => s.name.toLowerCase() == 'milk', orElse: () => kHouseholdStaples[0]),
-      kHouseholdStaples.firstWhere((s) => s.name.toLowerCase() == 'eggs', orElse: () => kHouseholdStaples[1]),
-      kHouseholdStaples.firstWhere((s) => s.name.toLowerCase() == 'rice', orElse: () => kHouseholdStaples[2]),
-      kHouseholdStaples.firstWhere((s) => s.name.toLowerCase().contains('oil'), orElse: () => kHouseholdStaples[3]),
+    // Top everyday kitchen essentials across dairy, produce, grains, and pantry
+    final candidateNames = [
+      'Milk', 'Eggs', 'Bread',
     ];
+    final List<HouseholdStaple> topStaples = [];
+    for (final name in candidateNames) {
+      final s = kHouseholdStaples.firstWhere(
+        (st) => st.name.toLowerCase().contains(name.toLowerCase()),
+        orElse: () => kHouseholdStaples.first,
+      );
+      if (!topStaples.contains(s)) {
+        topStaples.add(s);
+      }
+    }
+
+    // Existing item lookup map for pantry awareness
+    final existingMap = <String, InventoryItemModel>{};
+    for (final item in existingItems) {
+      existingMap[item.name.trim().toLowerCase()] = item;
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -1198,57 +1214,75 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFFFFBEB),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFFDE68A)),
+          border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFD97706).withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Row: Bolt Icon + Quick Add Staples + 650+ items + Chevron
+            // Header Row: Bolt Icon + Quick Add Staples + Dynamic Real Count Badge + Browse all >
             InkWell(
               onTap: () => _showAllEssentialsBottomSheet(context, existingItems),
               borderRadius: BorderRadius.circular(10),
               child: Row(
                 children: [
                   Container(
-                    width: 24,
-                    height: 24,
+                    width: 26,
+                    height: 26,
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFFD97706)),
+                    child: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFFD97706)),
                   ),
                   const SizedBox(width: 8),
                   const Text(
                     'Quick Add Staples',
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF78350F),
+                      letterSpacing: -0.2,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFFDE68A), width: 0.8),
                     ),
-                    child: const Text(
-                      '650+ items',
-                      style: TextStyle(
-                        fontSize: 10,
+                    child: Text(
+                      '${kHouseholdStaples.length} items',
+                      style: const TextStyle(
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFFB45309),
                       ),
                     ),
                   ),
                   const Spacer(),
+                  const Text(
+                    'Browse all',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
                   const Icon(
                     Icons.chevron_right_rounded,
-                    size: 20,
+                    size: 18,
                     color: Color(0xFFB45309),
                   ),
                 ],
@@ -1257,49 +1291,107 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
             const SizedBox(height: 10),
 
-            // Chips Row: Milk, Eggs, Rice, Oil, Explore ➔
+            // Chips Row: Milk, Eggs, Bread, Rice, Oil, Onion, Tomato... + Explore ➔
             SizedBox(
-              height: 36,
+              height: 42,
               child: ListView(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
                 children: [
                   for (final staple in topStaples) ...[
-                    Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      child: InkWell(
-                        onTap: () => _openStapleQuantityAndDetails(staple),
-                        borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
+                    Builder(
+                      builder: (context) {
+                        final existing = existingMap[staple.name.trim().toLowerCase()];
+                        final isAdded = existing != null;
+
+                        return Material(
+                          color: isAdded ? const Color(0xFFF0FDF4) : Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          child: InkWell(
+                            onTap: () => _openStapleQuantityAndDetails(staple),
                             borderRadius: BorderRadius.circular(30),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.02),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(staple.emoji, style: const TextStyle(fontSize: 14)),
-                              const SizedBox(width: 5),
-                              Text(
-                                staple.name,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1E293B),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: isAdded ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
+                                  width: 1,
                                 ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.03),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(staple.emoji, style: const TextStyle(fontSize: 15)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    staple.name,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: isAdded ? const Color(0xFF166534) : const Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  if (isAdded)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCFCE7),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.check_rounded, size: 10, color: Color(0xFF15803D)),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            '${existing.quantity.toStringAsFixed(existing.quantity.truncateToDouble() == existing.quantity ? 0 : 1)} ${existing.unit}',
+                                            style: const TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF15803D),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.add_rounded, size: 11, color: Color(0xFFB45309)),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            '${staple.defaultQty.toStringAsFixed(staple.defaultQty.truncateToDouble() == staple.defaultQty ? 0 : 1)} ${staple.defaultUnit}',
+                                            style: const TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFFB45309),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(width: 8),
                   ],
@@ -1312,10 +1404,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       onTap: () => _showAllEssentialsBottomSheet(context, existingItems),
                       borderRadius: BorderRadius.circular(30),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
+                          color: const Color(0xFFFEF9C3).withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: const Color(0xFFFDE68A)),
+                          border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1323,13 +1416,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             Text(
                               'Explore',
                               style: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFFB45309),
                               ),
                             ),
                             SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFFB45309)),
+                            Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFFB45309)),
                           ],
                         ),
                       ),
@@ -2014,7 +2107,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     child: const Icon(Icons.bolt_rounded, color: Color(0xFFD97706)),
                   ),
                   title: const Text('Quick Staples', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('1-tap create Milk, Bread, Rice, Salt, and 650+ staples', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  subtitle: Text('1-tap create Milk, Bread, Rice, Salt, and ${kHouseholdStaples.length} staples', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -2239,7 +2332,7 @@ class _AllEssentialsModalState extends State<_AllEssentialsModal> {
                   onChanged: (val) => setState(() => _searchQuery = val.trim()),
                   style: const TextStyle(fontSize: 13.5, color: Color(0xFF1E1B4B)),
                   decoration: InputDecoration(
-                    hintText: 'Search 650+ essentials in English or தமிழ்...',
+                    hintText: 'Search ${kHouseholdStaples.length} essentials in English or தமிழ்...',
                     hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                     prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF64748B)),
                     border: InputBorder.none,

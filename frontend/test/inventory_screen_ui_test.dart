@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:homestock/core/constants/household_staples.dart';
 import 'package:homestock/core/theme/app_theme.dart';
 import 'package:homestock/features/inventory/category_model.dart';
 import 'package:homestock/features/inventory/inventory_controller.dart';
@@ -115,9 +116,9 @@ void main() {
     expect(find.text('Low Stock'), findsOneWidget);
     expect(find.text('Expiring'), findsOneWidget);
 
-    // 6. Verify Quick Add Staples suggestion card (650+ items, Explore)
+    // 6. Verify Quick Add Staples suggestion card (${kHouseholdStaples.length} items, Explore)
     expect(find.text('Quick Add Staples'), findsOneWidget);
-    expect(find.text('650+ items'), findsOneWidget);
+    expect(find.text('${kHouseholdStaples.length} items'), findsOneWidget);
     expect(find.text('Explore'), findsOneWidget);
 
     // 7. Verify All Items section header
@@ -182,7 +183,7 @@ void main() {
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
 
     // 3. Verify Search Bar
-    expect(find.textContaining('Search 650+ essentials in English or தமிழ்...'), findsOneWidget);
+    expect(find.textContaining('Search ${kHouseholdStaples.length} essentials in English or தமிழ்...'), findsOneWidget);
 
     // 4. Verify Category Chips
     expect(find.text('All'), findsWidgets);
@@ -200,6 +201,49 @@ void main() {
     expect(find.text('முட்டை'), findsWidgets);
     expect(find.text('In Pantry'), findsWidgets);
     expect(find.text('+ List'), findsWidgets);
+  });
+
+  testWidgets(
+      'Empty state does not repeat Add Item button and shows real dynamic staples count',
+      (WidgetTester tester) async {
+    final mockController = MockInventoryController(
+      const InventoryState(
+        items: [],
+        categories: [],
+        isLoading: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventoryControllerProvider.overrideWith((ref) => mockController),
+          shoppingControllerProvider.overrideWith((ref) => MockShoppingController(const ShoppingState())),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const InventoryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 1. Verify EmptyStateView is shown with 'Add First Item'
+    expect(find.text('No items found'), findsOneWidget);
+    expect(find.text('Add First Item'), findsOneWidget);
+
+    // 2. Verify FloatingActionButton (+ Add Item) is NOT repeated / shown
+    expect(find.text('Add Item'), findsNothing);
+
+    // 3. Verify Staples count is the real dynamic count, not hardcoded 650+
+    expect(find.text('${kHouseholdStaples.length} items'), findsOneWidget);
+    expect(find.text('650+ items'), findsNothing);
+
+    // 4. Verify Quick Add Staples chips are present
+    expect(find.text('Milk'), findsWidgets);
+    expect(find.text('Eggs'), findsWidgets);
+    expect(find.text('Bread'), findsWidgets);
   });
 }
 

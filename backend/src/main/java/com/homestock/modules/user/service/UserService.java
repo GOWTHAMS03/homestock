@@ -26,7 +26,16 @@ public class UserService {
     public UserDto getCurrentUserProfile() {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
         User user = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new com.homestock.core.exception.UserNotFoundException("This HomeStock account could not be verified. Please sign in again."));
+
+        if (user.isDeleted()) {
+            throw new com.homestock.core.exception.UserNotFoundException("This HomeStock account could not be verified. Please sign in again.");
+        }
+
+        if (!user.isAccountActive()) {
+            throw new com.homestock.core.exception.AccountDisabledException("This HomeStock account is disabled.");
+        }
+
         return UserDto.fromEntity(user);
     }
 

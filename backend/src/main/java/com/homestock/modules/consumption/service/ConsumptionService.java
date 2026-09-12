@@ -45,6 +45,7 @@ public class ConsumptionService {
     private final SmartRecommendationService smartRecommendationService;
     private final HomeMemoryService homeMemoryService;
     private final NotificationDecisionService notificationDecisionService;
+    private final com.homestock.core.security.HomeSecurityService homeSecurityService;
 
     /**
      * Event Trigger: called whenever a purchase is recorded for an inventory item.
@@ -118,6 +119,10 @@ public class ConsumptionService {
         InventoryItem item = inventoryItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory item not found"));
 
+        if (!homeSecurityService.isMember(item.getHome().getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied to inventory item");
+        }
+
         Home home = item.getHome();
 
         if ("ADD_TO_SHOPPING".equalsIgnoreCase(request.getAction())) {
@@ -179,6 +184,10 @@ public class ConsumptionService {
     public PredictionDto confirmQuantity(UUID itemId, ConfirmQuantityRequest request) {
         InventoryItem item = inventoryItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory item not found"));
+
+        if (!homeSecurityService.isMember(item.getHome().getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied to inventory item");
+        }
 
         item.setQuantity(request.getQuantity());
         item.setQuantitySource(QuantitySource.VERIFIED);

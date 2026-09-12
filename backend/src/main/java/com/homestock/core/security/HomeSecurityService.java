@@ -51,4 +51,15 @@ public class HomeSecurityService {
     public boolean isOwner(UUID homeId) {
         return hasPermission(homeId, HomeRole.OWNER);
     }
+
+    public boolean canRemoveMember(UUID homeId, UUID targetUserId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
+            return false;
+        }
+        if (principal.getId().equals(targetUserId)) {
+            return isMember(homeId);
+        }
+        return canManageMembers(homeId);
+    }
 }

@@ -31,9 +31,15 @@ public class DashboardService {
     private final ShoppingListRepository shoppingListRepository;
     private final ShoppingListItemRepository shoppingListItemRepository;
     private final com.homestock.modules.consumption.service.SmartRecommendationService smartRecommendationService;
+    private final DashboardCacheService dashboardCacheService;
 
     @Transactional(readOnly = true)
     public DashboardSummaryDto getDashboardSummary(UUID homeId) {
+        Optional<DashboardSummaryDto> cached = dashboardCacheService.get(homeId);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         Home home = homeRepository.findById(homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Home not found"));
 
@@ -110,7 +116,7 @@ public class DashboardService {
                     .build());
         }
 
-        return DashboardSummaryDto.builder()
+        DashboardSummaryDto summary = DashboardSummaryDto.builder()
                 .homeName(home.getName())
                 .totalInventoryItems(totalItems)
                 .lowStockCount(lowStock)
@@ -119,6 +125,9 @@ public class DashboardService {
                 .expiringSoonCount(expiringSoonItems.size() + expiredItems.size())
                 .needsAttention(attentionList)
                 .build();
+
+        dashboardCacheService.put(homeId, summary);
+        return summary;
     }
 
     @Transactional(readOnly = true)

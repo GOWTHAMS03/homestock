@@ -10,6 +10,9 @@ class ApiClient {
   final Dio dio;
   final SecureStorageService secureStorage;
   ConnectivityMonitor? connectivityMonitor;
+  void Function()? onUserNotFound;
+  void Function()? onAccountDisabled;
+  void Function(String roomId)? onMembershipRemoved;
 
   ApiClient({Dio? customDio, required this.secureStorage, this.connectivityMonitor})
       : dio = customDio ??
@@ -90,8 +93,67 @@ class ApiClient {
             connectivityMonitor?.markOffline();
           }
 
-          // If 401 Unauthorized and not already refreshing: try token refresh
+          // Parse standardized backend error response
+          final data = error.response?.data;
+          String message = 'An unexpected error occurred. Please try again.';
+          String? code;
+          Map<String, dynamic>? errors;
 
+          if (data is Map) {
+            if (data['message'] != null) message = data['message'].toString();
+            if (data['code'] != null) code = data['code'].toString();
+            if (data['errors'] != null && data['errors'] is Map) {
+              errors = Map<String, dynamic>.from(data['errors'] as Map);
+            }
+          }
+
+          final apiException = ApiException(
+            message: message,
+            code: code,
+            statusCode: error.response?.statusCode,
+            errors: errors,
+          );
+
+          // Handle critical user identity & membership revocation signals
+          if (error.response?.statusCode == 401 && code == 'USER_NOT_FOUND') {
+            onUserNotFound?.call();
+            return handler.reject(
+              DioException(
+                requestOptions: error.requestOptions,
+                error: apiException,
+                response: error.response,
+                type: error.type,
+              ),
+            );
+          }
+
+          if (code == 'ACCOUNT_DISABLED') {
+            onAccountDisabled?.call();
+            return handler.reject(
+              DioException(
+                requestOptions: error.requestOptions,
+                error: apiException,
+                response: error.response,
+                type: error.type,
+              ),
+            );
+          }
+
+          if (code == 'MEMBERSHIP_REMOVED') {
+            final roomId = error.requestOptions.queryParameters['homeId']?.toString() ??
+                error.requestOptions.queryParameters['roomId']?.toString() ?? '';
+            onMembershipRemoved?.call(roomId);
+            return handler.reject(
+              DioException(
+                requestOptions: error.requestOptions,
+                error: apiException,
+                response: error.response,
+                type: error.type,
+              ),
+            );
+          }
+
+          // If 401 Unauthorized (and not USER_NOT_FOUND / auth endpoint): attempt refresh once
           if (error.response?.statusCode == 401 &&
               !error.requestOptions.path.contains('/auth/')) {
             final refreshed = await tryRefreshToken();
@@ -117,27 +179,6 @@ class ApiClient {
               }
             }
           }
-
-          // Parse standardized backend error response
-          final data = error.response?.data;
-          String message = 'An unexpected error occurred. Please try again.';
-          String? code;
-          Map<String, dynamic>? errors;
-
-          if (data is Map<String, dynamic>) {
-            if (data['message'] != null) message = data['message'].toString();
-            if (data['code'] != null) code = data['code'].toString();
-            if (data['errors'] != null && data['errors'] is Map<String, dynamic>) {
-              errors = data['errors'] as Map<String, dynamic>;
-            }
-          }
-
-          final apiException = ApiException(
-            message: message,
-            code: code,
-            statusCode: error.response?.statusCode,
-            errors: errors,
-          );
 
           return handler.reject(
             DioException(

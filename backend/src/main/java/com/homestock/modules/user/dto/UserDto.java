@@ -17,6 +17,9 @@ public class UserDto {
     private UUID id;
     private String email;
     private String fullName;
+    private String displayName;
+    private String username;
+    private String status;
     private String avatarUrl;
     private String phoneNumber;
     private Instant createdAt;
@@ -27,6 +30,9 @@ public class UserDto {
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
+                .displayName(user.getDisplayName())
+                .username(user.getUsername())
+                .status(user.getStatus())
                 .avatarUrl(user.getAvatarUrl())
                 .phoneNumber(user.getPhoneNumber())
                 .createdAt(user.getCreatedAt())

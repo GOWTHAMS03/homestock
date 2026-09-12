@@ -35,8 +35,10 @@ public class InventoryController {
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        int safePage = com.homestock.core.util.PaginationUtils.clampPage(page);
+        int safeSize = com.homestock.core.util.PaginationUtils.clampSize(size);
         PagedResponse<InventoryItemDto> response = inventoryService.getItems(
-                homeId, categoryId, storageLocation, query, page, size);
+                homeId, categoryId, storageLocation, query, safePage, safeSize);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -91,7 +93,9 @@ public class InventoryController {
             @PathVariable UUID itemId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        PagedResponse<StockTransactionDto> history = inventoryService.getItemTransactions(homeId, itemId, page, size);
+        int safePage = com.homestock.core.util.PaginationUtils.clampPage(page);
+        int safeSize = com.homestock.core.util.PaginationUtils.clampSize(size);
+        PagedResponse<StockTransactionDto> history = inventoryService.getItemTransactions(homeId, itemId, safePage, safeSize);
         return ResponseEntity.ok(ApiResponse.success(history));
     }
 

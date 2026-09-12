@@ -15,6 +15,8 @@ import com.homestock.modules.inventory.entity.StockTransaction;
 import com.homestock.modules.inventory.entity.TransactionType;
 import com.homestock.modules.inventory.repository.InventoryItemRepository;
 import com.homestock.modules.inventory.repository.StockTransactionRepository;
+import com.homestock.modules.sync.service.HomeChangeLogService;
+import com.homestock.modules.dashboard.service.DashboardCacheService;
 import com.homestock.modules.shopping.service.ShoppingService;
 import com.homestock.modules.notification.service.NotificationEngine;
 import com.homestock.modules.user.entity.User;
@@ -47,7 +49,8 @@ public class InventoryService {
     private final ShoppingService shoppingService;
     private final StorageService storageService;
     private final NotificationEngine notificationEngine;
-    private final com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
+    private final HomeChangeLogService homeChangeLogService;
+    private final DashboardCacheService dashboardCacheService;
 
     @Transactional(readOnly = true)
     public PagedResponse<InventoryItemDto> getItems(
@@ -141,6 +144,7 @@ public class InventoryService {
 
         homeChangeLogService.recordChange(home, "INVENTORY_ITEM", savedItem.getId(), "INSERT", null, null);
         notificationEngine.notifyHomeChanged(home, currentUserId);
+        dashboardCacheService.evict(homeId);
 
         // Check if item is created at or below low stock threshold
         if (savedItem.getQuantity().compareTo(savedItem.getMinimumQuantity()) <= 0) {
@@ -176,6 +180,7 @@ public class InventoryService {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
         homeChangeLogService.recordChange(item.getHome(), "INVENTORY_ITEM", updated.getId(), "UPDATE", null, null);
         notificationEngine.notifyHomeChanged(item.getHome(), currentUserId);
+        dashboardCacheService.evict(homeId);
 
         // Re-evaluate stock status after minimum threshold change
         if (updated.getQuantity().compareTo(updated.getMinimumQuantity()) <= 0) {
@@ -232,6 +237,7 @@ public class InventoryService {
         homeChangeLogService.recordChange(item.getHome(), "STOCK_TRANSACTION", savedTx.getId(), "INSERT", null, null);
         notificationEngine.notifyStockUpdated(item.getHome(), currentUser, savedItem, change, item.getUnit());
         notificationEngine.notifyHomeChanged(item.getHome(), currentUserId);
+        dashboardCacheService.evict(homeId);
 
         // Trigger automatic low stock evaluation
         if (newQty.compareTo(item.getMinimumQuantity()) <= 0) {
@@ -278,5 +284,6 @@ public class InventoryService {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
         homeChangeLogService.recordChange(item.getHome(), "INVENTORY_ITEM", itemId, "DELETE", null, null);
         notificationEngine.notifyHomeChanged(item.getHome(), currentUserId);
+        dashboardCacheService.evict(homeId);
     }
 }

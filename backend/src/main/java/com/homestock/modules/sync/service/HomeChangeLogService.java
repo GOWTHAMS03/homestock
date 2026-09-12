@@ -1,10 +1,12 @@
 package com.homestock.modules.sync.service;
 
 import com.homestock.modules.home.entity.Home;
+import com.homestock.modules.home.repository.HomeRepository;
 import com.homestock.modules.sync.entity.HomeChangeLog;
 import com.homestock.modules.sync.repository.HomeChangeLogRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,13 +15,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class HomeChangeLogService {
 
+    private static final Logger log = LoggerFactory.getLogger(HomeChangeLogService.class);
+
     private final HomeChangeLogRepository changeLogRepository;
-    private final com.homestock.modules.home.repository.HomeRepository homeRepository;
+    private final HomeRepository homeRepository;
+
+    public HomeChangeLogService(HomeChangeLogRepository changeLogRepository, HomeRepository homeRepository) {
+        this.changeLogRepository = changeLogRepository;
+        this.homeRepository = homeRepository;
+    }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public HomeChangeLog recordChange(
@@ -71,7 +78,6 @@ public class HomeChangeLogService {
         long effectiveSince = sinceVersion != null ? sinceVersion : 0L;
         int safeLimit = limit > 0 ? Math.min(limit, 1000) : 500;
         return changeLogRepository.findByHomeIdAndChangeVersionGreaterThan(
-                homeId, effectiveSince, org.springframework.data.domain.PageRequest.of(0, safeLimit));
+                homeId, effectiveSince, PageRequest.of(0, safeLimit));
     }
 }
-

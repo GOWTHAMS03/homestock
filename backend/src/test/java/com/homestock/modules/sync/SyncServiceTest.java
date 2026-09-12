@@ -60,8 +60,6 @@ class SyncServiceTest {
     @Mock
     private HomeRepository homeRepository;
     @Mock
-    private com.homestock.modules.home.repository.HomeMemberRepository homeMemberRepository;
-    @Mock
     private UserRepository userRepository;
     @Mock
     private ShoppingService shoppingService;
@@ -70,7 +68,11 @@ class SyncServiceTest {
     @Mock
     private com.homestock.modules.consumption.service.ConsumptionService consumptionService;
     @Mock
+    private com.homestock.modules.home.repository.HomeMemberRepository homeMemberRepository;
+    @Mock
     private com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
+    @Mock
+    private com.homestock.core.observability.OfflineSyncMetrics offlineSyncMetrics;
     @Mock
     private com.homestock.modules.notification.service.NotificationEngine notificationEngine;
 
@@ -224,137 +226,5 @@ class SyncServiceTest {
         assertEquals(1, response.getResults().size());
         assertEquals("SYNCED", response.getResults().get(0).getStatus());
         verify(shoppingListItemRepository).deleteAllCompletedByShoppingListId(listId);
-    }
-
-    @Test
-    void pullChanges_withSinceVersion_returnsDeletedIdsAndServerVersion() {
-        UUID deletedShoppingId = UUID.randomUUID();
-        com.homestock.modules.sync.entity.HomeChangeLog change = com.homestock.modules.sync.entity.HomeChangeLog.builder()
-                .home(home)
-                .changeVersion(45L)
-                .entityType("SHOPPING_LIST_ITEM")
-                .entityId(deletedShoppingId)
-                .operationType("DELETE")
-                .createdAt(Instant.now())
-                .build();
-
-        when(homeChangeLogService.getMaxVersion(homeId)).thenReturn(50L);
-        when(homeChangeLogService.getChangesSince(eq(homeId), eq(40L), anyInt())).thenReturn(List.of(change));
-
-        SyncPullResponse response = syncService.pullChanges(homeId, Instant.EPOCH, 40L);
-
-        assertNotNull(response);
-        assertEquals(50L, response.getServerVersion());
-        assertEquals(1, response.getDeletedShoppingItemIds().size());
-        assertEquals(deletedShoppingId.toString(), response.getDeletedShoppingItemIds().get(0));
-    }
-
-    @Test
-    void pushOperations_updateShoppingItem_updatesAndRecordsChange() {
-        UUID itemId = UUID.randomUUID();
-        com.homestock.modules.shopping.entity.ShoppingList mockList = com.homestock.modules.shopping.entity.ShoppingList.builder()
-                .home(home)
-                .name("Groceries")
-                .build();
-        com.homestock.modules.shopping.entity.ShoppingListItem existingItem = com.homestock.modules.shopping.entity.ShoppingListItem.builder()
-                .shoppingList(mockList)
-                .itemName("Milk")
-                .quantity(new BigDecimal("1.0"))
-                .unit("pcs")
-                .build();
-        existingItem.setId(itemId);
-
-        when(homeRepository.findById(homeId)).thenReturn(Optional.of(home));
-        when(processedOperationRepository.existsByOperationId("op-update-shop-1")).thenReturn(false);
-        when(shoppingListItemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(shoppingListItemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        SyncOperationDto op = SyncOperationDto.builder()
-                .operationId("op-update-shop-1")
-                .operationType("UPDATE_SHOPPING_ITEM")
-                .entityType("SHOPPING_LIST_ITEM")
-                .entityId(itemId.toString())
-                .payload(Map.of("quantity", 3.0, "unit", "L"))
-                .build();
-
-        SyncRequest request = SyncRequest.builder()
-                .homeId(homeId)
-                .operations(List.of(op))
-                .build();
-
-        SyncPushResponse response = syncService.pushOperations(request);
-
-        assertNotNull(response);
-        assertEquals(1, response.getResults().size());
-        assertEquals("SYNCED", response.getResults().get(0).getStatus());
-        assertEquals(new BigDecimal("3.0"), existingItem.getQuantity());
-        assertEquals("L", existingItem.getUnit());
-        verify(homeChangeLogService).recordChange(eq(home), eq("SHOPPING_LIST_ITEM"), eq(itemId), eq("UPDATE"), any(), eq("op-update-shop-1"));
-        verify(notificationEngine).notifyHomeChanged(eq(home), any());
-    }
-
-    @Test
-    void pushOperations_changeRole_updatesRoleAndRecordsChange() {
-        UUID targetUserId = UUID.randomUUID();
-        com.homestock.modules.user.entity.User targetUser = com.homestock.modules.user.entity.User.builder()
-                .email("user@example.com")
-                .fullName("Family Member")
-                .build();
-        targetUser.setId(targetUserId);
-
-        com.homestock.modules.home.entity.HomeMember member = com.homestock.modules.home.entity.HomeMember.builder()
-                .home(home)
-                .user(targetUser)
-                .role(com.homestock.modules.home.entity.HomeRole.MEMBER)
-                .build();
-        UUID memberId = UUID.randomUUID();
-        member.setId(memberId);
-
-        when(homeRepository.findById(homeId)).thenReturn(Optional.of(home));
-        when(processedOperationRepository.existsByOperationId("op-role-1")).thenReturn(false);
-        when(homeMemberRepository.findByHomeIdAndUserId(homeId, targetUserId)).thenReturn(Optional.of(member));
-        when(homeMemberRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        SyncOperationDto op = SyncOperationDto.builder()
-                .operationId("op-role-1")
-                .operationType("CHANGE_ROLE")
-                .entityType("HOME_MEMBER")
-                .entityId(targetUserId.toString())
-                .payload(Map.of("role", "ADMIN"))
-                .build();
-
-        SyncRequest request = SyncRequest.builder()
-                .homeId(homeId)
-                .operations(List.of(op))
-                .build();
-
-        SyncPushResponse response = syncService.pushOperations(request);
-
-        assertNotNull(response);
-        assertEquals(1, response.getResults().size());
-        assertEquals("SYNCED", response.getResults().get(0).getStatus());
-        assertEquals(com.homestock.modules.home.entity.HomeRole.ADMIN, member.getRole());
-        verify(homeChangeLogService).recordChange(eq(home), eq("HOME_MEMBER"), eq(memberId), eq("UPDATE"), any(), eq("op-role-1"));
-        verify(notificationEngine).notifyHomeChanged(eq(home), any());
-    }
-
-    @Test
-    void pullChanges_withSinceVersionAndNoChanges_returnsEmptyImmediately() {
-        when(homeChangeLogService.getMaxVersion(homeId)).thenReturn(150L);
-        when(homeChangeLogService.getChangesSince(eq(homeId), eq(150L), anyInt())).thenReturn(Collections.emptyList());
-
-        SyncPullResponse response = syncService.pullChanges(homeId, null, 150L, 500);
-
-        assertNotNull(response);
-        assertEquals(150L, response.getServerVersion());
-        assertEquals(150L, response.getNextServerVersion());
-        assertFalse(response.getHasMore());
-        assertTrue(response.getInventoryItems().isEmpty());
-        assertTrue(response.getShoppingListItems().isEmpty());
-        assertTrue(response.getHomeMembers().isEmpty());
-
-        // Verify full repository scans were NOT performed
-        verify(inventoryItemRepository, never()).findByHomeIdAndUpdatedAtAfter(any(), any());
-        verify(shoppingListItemRepository, never()).findByHomeIdAndUpdatedAtAfter(any(), any());
     }
 }

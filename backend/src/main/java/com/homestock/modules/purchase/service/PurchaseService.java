@@ -16,6 +16,7 @@ import com.homestock.modules.notification.service.NotificationEngine;
 import com.homestock.modules.purchase.dto.CreatePurchaseItemRequest;
 import com.homestock.modules.purchase.dto.CreatePurchaseRequest;
 import com.homestock.modules.purchase.dto.PurchaseDto;
+import com.homestock.modules.purchase.dto.PurchaseItemDto;
 import com.homestock.modules.purchase.entity.Purchase;
 import com.homestock.modules.purchase.entity.PurchaseItem;
 import com.homestock.modules.purchase.repository.PurchaseItemRepository;
@@ -26,6 +27,8 @@ import com.homestock.modules.shopping.repository.ShoppingListItemRepository;
 import com.homestock.modules.shopping.repository.ShoppingListRepository;
 import com.homestock.modules.store.entity.Store;
 import com.homestock.modules.store.repository.StoreRepository;
+import com.homestock.modules.sync.service.HomeChangeLogService;
+import com.homestock.modules.dashboard.service.DashboardCacheService;
 import com.homestock.modules.user.entity.User;
 import com.homestock.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +66,8 @@ public class PurchaseService {
     private final ShoppingListItemRepository shoppingListItemRepository;
     private final com.homestock.modules.consumption.service.ConsumptionService consumptionService;
     private final NotificationEngine notificationEngine;
-    private final com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
+    private final HomeChangeLogService homeChangeLogService;
+    private final DashboardCacheService dashboardCacheService;
 
     @Transactional
     public PurchaseDto recordPurchase(UUID homeId, CreatePurchaseRequest request) {
@@ -174,6 +178,7 @@ public class PurchaseService {
         homeChangeLogService.recordChange(home, "PURCHASE", savedPurchase.getId(), "INSERT", null, null);
         notificationEngine.notifyPurchaseRecorded(home, currentUser, savedPurchase);
         notificationEngine.notifyHomeChanged(home, currentUserId);
+        dashboardCacheService.evict(homeId);
 
         return PurchaseDto.fromEntity(savedPurchase);
     }
@@ -190,5 +195,14 @@ public class PurchaseService {
         Purchase purchase = purchaseRepository.findByIdAndHomeId(purchaseId, homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase record not found"));
         return PurchaseDto.fromEntity(purchase);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseItemDto> getPurchasesByInventoryItemId(UUID homeId, UUID itemId) {
+        List<PurchaseItem> items = purchaseItemRepository.findAllByInventoryItemId(itemId);
+        return items.stream()
+                .filter(i -> i.getPurchase().getHome().getId().equals(homeId))
+                .map(PurchaseItemDto::fromEntity)
+                .toList();
     }
 }

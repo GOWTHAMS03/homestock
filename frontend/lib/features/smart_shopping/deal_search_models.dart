@@ -67,6 +67,10 @@ class StoreOffer {
   final String? deepLink;
   final double? rating;
   final int? reviewCount;
+  final double? finalPrice;
+  final String? validationStatus;
+  final String? freshnessLabel;
+  final bool isBestPrice;
 
   const StoreOffer({
     required this.storeName,
@@ -84,6 +88,10 @@ class StoreOffer {
     this.deepLink,
     this.rating,
     this.reviewCount,
+    this.finalPrice,
+    this.validationStatus,
+    this.freshnessLabel,
+    this.isBestPrice = false,
   });
 
   factory StoreOffer.fromJson(Map<String, dynamic> json) {
@@ -103,6 +111,10 @@ class StoreOffer {
       deepLink: json['deepLink'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
       reviewCount: (json['reviewCount'] as num?)?.toInt(),
+      finalPrice: (json['finalPrice'] as num?)?.toDouble(),
+      validationStatus: json['validationStatus'] as String?,
+      freshnessLabel: json['freshnessLabel'] as String?,
+      isBestPrice: json['isBestPrice'] as bool? ?? false,
     );
   }
 }
@@ -140,6 +152,12 @@ class ProductDeal {
   final bool isPopular;
   final bool isExactMatch;
   final double? matchConfidence;
+  final double? confidenceScore;
+  final String? confidenceLevel;
+  final String? validationStatus;
+  final String? freshnessLabel;
+  final String? lastVerifiedAt;
+  final double? finalPrice;
   final List<StoreOffer> storeOffers;
 
   const ProductDeal({
@@ -175,8 +193,18 @@ class ProductDeal {
     this.isPopular = false,
     this.isExactMatch = false,
     this.matchConfidence,
+    this.confidenceScore,
+    this.confidenceLevel,
+    this.validationStatus,
+    this.freshnessLabel,
+    this.lastVerifiedAt,
+    this.finalPrice,
     this.storeOffers = const [],
   });
+
+  bool get isValidated => validationStatus == null || validationStatus == 'VALID' || validationStatus == 'PRICE_CHANGED';
+  bool get isStale => validationStatus == 'STALE';
+  bool get isOutOfStock => validationStatus == 'OUT_OF_STOCK';
 
   factory ProductDeal.fromJson(Map<String, dynamic> json) {
     return ProductDeal(
@@ -187,10 +215,10 @@ class ProductDeal {
       category: json['category'] as String?,
       packageSize: json['packageSize'] as String?,
       unit: json['unit'] as String?,
-      bestPrice: (json['bestPrice'] as num?)?.toDouble() ?? 0.0,
+      bestPrice: (json['bestPrice'] as num?)?.toDouble() ?? (json['price'] as num?)?.toDouble() ?? 0.0,
       mrp: (json['mrp'] as num?)?.toDouble(),
       discountPercent: (json['discountPercent'] as num?)?.toDouble(),
-      bestProvider: json['bestProvider'] as String? ?? '',
+      bestProvider: json['bestProvider'] as String? ?? json['seller'] as String? ?? '',
       unitPrice: (json['unitPrice'] as num?)?.toDouble(),
       unitPriceLabel: json['unitPriceLabel'] as String?,
       savingsVsHighest: (json['savingsVsHighest'] as num?)?.toDouble(),
@@ -211,7 +239,13 @@ class ProductDeal {
       isBestValue: json['bestValue'] as bool? ?? json['isBestValue'] as bool? ?? false,
       isPopular: json['popular'] as bool? ?? json['isPopular'] as bool? ?? false,
       isExactMatch: json['exactMatch'] as bool? ?? json['isExactMatch'] as bool? ?? false,
-      matchConfidence: (json['matchConfidence'] as num?)?.toDouble(),
+      matchConfidence: (json['matchConfidence'] as num?)?.toDouble() ?? (json['identityConfidence'] as num?)?.toDouble(),
+      confidenceScore: (json['confidenceScore'] as num?)?.toDouble(),
+      confidenceLevel: json['confidenceLevel'] as String?,
+      validationStatus: json['validationStatus'] as String?,
+      freshnessLabel: json['freshnessLabel'] as String?,
+      lastVerifiedAt: json['lastVerifiedAt'] as String?,
+      finalPrice: (json['finalPrice'] as num?)?.toDouble() ?? (json['bestFinalPrice'] as num?)?.toDouble(),
       storeOffers: (json['storeOffers'] as List<dynamic>?)
               ?.map((e) => StoreOffer.fromJson(e as Map<String, dynamic>))
               .toList() ??

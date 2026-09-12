@@ -52,6 +52,9 @@ class FakeProductDealRepository implements ProductDealRepository {
     return _buildMockResponse('Oil');
   }
 
+  @override
+  Future<bool> validateDeal(String dealId) async => true;
+
   ProductDealSearchResponse _buildMockResponse(String q) {
     const p1 = ProductDeal(
       id: 'DEAL-1',
@@ -274,6 +277,9 @@ class FakeExactDealRepository implements ProductDealRepository {
   }) async {
     return searchDeals(homeId: homeId);
   }
+
+  @override
+  Future<bool> validateDeal(String dealId) async => true;
 }
 
 void main() {

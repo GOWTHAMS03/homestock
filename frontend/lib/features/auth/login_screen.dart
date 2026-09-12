@@ -8,6 +8,7 @@ import '../../core/theme/theme_provider.dart' show isOnlineProvider;
 import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/homestock/homestock_card.dart';
 import '../../core/widgets/server_config_dialog.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'auth_controller.dart';
 import 'widgets/invite_qr_scanner_dialog.dart';
 
@@ -84,6 +85,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      final googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+      final account = await googleSignIn.signIn();
+      if (account == null) return; // User cancelled
+      final auth = await account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not retrieve Google ID token')),
+          );
+        }
+        return;
+      }
+      final success = await ref.read(authControllerProvider.notifier).loginWithGoogle(
+            idToken,
+            email: account.email,
+            displayName: account.displayName,
+            avatarUrl: account.photoUrl,
+          );
+      if (success && mounted) {
+        context.go('/');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google sign-in error: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
@@ -155,7 +191,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: AppSpacing.xl),
 
-                    if (authState.errorMessage != null) ...[
+                    if (authState.isUserNotFound || authState.verificationNotice != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFF87171)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withValues(alpha: 0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Account Verification Notice',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF991B1B),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              authState.verificationNotice ??
+                                  "We couldn't verify your HomeStock account.\n\nYour account may have been removed or your session is no longer valid.\n\nPlease sign in again to continue.",
+                              style: const TextStyle(
+                                color: Color(0xFF7F1D1D),
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ] else if (authState.errorMessage != null) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -258,14 +340,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               children: [
                                 AppTextField(
                                   controller: _emailController,
-                                  label: 'Email Address',
-                                  hint: 'you@example.com',
-                                  keyboardType: TextInputType.emailAddress,
-                                  prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20),
+                                  label: 'Email or Username',
+                                  hint: 'you@example.com or username',
+                                  prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                                   validator: (val) {
                                     if (_selectedTab == 0) {
-                                      if (val == null || val.trim().isEmpty) return 'Enter your email';
-                                      if (!val.contains('@')) return 'Enter a valid email';
+                                      if (val == null || val.trim().isEmpty) return 'Enter your email or username';
                                     }
                                     return null;
                                   },
@@ -308,6 +388,70 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     child: authState.isLoading
                                         ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                                         : const Text('Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+
+                                const Row(
+                                  children: [
+                                    Expanded(child: Divider()),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 12),
+                                      child: Text(
+                                        'OR',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textMuted,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(child: Divider()),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+
+                                SizedBox(
+                                  height: 50,
+                                  child: OutlinedButton(
+                                    onPressed: authState.isLoading ? null : _handleGoogleSignIn,
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: AppColors.outline.withValues(alpha: 0.8)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                                      backgroundColor: Colors.white,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 20,
+                                          height: 20,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Color(0xFF4285F4),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: const Text(
+                                            'G',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        const Text(
+                                          'Continue with Google',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],

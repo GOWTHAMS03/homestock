@@ -15,6 +15,9 @@ class SecureStorageService {
             ),
         _cache = cacheService;
 
+  String? _memoryAccessToken;
+  String? _memoryRefreshToken;
+
   static const _keyAccessToken = 'access_token';
   static const _keyRefreshToken = 'refresh_token';
   static const _keyActiveHomeId = 'active_home_id';
@@ -23,21 +26,23 @@ class SecureStorageService {
   static const _keyHomes = 'homes_json';
 
   Future<void> saveTokens({required String accessToken, required String refreshToken}) async {
+    _memoryAccessToken = accessToken;
+    _memoryRefreshToken = refreshToken;
     try {
       await _storage.write(key: _keyAccessToken, value: accessToken);
       await _storage.write(key: _keyRefreshToken, value: refreshToken);
     } catch (_) {}
-    await _cache?.set(_keyAccessToken, accessToken);
-    await _cache?.set(_keyRefreshToken, refreshToken);
+    // Remove from unencrypted Hive cache if previously present (CWE-312 prevention)
+    await _cache?.remove(_keyAccessToken);
+    await _cache?.remove(_keyRefreshToken);
   }
 
   Future<String?> getAccessToken() async {
-    final cached = _cache?.get(_keyAccessToken);
-    if (cached is String && cached.isNotEmpty) return cached;
+    if (_memoryAccessToken != null && _memoryAccessToken!.isNotEmpty) return _memoryAccessToken;
     try {
       final token = await _storage.read(key: _keyAccessToken);
       if (token != null && token.isNotEmpty) {
-        await _cache?.set(_keyAccessToken, token);
+        _memoryAccessToken = token;
         return token;
       }
     } catch (_) {}
@@ -45,12 +50,11 @@ class SecureStorageService {
   }
 
   Future<String?> getRefreshToken() async {
-    final cached = _cache?.get(_keyRefreshToken);
-    if (cached is String && cached.isNotEmpty) return cached;
+    if (_memoryRefreshToken != null && _memoryRefreshToken!.isNotEmpty) return _memoryRefreshToken;
     try {
       final token = await _storage.read(key: _keyRefreshToken);
       if (token != null && token.isNotEmpty) {
-        await _cache?.set(_keyRefreshToken, token);
+        _memoryRefreshToken = token;
         return token;
       }
     } catch (_) {}
@@ -58,13 +62,8 @@ class SecureStorageService {
   }
 
   bool hasCachedTokensSync() {
-    try {
-      final access = _cache?.get(_keyAccessToken);
-      final refresh = _cache?.get(_keyRefreshToken);
-      return (access is String && access.isNotEmpty) || (refresh is String && refresh.isNotEmpty);
-    } catch (_) {
-      return false;
-    }
+    return (_memoryAccessToken != null && _memoryAccessToken!.isNotEmpty) ||
+        (_memoryRefreshToken != null && _memoryRefreshToken!.isNotEmpty);
   }
 
   Future<void> saveUser(UserProfile user) async {
@@ -159,6 +158,8 @@ class SecureStorageService {
   }
 
   Future<void> clearAll() async {
+    _memoryAccessToken = null;
+    _memoryRefreshToken = null;
     final savedUrl = await getBaseUrl();
     try {
       await _storage.deleteAll();

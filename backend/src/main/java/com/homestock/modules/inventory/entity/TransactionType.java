@@ -5,5 +5,6 @@ public enum TransactionType {
     STOCK_OUT,
     ADJUSTMENT,
     EXPIRED,
-    DAMAGED
+    DAMAGED,
+    PURCHASE
 }

@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface StoreRepository extends JpaRepository<Store, UUID> {
     List<Store> findAllByHomeIdOrderByNameAsc(UUID homeId);
     Optional<Store> findByIdAndHomeId(UUID id, UUID homeId);
+    Optional<Store> findByHomeIdAndNameIgnoreCase(UUID homeId, String name);
     boolean existsByHomeIdAndNameIgnoreCase(UUID homeId, String name);
 
     @org.springframework.data.jpa.repository.Query("SELECT s FROM Store s WHERE s.home.id = :homeId AND s.updatedAt > :since ORDER BY s.name ASC")

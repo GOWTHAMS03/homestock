@@ -23,6 +23,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
     Optional<InventoryItem> findByIdAndHomeId(UUID id, UUID homeId);
 
+    List<InventoryItem> findByHomeId(UUID homeId);
+
+    Optional<InventoryItem> findByHomeIdAndBarcode(UUID homeId, String barcode);
+
+    Optional<InventoryItem> findByHomeIdAndProductId(UUID homeId, UUID productId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM InventoryItem i WHERE i.id = :id AND i.home.id = :homeId")
     Optional<InventoryItem> findWithLockByIdAndHomeId(@Param("id") UUID id, @Param("homeId") UUID homeId);

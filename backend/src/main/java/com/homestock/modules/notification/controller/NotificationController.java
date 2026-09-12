@@ -39,6 +39,8 @@ public class NotificationController {
     private final UserRepository userRepository;
     private final NotificationAnalyticsService analyticsService;
     private final com.homestock.modules.notification.provider.FirebaseNotificationProvider firebaseNotificationProvider;
+    private final com.homestock.modules.home.repository.HomeMemberRepository homeMemberRepository;
+    private final com.homestock.core.security.HomeSecurityService homeSecurityService;
 
     @GetMapping
     @Operation(summary = "Get user's notifications with pagination")
@@ -46,7 +48,7 @@ public class NotificationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = com.homestock.core.util.PaginationUtils.of(page, size);
         PagedResponse<NotificationDto> response = notificationService.getNotificationsForUser(currentUserId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -89,7 +91,23 @@ public class NotificationController {
     @Operation(summary = "Get high-value household restock and savings insights")
     public ResponseEntity<ApiResponse<List<com.homestock.modules.notification.dto.SmartInsightDto>>> getSmartInsights(
             @RequestParam(required = false) UUID homeId) {
-        UUID effectiveHomeId = homeId != null ? homeId : SecurityUtils.getCurrentUserId();
+        UUID currentUserId = SecurityUtils.getCurrentUserId();
+        UUID effectiveHomeId = homeId;
+        if (effectiveHomeId != null) {
+            if (!homeSecurityService.isMember(effectiveHomeId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Access denied to household insights");
+            }
+        } else {
+            effectiveHomeId = homeMemberRepository.findAllByUserId(currentUserId).stream()
+                    .findFirst()
+                    .map(hm -> hm.getHome().getId())
+                    .orElse(null);
+        }
+
+        if (effectiveHomeId == null) {
+            return ResponseEntity.ok(ApiResponse.success(List.of()));
+        }
+
         List<com.homestock.modules.notification.dto.SmartInsightDto> insights = analyticsService.getSmartInsights(effectiveHomeId);
         return ResponseEntity.ok(ApiResponse.success(insights));
     }

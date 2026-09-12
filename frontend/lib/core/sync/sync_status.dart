@@ -149,3 +149,28 @@ class SyncState {
   bool get isAuthRequired => effectiveSyncStatus == SyncStatus.authRequired;
   bool get isSynced => effectiveSyncStatus == SyncStatus.synced;
 }
+
+/// Detailed queue diagnostics breakdown across all sync operation states.
+class SyncQueueSummary {
+  final int pending;
+  final int syncing;
+  final int synced;
+  final int failed;
+  final int conflict;
+
+  const SyncQueueSummary({
+    this.pending = 0,
+    this.syncing = 0,
+    this.synced = 0,
+    this.failed = 0,
+    this.conflict = 0,
+  });
+
+  int get totalActive => pending + syncing + failed + conflict;
+  int get totalTracked => pending + syncing + synced + failed + conflict;
+  bool get hasPending => pending > 0;
+  bool get isCurrentlySyncing => syncing > 0;
+  bool get hasFailures => failed > 0;
+  bool get hasConflicts => conflict > 0;
+  bool get isAllSynced => pending == 0 && syncing == 0 && failed == 0 && conflict == 0;
+}

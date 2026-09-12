@@ -120,11 +120,4 @@ class PurchaseDao {
       }
     });
   }
-
-  /// Delete a store by ID (for remote deletions).
-  Future<void> deleteStore(String storeId) {
-    return (_db.delete(_db.localStores)
-          ..where((t) => t.id.equals(storeId)))
-        .go();
-  }
 }

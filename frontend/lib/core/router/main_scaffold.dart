@@ -71,51 +71,62 @@ class MainScaffold extends ConsumerWidget {
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     // 0. Home Tab
-                    _NavBarItem(
-                      index: 0,
-                      currentIndex: currentIndex,
-                      icon: Icons.home_outlined,
-                      selectedIcon: Icons.home_outlined,
-                      label: 'Home',
-                      badgeCount: 0,
-                      activeCircleColor: activeCircleColor,
-                      activePillBg: activePillBg,
-                      activeTextColor: activeTextColor,
-                      inactiveIconColor: inactiveIconColor,
-                      onTap: (index) => _handleNavigation(index),
+                    Expanded(
+                      child: Center(
+                        child: _NavBarItem(
+                          index: 0,
+                          currentIndex: currentIndex,
+                          icon: Icons.home_outlined,
+                          selectedIcon: Icons.home_outlined,
+                          label: 'Home',
+                          badgeCount: 0,
+                          activeCircleColor: activeCircleColor,
+                          activePillBg: activePillBg,
+                          activeTextColor: activeTextColor,
+                          inactiveIconColor: inactiveIconColor,
+                          onTap: (index) => _handleNavigation(index),
+                        ),
+                      ),
                     ),
 
                     // 1. Inventory Tab
-                    _NavBarItem(
-                      index: 1,
-                      currentIndex: currentIndex,
-                      icon: Icons.inventory_2_outlined,
-                      selectedIcon: Icons.inventory_2_outlined,
-                      label: 'Inventory',
-                      badgeCount: 0,
-                      activeCircleColor: activeCircleColor,
-                      activePillBg: activePillBg,
-                      activeTextColor: activeTextColor,
-                      inactiveIconColor: inactiveIconColor,
-                      onTap: (index) => _handleNavigation(index),
+                    Expanded(
+                      child: Center(
+                        child: _NavBarItem(
+                          index: 1,
+                          currentIndex: currentIndex,
+                          icon: Icons.inventory_2_outlined,
+                          selectedIcon: Icons.inventory_2_outlined,
+                          label: 'Inventory',
+                          badgeCount: 0,
+                          activeCircleColor: activeCircleColor,
+                          activePillBg: activePillBg,
+                          activeTextColor: activeTextColor,
+                          inactiveIconColor: inactiveIconColor,
+                          onTap: (index) => _handleNavigation(index),
+                        ),
+                      ),
                     ),
 
                     // 2. Shopping List Tab
-                    _NavBarItem(
-                      index: 2,
-                      currentIndex: currentIndex,
-                      icon: Icons.shopping_cart_outlined,
-                      selectedIcon: Icons.shopping_cart_outlined,
-                      label: 'Shopping',
-                      badgeCount: pendingCount,
-                      activeCircleColor: activeCircleColor,
-                      activePillBg: activePillBg,
-                      activeTextColor: activeTextColor,
-                      inactiveIconColor: inactiveIconColor,
-                      onTap: (index) => _handleNavigation(index),
+                    Expanded(
+                      child: Center(
+                        child: _NavBarItem(
+                          index: 2,
+                          currentIndex: currentIndex,
+                          icon: Icons.shopping_cart_outlined,
+                          selectedIcon: Icons.shopping_cart_outlined,
+                          label: 'Shopping',
+                          badgeCount: pendingCount,
+                          activeCircleColor: activeCircleColor,
+                          activePillBg: activePillBg,
+                          activeTextColor: activeTextColor,
+                          inactiveIconColor: inactiveIconColor,
+                          onTap: (index) => _handleNavigation(index),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -135,7 +146,7 @@ class MainScaffold extends ConsumerWidget {
   }
 }
 
-/// Snappy & tactile Navigation Bar Item
+/// Snappy, fluid & buttery-smooth Navigation Bar Item
 class _NavBarItem extends StatefulWidget {
   final int index;
   final int currentIndex;
@@ -176,137 +187,142 @@ class _NavBarItemState extends State<_NavBarItem> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) {
-        setState(() => _isPressed = true);
-        HapticFeedback.lightImpact();
-      },
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-      },
-      onTapCancel: () {
-        setState(() => _isPressed = false);
-      },
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
       onTap: () {
+        HapticFeedback.selectionClick();
         widget.onTap(widget.index);
       },
       child: AnimatedScale(
-        scale: _isPressed ? 0.93 : 1.0,
-        duration: const Duration(milliseconds: 90),
+        scale: _isPressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 100),
         curve: Curves.easeOutCubic,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
           height: 48,
-          padding: isSelected
-              ? const EdgeInsets.only(left: 5, top: 4, bottom: 4, right: 14)
-              : const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: EdgeInsets.only(
+            left: isSelected ? 5 : 12,
+            right: isSelected ? 14 : 12,
+            top: 4,
+            bottom: 4,
+          ),
           decoration: BoxDecoration(
             color: isSelected ? widget.activePillBg : Colors.transparent,
             borderRadius: BorderRadius.circular(26),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (isSelected) ...[
-                // Solid circle badge with White Icon & subtle drop shadow
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: widget.activeCircleColor,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: widget.activeCircleColor.withValues(alpha: 0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      widget.selectedIcon,
-                      size: 20,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                // Smooth AnimatedSize label sliding without pop or wrap
-                ClipRect(
-                  child: AnimatedSize(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(width: 8),
-                        Text(
-                          widget.label,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.clip,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: widget.activeTextColor,
-                            letterSpacing: -0.2,
+              // Circular background badge with animated color & shadow
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                width: isSelected ? 38 : 32,
+                height: isSelected ? 38 : 32,
+                decoration: BoxDecoration(
+                  color: isSelected ? widget.activeCircleColor : Colors.transparent,
+                  shape: BoxShape.circle,
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: widget.activeCircleColor.withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        ]
+                      : const [],
                 ),
-              ] else ...[
-                // Unselected: Sleek Outline Icon with optional animated pending badge
-                Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      widget.icon,
-                      size: 24,
-                      color: widget.inactiveIconColor,
-                    ),
-                    if (widget.badgeCount > 0)
-                      Positioned(
-                        top: -4,
-                        right: -7,
-                        child: AnimatedScale(
-                          scale: widget.badgeCount > 0 ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutBack,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444),
-                              borderRadius: BorderRadius.circular(10),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFEF4444).withValues(alpha: 0.4),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                            child: Center(
-                              child: Text(
-                                widget.badgeCount > 99 ? '99+' : '${widget.badgeCount}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1,
+                child: Center(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      TweenAnimationBuilder<Color?>(
+                        tween: ColorTween(
+                          end: isSelected ? Colors.white : widget.inactiveIconColor,
+                        ),
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, color, _) {
+                          return Icon(
+                            isSelected ? widget.selectedIcon : widget.icon,
+                            size: isSelected ? 20 : 24,
+                            color: color,
+                          );
+                        },
+                      ),
+                      if (widget.badgeCount > 0)
+                        Positioned(
+                          top: isSelected ? -4 : -5,
+                          right: isSelected ? -5 : -7,
+                          child: AnimatedScale(
+                            scale: widget.badgeCount > 0 ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutBack,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444),
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                              child: Center(
+                                child: Text(
+                                  widget.badgeCount > 99 ? '99+' : '${widget.badgeCount}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ],
+              ),
+
+              // Smooth AnimatedSize label sliding with zero pop and fluid collapse
+              ClipRect(
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.centerLeft,
+                  child: isSelected
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(width: 8),
+                            Text(
+                              widget.label,
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.clip,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: widget.activeTextColor,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
             ],
           ),
         ),

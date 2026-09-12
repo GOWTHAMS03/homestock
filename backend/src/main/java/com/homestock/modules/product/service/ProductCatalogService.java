@@ -41,6 +41,7 @@ public class ProductCatalogService {
     private final UserRepository userRepository;
     private final BarcodeValidationService barcodeValidationService;
     private final InternalProductProvider internalProductProvider;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public ProductDto createProduct(CreateProductRequest request) {
@@ -52,7 +53,9 @@ public class ProductCatalogService {
 
             if (productRepository.existsByBarcode(normalizedBarcode)) {
                 Product existing = productRepository.findByBarcode(normalizedBarcode).orElseThrow();
-                return internalProductProvider.toDto(existing);
+                ProductDto existingDto = internalProductProvider.toDto(existing);
+                productCacheService.put(existingDto);
+                return existingDto;
             }
         }
 
@@ -81,14 +84,23 @@ public class ProductCatalogService {
                 .build();
 
         Product saved = productRepository.save(product);
-        return internalProductProvider.toDto(saved);
+        ProductDto createdDto = internalProductProvider.toDto(saved);
+        productCacheService.put(createdDto);
+        return createdDto;
     }
 
     @Transactional(readOnly = true)
     public ProductDto getProductById(UUID id) {
+        Optional<ProductDto> cached = productCacheService.getById(id);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
-        return internalProductProvider.toDto(product);
+        ProductDto dto = internalProductProvider.toDto(product);
+        productCacheService.put(dto);
+        return dto;
     }
 
     @Transactional(readOnly = true)

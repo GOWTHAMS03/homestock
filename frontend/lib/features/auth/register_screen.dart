@@ -18,17 +18,22 @@ class RegisterScreen extends ConsumerStatefulWidget {
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -39,7 +44,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
           fullName: _nameController.text.trim(),
-          phoneNumber: _phoneController.text.trim().isNotEmpty ? null : _phoneController.text.trim(),
+          username: _usernameController.text.trim().isEmpty ? null : _usernameController.text.trim(),
+          confirmPassword: _confirmPasswordController.text,
+          phoneNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         );
 
     if (success && mounted) {
@@ -116,6 +123,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         const SizedBox(height: AppSpacing.md),
 
                         AppTextField(
+                          controller: _usernameController,
+                          label: 'Username (Optional)',
+                          hint: 'e.g. gowtham03',
+                          prefixIcon: const Icon(Icons.alternate_email_rounded, size: 20),
+                          validator: (val) {
+                            if (val != null && val.trim().isNotEmpty && val.trim().length < 3) {
+                              return 'Username must be at least 3 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+
+                        AppTextField(
                           controller: _emailController,
                           label: 'Email Address',
                           hint: 'you@example.com',
@@ -154,6 +175,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ),
                           validator: (val) {
                             if (val == null || val.length < 6) return 'Password must be at least 6 characters';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+
+                        AppTextField(
+                          controller: _confirmPasswordController,
+                          label: 'Confirm Password',
+                          hint: 'Repeat your password',
+                          obscureText: _obscureConfirmPassword,
+                          prefixIcon: const Icon(Icons.lock_clock_outlined, size: 20),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 20,
+                              color: AppColors.textMuted,
+                            ),
+                            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.isEmpty) return 'Please confirm your password';
+                            if (val != _passwordController.text) return 'Passwords do not match';
                             return null;
                           },
                         ),

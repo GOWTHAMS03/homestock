@@ -35,6 +35,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final com.homestock.modules.auth.repository.AuthIdentityRepository authIdentityRepository;
+    private final GoogleAuthenticationService googleAuthenticationService;
     private final HomeRepository homeRepository;
     private final HomeMemberRepository homeMemberRepository;
     private final PasswordEncoder passwordEncoder;
@@ -48,36 +50,90 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail().toLowerCase().trim())) {
+        String email = request.getEmail().toLowerCase().trim();
+        if (userRepository.existsByEmail(email)) {
             throw new BusinessRuleException("EMAIL_ALREADY_EXISTS", "A user with this email address already exists.");
         }
 
+        if (request.getConfirmPassword() != null && !request.getConfirmPassword().isBlank()
+                && !request.getPassword().equals(request.getConfirmPassword())) {
+            throw new BusinessRuleException("PASSWORD_MISMATCH", "Password and Confirm Password do not match.");
+        }
+
+        String username = request.getUsername();
+        if (username != null && !username.isBlank()) {
+            username = username.trim().toLowerCase();
+            if (userRepository.existsByUsername(username)) {
+                throw new BusinessRuleException("USERNAME_ALREADY_EXISTS", "A user with this username already exists.");
+            }
+        } else {
+            String base = email.split("@")[0].replaceAll("[^a-zA-Z0-9_]", "").toLowerCase();
+            if (base.isBlank()) base = "user";
+            username = base;
+            int counter = 1;
+            while (userRepository.existsByUsername(username)) {
+                username = base + "_" + (counter++);
+            }
+        }
+
         User user = User.builder()
-                .email(request.getEmail().toLowerCase().trim())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .email(email)
+                .username(username)
                 .fullName(request.getFullName().trim())
+                .displayName(request.getFullName().trim())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .phoneNumber(request.getPhoneNumber())
+                .status("ACTIVE")
                 .isActive(true)
+                .lastLoginAt(Instant.now())
                 .build();
 
         User savedUser = userRepository.save(user);
+
+        // Save local auth identity
+        com.homestock.modules.auth.entity.AuthIdentity localIdentity = com.homestock.modules.auth.entity.AuthIdentity.builder()
+                .user(savedUser)
+                .provider("LOCAL")
+                .providerSubject(email)
+                .build();
+        authIdentityRepository.save(localIdentity);
+
         return generateAuthResponse(savedUser);
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim())
+        String identifier = request.getEmail().toLowerCase().trim();
+        User user = userRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Invalid email or password"));
+
+        if (user.isDeleted()) {
+            throw new com.homestock.core.exception.UserNotFoundException("This HomeStock account could not be verified. Please sign in again.");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new org.springframework.security.authentication.BadCredentialsException("Invalid email or password");
         }
 
-        if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new UnauthorizedException("User account is deactivated");
+        if (!user.isAccountActive()) {
+            throw new com.homestock.core.exception.AccountDisabledException("This HomeStock account is disabled.");
         }
 
+        user.setLastLoginAt(Instant.now());
+        userRepository.save(user);
+
         return generateAuthResponse(user);
+    }
+
+    @Transactional
+    public AuthResponse loginWithGoogle(com.homestock.modules.auth.dto.GoogleAuthRequest request) {
+        User user = googleAuthenticationService.authenticateGoogleUser(request);
+        return generateAuthResponse(user);
+    }
+
+    @Transactional
+    public void linkGoogle(UUID currentUserId, com.homestock.modules.auth.dto.GoogleAuthRequest request) {
+        googleAuthenticationService.linkGoogleAccount(currentUserId, request);
     }
 
     @Transactional
@@ -98,35 +154,61 @@ public class AuthService {
                         String rawPassword = request.getPassword() != null && !request.getPassword().trim().isEmpty()
                                 ? request.getPassword()
                                 : UUID.randomUUID().toString();
-                        return userRepository.save(User.builder()
+                        String username = candidateEmail.split("@")[0] + "_" + UUID.randomUUID().toString().substring(0, 4);
+                        User newUser = userRepository.save(User.builder()
                                 .email(candidateEmail)
+                                .username(username)
                                 .passwordHash(passwordEncoder.encode(rawPassword))
                                 .fullName(fullName)
+                                .displayName(fullName)
+                                .status("ACTIVE")
                                 .isActive(true)
+                                .lastLoginAt(Instant.now())
                                 .build());
+                        authIdentityRepository.save(com.homestock.modules.auth.entity.AuthIdentity.builder()
+                                .user(newUser)
+                                .provider("LOCAL")
+                                .providerSubject(candidateEmail)
+                                .build());
+                        return newUser;
                     });
         } else {
-            String sanitizedName = fullName.toLowerCase().replaceAll("[^a-z0-9]", "");
-            if (sanitizedName.isEmpty()) sanitizedName = "member";
-            String uniqueEmail = sanitizedName + "." + cleanCode.toLowerCase() + "@homestock.local";
+            String rawSanitized = fullName.toLowerCase().replaceAll("[^a-z0-9]", "");
+            final String sanitizedName = rawSanitized.isEmpty() ? "member" : rawSanitized;
+            final String uniqueEmail = sanitizedName + "." + cleanCode.toLowerCase() + "@homestock.local";
 
             user = userRepository.findByEmail(uniqueEmail)
                     .orElseGet(() -> {
                         String rawPassword = UUID.randomUUID().toString();
-                        return userRepository.save(User.builder()
+                        String username = sanitizedName + "_" + UUID.randomUUID().toString().substring(0, 4);
+                        User newUser = userRepository.save(User.builder()
                                 .email(uniqueEmail)
+                                .username(username)
                                 .passwordHash(passwordEncoder.encode(rawPassword))
                                 .fullName(fullName)
+                                .displayName(fullName)
+                                .status("ACTIVE")
                                 .isActive(true)
+                                .lastLoginAt(Instant.now())
                                 .build());
+                        authIdentityRepository.save(com.homestock.modules.auth.entity.AuthIdentity.builder()
+                                .user(newUser)
+                                .provider("LOCAL")
+                                .providerSubject(uniqueEmail)
+                                .build());
+                        return newUser;
                     });
         }
 
-        if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new UnauthorizedException("User account is deactivated");
+        if (user.isDeleted()) {
+            throw new com.homestock.core.exception.UserNotFoundException("This HomeStock account could not be verified. Please sign in again.");
         }
 
-        // Add user as HomeMember if not already in this household
+        if (!user.isAccountActive()) {
+            throw new com.homestock.core.exception.AccountDisabledException("This HomeStock account is disabled.");
+        }
+
+        // Add user as HomeMember if not already in this household (idempotent)
         if (!homeMemberRepository.existsByHomeIdAndUserId(home.getId(), user.getId())) {
             HomeMember newMember = HomeMember.builder()
                     .home(home)
@@ -150,29 +232,26 @@ public class AuthService {
         }
 
         User user = refreshToken.getUser();
-        UserPrincipal principal = UserPrincipal.create(user);
-        String newAccessToken = jwtTokenProvider.generateAccessToken(principal);
+        if (user == null || user.isDeleted()) {
+            refreshTokenRepository.delete(refreshToken);
+            throw new com.homestock.core.exception.UserNotFoundException("This HomeStock account could not be verified. Please sign in again.");
+        }
 
-        // Sliding expiration window: extend refresh token expiration on each refresh so session stays alive
-        refreshToken.setExpiresAt(Instant.now().plusMillis(refreshTokenExpirationMs));
-        refreshTokenRepository.save(refreshToken);
+        if (!user.isAccountActive()) {
+            refreshTokenRepository.delete(refreshToken);
+            throw new com.homestock.core.exception.AccountDisabledException("This HomeStock account is disabled.");
+        }
 
-        return AuthResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(refreshToken.getTokenHash())
-                .tokenType("Bearer")
-                .expiresIn(accessTokenExpirationMs / 1000)
-                .user(UserDto.fromEntity(user))
-                .build();
+        // Token rotation: delete old refresh token and issue a fresh pair
+        refreshTokenRepository.delete(refreshToken);
+
+        return generateAuthResponse(user);
     }
 
     @Transactional
     public void logout(String refreshToken) {
         if (refreshToken != null) {
-            refreshTokenRepository.findByTokenHash(refreshToken).ifPresent(token -> {
-                token.setRevoked(true);
-                refreshTokenRepository.save(token);
-            });
+            refreshTokenRepository.findByTokenHash(refreshToken).ifPresent(refreshTokenRepository::delete);
         }
     }
 

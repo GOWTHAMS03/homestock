@@ -65,6 +65,7 @@ public class SyncService {
     private final com.homestock.modules.consumption.service.ConsumptionService consumptionService;
     private final HomeChangeLogService homeChangeLogService;
     private final NotificationEngine notificationEngine;
+    private final com.homestock.core.observability.OfflineSyncMetrics offlineSyncMetrics;
 
     /**
      * Process batch of offline operations idempotently.
@@ -82,17 +83,48 @@ public class SyncService {
             currentUser = userRepository.findById(currentUserId).orElse(null);
         } catch (Exception ignored) {}
 
-        List<SyncOperationResultDto> results = new ArrayList<>();
+        if (currentUser != null) {
+            Optional<com.homestock.modules.home.entity.HomeMember> memberOpt = homeMemberRepository.findByHomeIdAndUserId(homeId, currentUser.getId());
+            if (memberOpt.isEmpty() || !memberOpt.get().getRole().hasPermission(com.homestock.modules.home.entity.HomeRole.MEMBER)) {
+                throw new org.springframework.security.access.AccessDeniedException("Viewer role does not have permission to mutate household data");
+            }
+        }
 
-        if (request.getOperations() != null) {
-            for (SyncOperationDto op : request.getOperations()) {
-                SyncOperationResultDto result = processSingleOperation(op, home, currentUser);
-                results.add(result);
+        List<SyncOperationResultDto> results = new ArrayList<>();
+        int opCount = request.getOperations() != null ? request.getOperations().size() : 0;
+        if (offlineSyncMetrics != null) {
+            offlineSyncMetrics.recordPending(opCount);
+            offlineSyncMetrics.startSyncing();
+        }
+        long startTime = System.currentTimeMillis();
+        int successCount = 0;
+        int failedCount = 0;
+
+        try {
+            if (request.getOperations() != null) {
+                for (SyncOperationDto op : request.getOperations()) {
+                    SyncOperationResultDto result = processSingleOperation(op, home, currentUser);
+                    results.add(result);
+                    if ("SYNCED".equals(result.getStatus()) || "ALREADY_PROCESSED".equals(result.getStatus())) {
+                        successCount++;
+                    } else {
+                        failedCount++;
+                    }
+                }
+            }
+        } finally {
+            if (offlineSyncMetrics != null) {
+                offlineSyncMetrics.stopSyncing();
+                offlineSyncMetrics.recordSuccess(successCount);
+                offlineSyncMetrics.recordFailed(failedCount);
+                offlineSyncMetrics.recordDuration(System.currentTimeMillis() - startTime);
             }
         }
 
         // Notify other family members that home data has changed
-        notificationEngine.notifyHomeChanged(home, currentUserId);
+        if (notificationEngine != null) {
+            notificationEngine.notifyHomeChanged(home, currentUserId);
+        }
 
         return SyncPushResponse.builder().results(results).build();
     }

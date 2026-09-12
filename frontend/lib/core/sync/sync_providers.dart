@@ -85,3 +85,10 @@ final currentSyncStateProvider = StateProvider<SyncState>((ref) {
   });
   return const SyncState();
 });
+
+/// Watch real-time breakdown of queue operations across all 5 states:
+/// pending, syncing, synced, failed, and conflict.
+final syncQueueSummaryProvider = StreamProvider<SyncQueueSummary>((ref) {
+  final syncDao = ref.watch(syncDaoProvider);
+  return syncDao.watchQueueSummary();
+});

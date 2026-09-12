@@ -12,12 +12,15 @@ import com.homestock.modules.home.repository.HomeMemberRepository;
 import com.homestock.modules.home.repository.HomeRepository;
 import com.homestock.modules.user.entity.User;
 import com.homestock.modules.user.repository.UserRepository;
+import com.homestock.modules.sync.service.HomeChangeLogService;
+import com.homestock.modules.notification.service.NotificationEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,8 +32,8 @@ public class HomeService {
     private final HomeMemberRepository homeMemberRepository;
     private final UserRepository userRepository;
     private final CategoryService categoryService;
-    private final com.homestock.modules.sync.service.HomeChangeLogService homeChangeLogService;
-    private final com.homestock.modules.notification.service.NotificationEngine notificationEngine;
+    private final HomeChangeLogService homeChangeLogService;
+    private final NotificationEngine notificationEngine;
 
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private final SecureRandom random = new SecureRandom();
@@ -72,29 +75,35 @@ public class HomeService {
     public HomeDto joinHome(JoinHomeRequest request) {
         UUID currentUserId = SecurityUtils.getCurrentUserId();
         User currentUser = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new com.homestock.core.exception.UserNotFoundException("User not found"));
+
+        if (currentUser.isDeleted()) {
+            throw new com.homestock.core.exception.UserNotFoundException("This HomeStock account could not be verified. Please sign in again.");
+        }
 
         String code = request.getInviteCode().trim().toUpperCase();
         Home home = homeRepository.findByInviteCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid home invite code"));
 
-        if (homeMemberRepository.existsByHomeIdAndUserId(home.getId(), currentUserId)) {
-            throw new BusinessRuleException("You are already a member of this home.");
+        Optional<HomeMember> existingOpt = homeMemberRepository.findByHomeIdAndUserId(home.getId(), currentUserId);
+        HomeMember member;
+        if (existingOpt.isPresent()) {
+            member = existingOpt.get();
+        } else {
+            HomeMember newMember = HomeMember.builder()
+                    .home(home)
+                    .user(currentUser)
+                    .role(HomeRole.MEMBER)
+                    .build();
+            member = homeMemberRepository.save(newMember);
+
+            // Record change log & notify family members
+            homeChangeLogService.recordChange(home, "HOME_MEMBER", member.getId(), "INSERT", null, null);
+            notificationEngine.notifyHomeChanged(home, currentUserId);
         }
 
-        HomeMember newMember = HomeMember.builder()
-                .home(home)
-                .user(currentUser)
-                .role(HomeRole.MEMBER)
-                .build();
-        HomeMember savedMember = homeMemberRepository.save(newMember);
-
-        // Record change log & notify family members
-        homeChangeLogService.recordChange(home, "HOME_MEMBER", savedMember.getId(), "INSERT", null, null);
-        notificationEngine.notifyHomeChanged(home, currentUserId);
-
         int memberCount = homeMemberRepository.findAllByHomeId(home.getId()).size();
-        return HomeDto.fromEntity(home, HomeRole.MEMBER, memberCount);
+        return HomeDto.fromEntity(home, member.getRole(), memberCount);
     }
 
     @Transactional(readOnly = true)
