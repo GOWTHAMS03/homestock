@@ -24,6 +24,7 @@ spring:
         prepStmtCacheSqlLimit: 2048
         useServerPrepStmts: true
   jpa:
+    open-in-view: ${SPRING_JPA_OPEN_IN_VIEW:false}
     properties:
       hibernate:
         default_batch_fetch_size: ${HIBERNATE_BATCH_FETCH_SIZE:50}
@@ -33,6 +34,8 @@ spring:
       max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:25MB}
   data:
     redis:
+      repositories:
+        enabled: false
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
@@ -182,5 +185,10 @@ management:
     distribution:
       percentiles-histogram:
         http.server.requests: true
+
+logging:
+  level:
+    org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer: ERROR
+
 
 
