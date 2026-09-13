@@ -32,7 +32,7 @@ class LocationDealsRepository {
 
     try {
       final response = await _apiClient.dio.get(
-        '/api/v1/shops/nearby',
+        '/shops/nearby',
         queryParameters: {
           'lat': latitude,
           'lon': longitude,
@@ -62,7 +62,7 @@ class LocationDealsRepository {
   /// Get details and confirmed catalog offers for a specific shop
   Future<Map<String, dynamic>> getShopDetailsAndDeals(String shopId) async {
     try {
-      final response = await _apiClient.dio.get('/api/v1/shops/$shopId/deals');
+      final response = await _apiClient.dio.get('/shops/$shopId/deals');
       final data = response.data['data'] as Map<String, dynamic>? ?? {};
 
       final shopJson = data['shop'] as Map<String, dynamic>? ?? {};
@@ -91,7 +91,7 @@ class LocationDealsRepository {
   }) async {
     try {
       final response = await _apiClient.dio.get(
-        '/api/v1/deals/nearby',
+        '/deals/nearby',
         queryParameters: {
           'q': query,
           'lat': latitude,
@@ -130,7 +130,7 @@ class LocationDealsRepository {
   }) async {
     try {
       final response = await _apiClient.dio.post(
-        '/api/v1/deals/basket',
+        '/deals/basket',
         data: {
           'homeId': homeId,
           'items': items,
@@ -154,7 +154,7 @@ class LocationDealsRepository {
   Future<List<AreaSearchResult>> searchAreas(String query) async {
     try {
       final response = await _apiClient.dio.get(
-        '/api/v1/location/search-areas',
+        '/location/search-areas',
         queryParameters: {'q': query},
       );
 
@@ -174,7 +174,7 @@ class LocationDealsRepository {
   }) async {
     try {
       final response = await _apiClient.dio.post(
-        '/api/v1/deals/voice-search',
+        '/deals/voice-search',
         data: {
           'query': query,
           'latitude': latitude,
@@ -200,7 +200,7 @@ class LocationDealsRepository {
   }) async {
     try {
       final response = await _apiClient.dio.post(
-        '/api/v1/deals/click',
+        '/deals/click',
         queryParameters: {
           if (dealId != null) 'dealId': dealId,
           if (shopId != null) 'shopId': shopId,

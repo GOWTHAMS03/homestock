@@ -74,6 +74,14 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Prevent accidental duplication of /api/v1 if baseUrl already has it
+          if (options.baseUrl.endsWith('/api/v1')) {
+            if (options.path.startsWith('/api/v1/')) {
+              options.path = options.path.substring(7);
+            } else if (options.path.startsWith('api/v1/')) {
+              options.path = options.path.substring(6);
+            }
+          }
           final token = await secureStorage.getAccessToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';

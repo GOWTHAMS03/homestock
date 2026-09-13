@@ -89,7 +89,7 @@ class ProductDealRepository {
   /// Validate a specific deal before launching external URL (Phase 20)
   Future<bool> validateDeal(String dealId) async {
     try {
-      final response = await _apiClient.dio.post('/api/v1/deals/$dealId/validate');
+      final response = await _apiClient.dio.post('/deals/$dealId/validate');
       return response.statusCode == 200;
     } catch (e) {
       if (kDebugMode) print('[ProductDealRepo] validateDeal error: $e');

@@ -34,7 +34,7 @@ class AuthRepository {
     String? avatarUrl,
   }) async {
     final response = await apiClient.dio.post(
-      '/api/v1/auth/google',
+      '/auth/google',
       data: {
         'idToken': idToken,
         if (email != null && email.isNotEmpty) 'email': email,
