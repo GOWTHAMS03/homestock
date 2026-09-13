@@ -86,9 +86,13 @@ class BillItemCandidateDto {
   });
 
   factory BillItemCandidateDto.fromJson(Map<String, dynamic> json) {
+    final status = json['matchStatus']?.toString() ?? 'NEW_PRODUCT';
     return BillItemCandidateDto(
       rawItemName: json['rawItemName']?.toString() ?? '',
-      normalizedItemName: json['normalizedItemName']?.toString() ?? '',
+      normalizedItemName: json['normalizedItemName']?.toString() ??
+          json['matchedProductName']?.toString() ??
+          json['rawItemName']?.toString() ??
+          '',
       quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
       unit: json['unit']?.toString() ?? 'pcs',
       mrp: (json['mrp'] as num?)?.toDouble(),
@@ -98,12 +102,13 @@ class BillItemCandidateDto {
       finalPrice: (json['finalPrice'] as num?)?.toDouble() ?? 0.0,
       standardUnitPrice: (json['standardUnitPrice'] as num?)?.toDouble() ?? 0.0,
       matchConfidence: (json['matchConfidence'] as num?)?.toDouble() ?? 0.0,
-      matchStatus: json['matchStatus']?.toString() ?? 'NEW_PRODUCT',
+      matchStatus: status,
       matchedProductId: json['matchedProductId']?.toString(),
       matchedInventoryItemId: json['matchedInventoryItemId']?.toString(),
       matchedShoppingListItemId: json['matchedShoppingListItemId']?.toString(),
-      matchedExistingProductName: json['matchedExistingProductName']?.toString(),
-      isNewProductCandidate: json['isNewProductCandidate'] as bool? ?? false,
+      matchedExistingProductName: json['matchedExistingProductName']?.toString() ??
+          json['matchedProductName']?.toString(),
+      isNewProductCandidate: (json['isNewProductCandidate'] as bool?) ?? (status == 'NEW_PRODUCT'),
       suggestedMatches: (json['suggestedMatches'] as List<dynamic>?)
               ?.map((e) => ExistingProductMatchDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -156,6 +161,7 @@ class BillItemCandidateDto {
 
 @immutable
 class BillScanResponseDto {
+  final String? billId;
   final String? shopName;
   final String? billNumber;
   final String? billDate;
@@ -165,6 +171,7 @@ class BillScanResponseDto {
   final List<BillItemCandidateDto> items;
 
   const BillScanResponseDto({
+    this.billId,
     this.shopName,
     this.billNumber,
     this.billDate,
@@ -176,11 +183,16 @@ class BillScanResponseDto {
 
   factory BillScanResponseDto.fromJson(Map<String, dynamic> json) {
     return BillScanResponseDto(
+      billId: json['billId']?.toString(),
       shopName: json['shopName']?.toString(),
       billNumber: json['billNumber']?.toString(),
       billDate: json['billDate']?.toString(),
-      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
-      duplicateBillDetected: json['duplicateBillDetected'] as bool? ?? false,
+      totalAmount: (json['totalAmount'] as num?)?.toDouble() ??
+          (json['total'] as num?)?.toDouble() ??
+          0.0,
+      duplicateBillDetected: (json['duplicateBillDetected'] as bool?) ??
+          (json['isDuplicate'] as bool?) ??
+          false,
       existingBillId: json['existingBillId']?.toString(),
       items: (json['items'] as List<dynamic>?)
               ?.map((e) => BillItemCandidateDto.fromJson(e as Map<String, dynamic>))
@@ -244,6 +256,7 @@ class BillConfirmItemDto {
 
 @immutable
 class BillConfirmRequestDto {
+  final String? billId;
   final String? shopName;
   final String? billNumber;
   final String? billDate; // YYYY-MM-DD
@@ -252,6 +265,7 @@ class BillConfirmRequestDto {
   final List<BillConfirmItemDto> items;
 
   const BillConfirmRequestDto({
+    this.billId,
     this.shopName,
     this.billNumber,
     this.billDate,
@@ -261,6 +275,7 @@ class BillConfirmRequestDto {
   });
 
   Map<String, dynamic> toJson() => {
+        if (billId != null) 'billId': billId,
         'shopName': shopName,
         'billNumber': billNumber,
         'billDate': billDate,
@@ -390,10 +405,16 @@ class CategoryExpenseDto {
 
   factory CategoryExpenseDto.fromJson(Map<String, dynamic> json) {
     return CategoryExpenseDto(
-      category: json['category']?.toString() ?? 'General',
-      totalSpend: (json['totalSpend'] as num?)?.toDouble() ?? 0.0,
-      percentageOfTotal: (json['percentageOfTotal'] as num?)?.toDouble() ?? 0.0,
-      itemCount: json['itemCount'] as int? ?? 0,
+      category: json['category']?.toString() ?? json['categoryName']?.toString() ?? 'General',
+      totalSpend: (json['totalSpend'] as num?)?.toDouble() ??
+          (json['totalAmount'] as num?)?.toDouble() ??
+          0.0,
+      percentageOfTotal: (json['percentageOfTotal'] as num?)?.toDouble() ??
+          (json['spendingPercentage'] as num?)?.toDouble() ??
+          0.0,
+      itemCount: json['itemCount'] as int? ??
+          (json['purchaseCount'] as num?)?.toInt() ??
+          0,
     );
   }
 }
@@ -414,16 +435,26 @@ class TopRetailerDto {
 
   factory TopRetailerDto.fromJson(Map<String, dynamic> json) {
     return TopRetailerDto(
-      retailerName: json['retailerName']?.toString() ?? 'Retailer',
-      totalSpend: (json['totalSpend'] as num?)?.toDouble() ?? 0.0,
-      billCount: json['billCount'] as int? ?? 0,
-      percentageOfTotal: (json['percentageOfTotal'] as num?)?.toDouble() ?? 0.0,
+      retailerName: json['retailerName']?.toString() ??
+          json['shopName']?.toString() ??
+          'Retailer',
+      totalSpend: (json['totalSpend'] as num?)?.toDouble() ??
+          (json['totalAmount'] as num?)?.toDouble() ??
+          0.0,
+      billCount: json['billCount'] as int? ??
+          (json['billsCount'] as num?)?.toInt() ??
+          0,
+      percentageOfTotal: (json['percentageOfTotal'] as num?)?.toDouble() ??
+          (json['spendingPercentage'] as num?)?.toDouble() ??
+          0.0,
     );
   }
 }
 
 @immutable
 class PriceAnomalyDto {
+  final String? productId;
+  final String? inventoryItemId;
   final String productName;
   final String? category;
   final double currentPrice;
@@ -431,9 +462,12 @@ class PriceAnomalyDto {
   final double percentageChange;
   final String unit;
   final String alertType; // PRICE_HIKE, PRICE_DROP
+  final String? storeName;
   final String? detectedAt;
 
   const PriceAnomalyDto({
+    this.productId,
+    this.inventoryItemId,
     required this.productName,
     this.category,
     required this.currentPrice,
@@ -441,18 +475,22 @@ class PriceAnomalyDto {
     required this.percentageChange,
     required this.unit,
     required this.alertType,
+    this.storeName,
     this.detectedAt,
   });
 
   factory PriceAnomalyDto.fromJson(Map<String, dynamic> json) {
     return PriceAnomalyDto(
-      productName: json['productName']?.toString() ?? '',
+      productId: json['productId']?.toString(),
+      inventoryItemId: json['inventoryItemId']?.toString(),
+      productName: json['productName']?.toString() ?? 'Item',
       category: json['category']?.toString(),
       currentPrice: (json['currentPrice'] as num?)?.toDouble() ?? 0.0,
       previousPrice: (json['previousPrice'] as num?)?.toDouble() ?? 0.0,
       percentageChange: (json['percentageChange'] as num?)?.toDouble() ?? 0.0,
       unit: json['unit']?.toString() ?? 'pcs',
       alertType: json['alertType']?.toString() ?? 'PRICE_HIKE',
+      storeName: json['storeName']?.toString(),
       detectedAt: json['detectedAt']?.toString(),
     );
   }
@@ -462,42 +500,63 @@ class PriceAnomalyDto {
 class MonthlyExpenseReportDto {
   final int year;
   final int month;
+  final String? monthName;
   final double totalSpend;
   final double previousMonthSpend;
   final double momPercentageChange;
   final int totalBills;
   final int totalItemsPurchased;
+  final double averageBillAmount;
   final List<CategoryExpenseDto> categoryBreakdown;
   final List<TopRetailerDto> topRetailers;
   final List<PriceAnomalyDto> priceAnomalies;
+  final List<BillingPeriodDto> availablePeriods;
+  final List<MonthlyBillSummaryDto> bills;
 
   const MonthlyExpenseReportDto({
     required this.year,
     required this.month,
+    this.monthName,
     required this.totalSpend,
     required this.previousMonthSpend,
     required this.momPercentageChange,
     required this.totalBills,
     required this.totalItemsPurchased,
+    this.averageBillAmount = 0.0,
     this.categoryBreakdown = const [],
     this.topRetailers = const [],
     this.priceAnomalies = const [],
+    this.availablePeriods = const [],
+    this.bills = const [],
   });
 
   factory MonthlyExpenseReportDto.fromJson(Map<String, dynamic> json) {
+    final billsCount = json['totalBills'] as int? ??
+        (json['billsCount'] as num?)?.toInt() ??
+        0;
+    final spend = (json['totalSpend'] as num?)?.toDouble() ?? 0.0;
+    final avg = (json['averageBillAmount'] as num?)?.toDouble() ??
+        (billsCount > 0 ? spend / billsCount : 0.0);
+
     return MonthlyExpenseReportDto(
       year: json['year'] as int? ?? DateTime.now().year,
       month: json['month'] as int? ?? DateTime.now().month,
-      totalSpend: (json['totalSpend'] as num?)?.toDouble() ?? 0.0,
+      monthName: json['monthName']?.toString(),
+      totalSpend: spend,
       previousMonthSpend: (json['previousMonthSpend'] as num?)?.toDouble() ?? 0.0,
-      momPercentageChange: (json['momPercentageChange'] as num?)?.toDouble() ?? 0.0,
-      totalBills: json['totalBills'] as int? ?? 0,
-      totalItemsPurchased: json['totalItemsPurchased'] as int? ?? 0,
-      categoryBreakdown: (json['categoryBreakdown'] as List<dynamic>?)
+      momPercentageChange: (json['momPercentageChange'] as num?)?.toDouble() ??
+          (json['spendingTrendPercent'] as num?)?.toDouble() ??
+          0.0,
+      totalBills: billsCount,
+      totalItemsPurchased: json['totalItemsPurchased'] as int? ??
+          (json['itemsPurchasedCount'] as num?)?.toInt() ??
+          0,
+      averageBillAmount: avg,
+      categoryBreakdown: ((json['categoryBreakdown'] ?? json['categories']) as List<dynamic>?)
               ?.map((e) => CategoryExpenseDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
-      topRetailers: (json['topRetailers'] as List<dynamic>?)
+      topRetailers: ((json['topRetailers'] ?? json['shopBreakdown']) as List<dynamic>?)
               ?.map((e) => TopRetailerDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -505,6 +564,126 @@ class MonthlyExpenseReportDto {
               ?.map((e) => PriceAnomalyDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      availablePeriods: (json['availablePeriods'] as List<dynamic>?)
+              ?.map((e) => BillingPeriodDto.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      bills: (json['bills'] as List<dynamic>?)
+              ?.map((e) => MonthlyBillSummaryDto.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+  }
+}
+
+@immutable
+class MonthlyBillSummaryDto {
+  final String id;
+  final String shopName;
+  final String billNumber;
+  final String? billDate;
+  final double totalAmount;
+  final double subtotal;
+  final double taxAmount;
+  final double discountAmount;
+  final int itemsCount;
+  final String status;
+  final String source;
+  final List<BillItemSummaryDto> items;
+
+  const MonthlyBillSummaryDto({
+    required this.id,
+    required this.shopName,
+    this.billNumber = 'N/A',
+    this.billDate,
+    required this.totalAmount,
+    this.subtotal = 0.0,
+    this.taxAmount = 0.0,
+    this.discountAmount = 0.0,
+    this.itemsCount = 0,
+    this.status = 'CONFIRMED',
+    this.source = 'AI_SCANNED',
+    this.items = const [],
+  });
+
+  factory MonthlyBillSummaryDto.fromJson(Map<String, dynamic> json) {
+    return MonthlyBillSummaryDto(
+      id: json['id']?.toString() ?? '',
+      shopName: json['shopName']?.toString() ?? 'Retail Store',
+      billNumber: json['billNumber']?.toString() ?? 'N/A',
+      billDate: json['billDate']?.toString(),
+      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
+      taxAmount: (json['taxAmount'] as num?)?.toDouble() ?? 0.0,
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      itemsCount: (json['itemsCount'] as num?)?.toInt() ??
+          ((json['items'] as List<dynamic>?)?.length ?? 0),
+      status: json['status']?.toString() ?? 'CONFIRMED',
+      source: json['source']?.toString() ?? 'AI_SCANNED',
+      items: (json['items'] as List<dynamic>?)
+              ?.map((e) => BillItemSummaryDto.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+  }
+}
+
+@immutable
+class BillItemSummaryDto {
+  final String? id;
+  final String itemName;
+  final double quantity;
+  final String unit;
+  final double unitPrice;
+  final double finalPrice;
+  final String? category;
+
+  const BillItemSummaryDto({
+    this.id,
+    required this.itemName,
+    this.quantity = 1.0,
+    this.unit = 'pcs',
+    this.unitPrice = 0.0,
+    this.finalPrice = 0.0,
+    this.category,
+  });
+
+  factory BillItemSummaryDto.fromJson(Map<String, dynamic> json) {
+    return BillItemSummaryDto(
+      id: json['id']?.toString(),
+      itemName: json['itemName']?.toString() ?? 'Item',
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
+      unit: json['unit']?.toString() ?? 'pcs',
+      unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
+      finalPrice: (json['finalPrice'] as num?)?.toDouble() ?? 0.0,
+      category: json['category']?.toString(),
+    );
+  }
+}
+
+@immutable
+class BillingPeriodDto {
+  final int year;
+  final int month;
+  final String? monthName;
+  final int billsCount;
+  final double totalSpend;
+
+  const BillingPeriodDto({
+    required this.year,
+    required this.month,
+    this.monthName,
+    required this.billsCount,
+    required this.totalSpend,
+  });
+
+  factory BillingPeriodDto.fromJson(Map<String, dynamic> json) {
+    return BillingPeriodDto(
+      year: json['year'] as int? ?? DateTime.now().year,
+      month: json['month'] as int? ?? DateTime.now().month,
+      monthName: json['monthName']?.toString(),
+      billsCount: json['billsCount'] as int? ?? 0,
+      totalSpend: (json['totalSpend'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -515,6 +694,7 @@ class StoreComparisonDto {
   final double totalSpent;
   final int visitCount;
   final double avgSpendPerVisit;
+  final double percentageOfTotal;
   final String? firstSeen;
   final String? lastSeen;
 
@@ -523,16 +703,23 @@ class StoreComparisonDto {
     required this.totalSpent,
     required this.visitCount,
     required this.avgSpendPerVisit,
+    this.percentageOfTotal = 0.0,
     this.firstSeen,
     this.lastSeen,
   });
 
   factory StoreComparisonDto.fromJson(Map<String, dynamic> json) {
+    final visits = json['visitCount'] as int? ?? (json['billsCount'] as num?)?.toInt() ?? 0;
+    final total = (json['totalSpent'] as num?)?.toDouble() ?? (json['totalAmount'] as num?)?.toDouble() ?? 0.0;
+    final avg = (json['avgSpendPerVisit'] as num?)?.toDouble() ?? (visits > 0 ? total / visits : 0.0);
+    final pct = (json['percentageOfTotal'] as num?)?.toDouble() ?? (json['spendingPercentage'] as num?)?.toDouble() ?? 0.0;
+
     return StoreComparisonDto(
-      storeName: json['storeName']?.toString() ?? 'Retail Store',
-      totalSpent: (json['totalSpent'] as num?)?.toDouble() ?? 0.0,
-      visitCount: json['visitCount'] as int? ?? 0,
-      avgSpendPerVisit: (json['avgSpendPerVisit'] as num?)?.toDouble() ?? 0.0,
+      storeName: json['storeName']?.toString() ?? json['shopName']?.toString() ?? 'Retail Store',
+      totalSpent: total,
+      visitCount: visits,
+      avgSpendPerVisit: avg,
+      percentageOfTotal: pct,
       firstSeen: json['firstSeen']?.toString(),
       lastSeen: json['lastSeen']?.toString(),
     );
@@ -547,6 +734,7 @@ class PricePointDto {
   final double standardUnitPrice;
   final double quantity;
   final String unit;
+  final bool isHigherThanUsual;
 
   const PricePointDto({
     required this.purchaseDate,
@@ -555,16 +743,47 @@ class PricePointDto {
     required this.standardUnitPrice,
     required this.quantity,
     required this.unit,
+    this.isHigherThanUsual = false,
   });
 
   factory PricePointDto.fromJson(Map<String, dynamic> json) {
     return PricePointDto(
       purchaseDate: json['purchaseDate']?.toString() ?? '',
-      storeName: json['storeName']?.toString() ?? '',
+      storeName: json['storeName']?.toString() ?? 'Store',
       unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
-      standardUnitPrice: (json['standardUnitPrice'] as num?)?.toDouble() ?? 0.0,
+      standardUnitPrice: (json['standardUnitPrice'] as num?)?.toDouble() ??
+          (json['unitPrice'] as num?)?.toDouble() ??
+          0.0,
       quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
       unit: json['unit']?.toString() ?? 'pcs',
+      isHigherThanUsual: json['isHigherThanUsual'] as bool? ?? false,
+    );
+  }
+}
+
+@immutable
+class StorePriceComparisonItemDto {
+  final String storeName;
+  final double averagePrice;
+  final double minPrice;
+  final double maxPrice;
+  final int purchaseCount;
+
+  const StorePriceComparisonItemDto({
+    required this.storeName,
+    required this.averagePrice,
+    required this.minPrice,
+    required this.maxPrice,
+    required this.purchaseCount,
+  });
+
+  factory StorePriceComparisonItemDto.fromJson(Map<String, dynamic> json) {
+    return StorePriceComparisonItemDto(
+      storeName: json['storeName']?.toString() ?? 'Store',
+      averagePrice: (json['averagePrice'] as num?)?.toDouble() ?? 0.0,
+      minPrice: (json['minPrice'] as num?)?.toDouble() ?? 0.0,
+      maxPrice: (json['maxPrice'] as num?)?.toDouble() ?? 0.0,
+      purchaseCount: (json['purchaseCount'] as num?)?.toInt() ?? 1,
     );
   }
 }
@@ -572,30 +791,64 @@ class PricePointDto {
 @immutable
 class ProductPriceHistoryDto {
   final String productId;
+  final String? inventoryItemId;
   final String productName;
   final double lowestPrice;
   final double highestPrice;
   final double currentPrice;
+  final double averagePrice;
+  final double previousPrice;
+  final double priceChangePercent;
+  final String unit;
+  final String? recommendedStore;
+  final bool isHigherThanUsual;
   final List<PricePointDto> pricePoints;
+  final List<StorePriceComparisonItemDto> storeComparisons;
 
   const ProductPriceHistoryDto({
     required this.productId,
+    this.inventoryItemId,
     required this.productName,
     required this.lowestPrice,
     required this.highestPrice,
     required this.currentPrice,
+    this.averagePrice = 0.0,
+    this.previousPrice = 0.0,
+    this.priceChangePercent = 0.0,
+    this.unit = 'pcs',
+    this.recommendedStore,
+    this.isHigherThanUsual = false,
     this.pricePoints = const [],
+    this.storeComparisons = const [],
   });
 
   factory ProductPriceHistoryDto.fromJson(Map<String, dynamic> json) {
+    final pointsList = (json['pricePoints'] ?? json['recentPurchases']) as List<dynamic>?;
+    final storesList = (json['storeComparisons']) as List<dynamic>?;
+
     return ProductPriceHistoryDto(
       productId: json['productId']?.toString() ?? '',
-      productName: json['productName']?.toString() ?? '',
-      lowestPrice: (json['lowestPrice'] as num?)?.toDouble() ?? 0.0,
-      highestPrice: (json['highestPrice'] as num?)?.toDouble() ?? 0.0,
+      inventoryItemId: json['inventoryItemId']?.toString(),
+      productName: json['productName']?.toString() ?? 'Product',
+      lowestPrice: (json['lowestPrice'] as num?)?.toDouble() ??
+          (json['minPrice'] as num?)?.toDouble() ??
+          0.0,
+      highestPrice: (json['highestPrice'] as num?)?.toDouble() ??
+          (json['maxPrice'] as num?)?.toDouble() ??
+          0.0,
       currentPrice: (json['currentPrice'] as num?)?.toDouble() ?? 0.0,
-      pricePoints: (json['pricePoints'] as List<dynamic>?)
+      averagePrice: (json['averagePrice'] as num?)?.toDouble() ?? 0.0,
+      previousPrice: (json['previousPrice'] as num?)?.toDouble() ?? 0.0,
+      priceChangePercent: (json['priceChangePercent'] as num?)?.toDouble() ?? 0.0,
+      unit: json['unit']?.toString() ?? 'pcs',
+      recommendedStore: json['recommendedStore']?.toString(),
+      isHigherThanUsual: json['isHigherThanUsual'] as bool? ?? false,
+      pricePoints: pointsList
               ?.map((e) => PricePointDto.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      storeComparisons: storesList
+              ?.map((e) => StorePriceComparisonItemDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
     );

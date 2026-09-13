@@ -6,6 +6,7 @@ import '../../auth/auth_controller.dart' show apiClientProvider;
 import '../../home_switcher/home_controller.dart';
 import '../models/bill_models.dart';
 import '../services/bill_api_service.dart';
+import '../services/local_ocr_service.dart';
 
 final billApiServiceProvider = Provider<BillApiService>((ref) {
   final client = ref.watch(apiClientProvider);
@@ -111,8 +112,13 @@ class BillScannerController extends StateNotifier<BillScannerState> {
         }
       }
 
+      // Perform fast on-device OCR with Google ML Kit when available (Android/iOS)
+      final localOcr = LocalOcrService();
+      final String? recognizedText = await localOcr.extractTextFromImages(state.imagePaths);
+
       final result = await _apiService.scanBill(
         _homeId,
+        rawText: recognizedText,
         base64Images: base64Images,
         storeName: storeName,
         billDate: billDate,
@@ -267,7 +273,7 @@ class BillScannerController extends StateNotifier<BillScannerState> {
           productId: item.matchedProductId,
           inventoryItemId: item.matchedInventoryItemId,
           shoppingListItemId: item.matchedShoppingListItemId,
-          createNewProduct: item.isNewProductCandidate || item.matchedProductId == null,
+          createNewProduct: item.isNewProductCandidate && item.matchedInventoryItemId == null && item.matchedProductId == null,
           newProductName: item.normalizedItemName,
           quantity: item.quantity,
           unit: item.unit,
@@ -280,6 +286,7 @@ class BillScannerController extends StateNotifier<BillScannerState> {
       }).toList();
 
       final req = BillConfirmRequestDto(
+        billId: state.scanResult?.billId,
         shopName: state.shopName.isNotEmpty ? state.shopName : 'Supermarket',
         billNumber: state.billNumber.isNotEmpty ? state.billNumber : null,
         billDate: dateStr,

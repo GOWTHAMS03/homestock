@@ -23,8 +23,8 @@ public class DuplicateBillDetector {
     }
 
     public String generateIdempotencyKey(UUID homeId, String shopName, String billNumber, LocalDate billDate, BigDecimal totalAmount) {
-        String cleanShop = shopName != null ? shopName.trim().toLowerCase() : "unknown";
-        String cleanNo = billNumber != null ? billNumber.trim().toLowerCase() : "none";
+        String cleanShop = sanitize(shopName) != null ? sanitize(shopName).toLowerCase() : "unknown";
+        String cleanNo = sanitize(billNumber) != null ? sanitize(billNumber).toLowerCase() : "none";
         String cleanDate = billDate != null ? billDate.toString() : "nodate";
         String cleanTotal = totalAmount != null ? totalAmount.setScale(2).toString() : "0.00";
 
@@ -39,7 +39,9 @@ public class DuplicateBillDetector {
     }
 
     public DuplicateCheckResult checkDuplicate(UUID homeId, String shopName, String billNumber, LocalDate billDate, BigDecimal totalAmount) {
-        String key = generateIdempotencyKey(homeId, shopName, billNumber, billDate, totalAmount);
+        String safeShop = sanitize(shopName);
+        String safeNo = sanitize(billNumber);
+        String key = generateIdempotencyKey(homeId, safeShop, safeNo, billDate, totalAmount);
 
         // 1. Exact Idempotent duplicate check
         Optional<PurchasedBill> exactMatch = billRepository.findByHomeIdAndIdempotencyKey(homeId, key);
@@ -54,8 +56,8 @@ public class DuplicateBillDetector {
         }
 
         // 2. Soft duplicate check (same shop + date + amount)
-        if (shopName != null && billDate != null && totalAmount != null) {
-            List<PurchasedBill> potentials = billRepository.findPotentialDuplicates(homeId, shopName, billDate, totalAmount);
+        if (safeShop != null && !safeShop.isBlank() && billDate != null && totalAmount != null) {
+            List<PurchasedBill> potentials = billRepository.findPotentialDuplicates(homeId, safeShop, billDate, totalAmount);
             if (!potentials.isEmpty()) {
                 PurchasedBill b = potentials.get(0);
                 return new DuplicateCheckResult(
@@ -68,6 +70,12 @@ public class DuplicateBillDetector {
         }
 
         return new DuplicateCheckResult(false, false, null, null);
+    }
+
+    private String sanitize(String input) {
+        if (input == null) return null;
+        String s = input.replace("\u0000", "").replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "").trim();
+        return s.isEmpty() ? null : s;
     }
 
     public record DuplicateCheckResult(

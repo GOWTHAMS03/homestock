@@ -34,4 +34,24 @@ public class BillScanPreviewResponseDto {
     private int autoMatchedCount;
     private int suggestedCount;
     private int newProductCount;
+
+    // AI Pipeline fields
+    private BigDecimal imageQualityScore;
+    private String imageQualityMessage;
+    private BigDecimal ocrConfidence;
+    private BigDecimal overallConfidence;
+    private String processingStatus;
+    private int needsReviewCount;
+    private String validationStatus;
+    private BigDecimal validationDiscrepancy;
+    private String aiProvider;
+    private int processingDurationMs;
+
+    public BigDecimal getTotalAmount() {
+        return total != null ? total : BigDecimal.ZERO;
+    }
+
+    public boolean isDuplicateBillDetected() {
+        return isDuplicate;
+    }
 }

@@ -57,4 +57,19 @@ public interface PurchasedBillRepository extends JpaRepository<PurchasedBill, UU
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    @Query("SELECT EXTRACT(YEAR FROM b.billDate), EXTRACT(MONTH FROM b.billDate), COUNT(b), SUM(b.totalAmount) " +
+           "FROM PurchasedBill b WHERE b.home.id = :homeId AND b.status = 'CONFIRMED' " +
+           "GROUP BY EXTRACT(YEAR FROM b.billDate), EXTRACT(MONTH FROM b.billDate) " +
+           "ORDER BY EXTRACT(YEAR FROM b.billDate) DESC, EXTRACT(MONTH FROM b.billDate) DESC")
+    List<Object[]> getAvailableBillingPeriods(@Param("homeId") UUID homeId);
+
+    @Query("SELECT b FROM PurchasedBill b WHERE b.home.id = :homeId " +
+           "AND b.billDate >= :startDate AND b.billDate <= :endDate AND b.status = 'CONFIRMED' " +
+           "ORDER BY b.billDate DESC, b.createdAt DESC")
+    List<PurchasedBill> findBillsInPeriod(
+            @Param("homeId") UUID homeId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 }

@@ -12,6 +12,7 @@ import '../../core/widgets/skeleton_loader.dart';
 import '../auth/auth_controller.dart';
 import '../auth/auth_state.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
+import '../bill/screens/bill_scanner_screen.dart';
 import '../home_switcher/create_home_dialog.dart';
 import '../home_switcher/home_controller.dart';
 import '../home_switcher/join_home_dialog.dart';
@@ -33,10 +34,9 @@ import 'what_do_i_need_sheet.dart';
 /// 2. "What needs your attention today?" Unified White Card with Target Icon & 3 Status Mini-Cards
 /// 3. Quick Actions: Search / Scan / Voice Pill Bar
 /// 4. Featured Attention Card: Prominent card (Eggs) with progress bar, advice microcopy & "+ Add to List" CTA
-/// 5. "⚡ Quick Access": 4 pastel shortcut cards in a horizontal row (Low Stock, Expiring Soon, Shopping List, Categories)
-/// 6. "🧺 Your Pantry": Horizontal pantry item cards with "✨ Smart Suggestions" pill button
-/// 7. "⊞ Pantry Categories": Horizontal category chips with semantic icons
-/// 8. "✨ Next up for your home": Soft lavender banner card with usage insights & suggestions CTA
+/// 5. "🧺 Your Pantry": Horizontal pantry item cards with "✨ Smart Suggestions" pill button
+/// 6. "⊞ Pantry Categories": Horizontal category chips with semantic icons
+/// 7. "✨ Next up for your home": Soft lavender banner card with usage insights & suggestions CTA
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -183,11 +183,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     _buildFeaturedAttentionSection(context, ref, attentionItems),
                     const SizedBox(height: 22),
 
-                    // 5. "⚡ QUICK ACCESS": 4 Horizontal Pastel Cards (Low Stock, Expiring, Shopping, Categories)
-                    _buildQuickAccessSection(context, ref, summary),
-                    const SizedBox(height: 22),
-
-                    // 6. "🧺 YOUR PANTRY": Horizontal Item Cards with "✨ Smart Suggestions" Button
+                    // 5. "🧺 YOUR PANTRY": Horizontal Item Cards with "✨ Smart Suggestions" Button
                     _buildYourPantrySection(context, ref),
                     const SizedBox(height: 22),
 
@@ -1381,7 +1377,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
           // [ Scan ] Button
           InkWell(
-            onTap: () => BarcodeScannerWidget.open(context),
+            onTap: () => _showScanSelectorSheet(context),
             borderRadius: BorderRadius.circular(8),
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1434,6 +1430,90 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showScanSelectorSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Choose Scan Type',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E1B4B),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.document_scanner_rounded, color: Color(0xFF16A34A)),
+                  ),
+                  title: const Text('Scan Grocery Bill (OCR)', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Extract receipt items, restock inventory & track spend', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BillScannerScreen()),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF3B82F6)),
+                  ),
+                  title: const Text('Scan Product Barcode', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Instant camera scan for product details & lookup', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    BarcodeScannerWidget.open(context);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1870,198 +1950,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   // ==================================================
-  // 5. QUICK ACCESS (4 Cards in 1 Row)
-  // ==================================================
-  Widget _buildQuickAccessSection(
-    BuildContext context,
-    WidgetRef ref,
-    DashboardSummaryModel? summary,
-  ) {
-    final lowCount = (summary?.lowStockCount ?? 0) + (summary?.outOfStockCount ?? 0);
-    final expiringCount = summary?.expiringSoonCount ?? 0;
-    final shoppingCount = summary?.pendingShoppingCount ?? 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header Row: ⚡ Quick Access + See All
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.bolt_rounded, size: 20, color: Color(0xFFF59E0B)),
-                SizedBox(width: 6),
-                Text(
-                  'Quick Access',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
-            ),
-            InkWell(
-              onTap: () {
-                ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.all);
-                context.go('/inventory');
-              },
-              borderRadius: BorderRadius.circular(6),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                child: Text(
-                  'See All',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF6366F1),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-
-        // 4 Pastel Cards in a horizontal row
-        SizedBox(
-          height: 102,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            children: [
-              // Card 1: Low Stock
-              _buildQuickAccessPillCard(
-                icon: Icons.warning_amber_rounded,
-                iconColor: const Color(0xFFDC2626),
-                iconBg: const Color(0xFFFEE2E2),
-                cardBg: const Color(0xFFFEF2F2),
-                borderColor: const Color(0xFFFECDD3),
-                title: 'Low Stock',
-                subtitle: '$lowCount ${lowCount == 1 ? 'item' : 'items'}',
-                onTap: () {
-                  ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.lowStock);
-                  context.go('/inventory');
-                },
-              ),
-              const SizedBox(width: 8),
-
-              // Card 2: Expiring Soon
-              _buildQuickAccessPillCard(
-                icon: Icons.access_time_filled_rounded,
-                iconColor: const Color(0xFFD97706),
-                iconBg: const Color(0xFFFEF3C7),
-                cardBg: const Color(0xFFFEF9C3),
-                borderColor: const Color(0xFFFEF08A),
-                title: 'Expiring Soon',
-                subtitle: '$expiringCount ${expiringCount == 1 ? 'item' : 'items'}',
-                onTap: () => context.push('/attention'),
-              ),
-              const SizedBox(width: 8),
-
-              // Card 3: Shopping List
-              _buildQuickAccessPillCard(
-                icon: Icons.shopping_bag_outlined,
-                iconColor: const Color(0xFF7C3AED),
-                iconBg: const Color(0xFFEDE9FE),
-                cardBg: const Color(0xFFF3E8FF),
-                borderColor: const Color(0xFFE9D5FF),
-                title: 'Shopping List',
-                subtitle: '$shoppingCount ${shoppingCount == 1 ? 'item' : 'items'}',
-                onTap: () => context.go('/shopping'),
-              ),
-              const SizedBox(width: 8),
-
-              // Card 4: Categories
-              _buildQuickAccessPillCard(
-                icon: Icons.grid_view_rounded,
-                iconColor: const Color(0xFF0284C7),
-                iconBg: const Color(0xFFDBEAFE),
-                cardBg: const Color(0xFFE0F2FE),
-                borderColor: const Color(0xFFBAE6FD),
-                title: 'Categories',
-                subtitle: 'View all',
-                onTap: () {
-                  ref.read(inventoryControllerProvider.notifier).setFilterType(InventoryFilterType.all);
-                  context.go('/inventory');
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickAccessPillCard({
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBg,
-    required Color cardBg,
-    required Color borderColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 106,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor, width: 1.0),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
-              ),
-              child: Center(child: Icon(icon, size: 17, color: iconColor)),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================================================
-  // 6. YOUR PANTRY (Horizontal Cards + Smart Suggestions)
+  // 5. YOUR PANTRY (Horizontal Cards + Smart Suggestions)
   // ==================================================
   Widget _buildYourPantrySection(BuildContext context, WidgetRef ref) {
     final invState = ref.watch(inventoryControllerProvider);

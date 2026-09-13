@@ -1,5 +1,6 @@
 package com.homestock.modules.bill.matching;
 
+import com.homestock.modules.bill.dto.ExistingProductMatchDto;
 import com.homestock.modules.bill.parser.ParsedBillItem;
 import com.homestock.modules.inventory.entity.InventoryItem;
 import com.homestock.modules.inventory.repository.InventoryItemRepository;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service("billProductMatchingEngine")
 public class ProductMatchingEngine {
@@ -50,57 +52,80 @@ public class ProductMatchingEngine {
         // Calculate standard unit price (per 1 KG or per 1 L or per 1 PCS)
         BigDecimal standardUnitPrice = calculateStandardPrice(finalPrice, qty, unit);
 
+        // Fetch home's active (non-archived) inventory items
+        List<InventoryItem> homeItems = inventoryItemRepository.findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(homeId);
+
         // 1. Check Barcode Match (if barcode present)
         if (scannedItem.getBarcode() != null && !scannedItem.getBarcode().isEmpty()) {
-            Optional<InventoryItem> barcodeItem = inventoryItemRepository.findByHomeIdAndBarcode(homeId, scannedItem.getBarcode());
+            Optional<InventoryItem> barcodeItem = inventoryItemRepository.findByHomeIdAndBarcodeAndIsArchivedFalse(homeId, scannedItem.getBarcode());
             if (barcodeItem.isPresent()) {
-                return buildResult(scannedItem, barcodeItem.get(), barcodeItem.get().getProduct(), BigDecimal.valueOf(100.0), "AUTO_MATCHED", standardUnitPrice);
+                return buildResult(scannedItem, barcodeItem.get(), barcodeItem.get().getProduct(), BigDecimal.valueOf(100.0), "AUTO_MATCHED", standardUnitPrice, Collections.emptyList());
             }
             Optional<Product> barcodeProduct = productRepository.findByBarcode(scannedItem.getBarcode());
             if (barcodeProduct.isPresent()) {
-                return buildResult(scannedItem, null, barcodeProduct.get(), BigDecimal.valueOf(100.0), "AUTO_MATCHED", standardUnitPrice);
+                Optional<InventoryItem> homeBarcodeItem = inventoryItemRepository.findByHomeIdAndProductIdAndIsArchivedFalse(homeId, barcodeProduct.get().getId());
+                return buildResult(scannedItem, homeBarcodeItem.orElse(null), barcodeProduct.get(), BigDecimal.valueOf(100.0), "AUTO_MATCHED", standardUnitPrice, Collections.emptyList());
             }
         }
 
-        // Fetch home's existing inventory items
-        List<InventoryItem> homeItems = inventoryItemRepository.findByHomeId(homeId);
-
-        // 2. Exact Normalized Name Match in Household Inventory
+        // 2. Exact Raw or Normalized Name Match in Household Inventory
         for (InventoryItem item : homeItems) {
+            if (item.getName().equalsIgnoreCase(scannedItem.getName()) || item.getName().equalsIgnoreCase(norm.originalName())) {
+                return buildResult(scannedItem, item, item.getProduct(), BigDecimal.valueOf(100.0), "AUTO_MATCHED", standardUnitPrice, Collections.emptyList());
+            }
             ProductNormalizationService.NormalizedProductInfo itemNorm = normalizationService.normalize(item.getName());
             if (normName.equalsIgnoreCase(itemNorm.normalizedName())) {
                 boolean brandMatch = (brand == null || item.getBrand() == null || brand.equalsIgnoreCase(item.getBrand()));
                 BigDecimal confidence = brandMatch ? BigDecimal.valueOf(98.0) : BigDecimal.valueOf(95.0);
-                return buildResult(scannedItem, item, item.getProduct(), confidence, "AUTO_MATCHED", standardUnitPrice);
+                return buildResult(scannedItem, item, item.getProduct(), confidence, "AUTO_MATCHED", standardUnitPrice, Collections.emptyList());
             }
         }
 
         // 3. Exact Normalized Name Match in Global Product Catalog
         Optional<Product> catalogProduct = productRepository.findByNormalizedName(normName);
         if (catalogProduct.isPresent()) {
-            return buildResult(scannedItem, null, catalogProduct.get(), BigDecimal.valueOf(95.0), "AUTO_MATCHED", standardUnitPrice);
+            Optional<InventoryItem> homeCatalogItem = inventoryItemRepository.findByHomeIdAndProductIdAndIsArchivedFalse(homeId, catalogProduct.get().getId());
+            return buildResult(scannedItem, homeCatalogItem.orElse(null), catalogProduct.get(), BigDecimal.valueOf(95.0), "AUTO_MATCHED", standardUnitPrice, Collections.emptyList());
         }
 
-        // 4. Fuzzy Similarity across Household Inventory
+        // 4. Score Household Items and Collect Suggestions
+        List<ExistingProductMatchDto> suggestions = new ArrayList<>();
         InventoryItem bestFuzzyItem = null;
         double bestFuzzyScore = 0.0;
 
         for (InventoryItem item : homeItems) {
             ProductNormalizationService.NormalizedProductInfo itemNorm = normalizationService.normalize(item.getName());
-            double sim = calculateSimilarity(normName, itemNorm.normalizedName(), brand, item.getBrand());
+            double sim = calculateSimilarity(normName, itemNorm.normalizedName(), brand, item.getBrand(), scannedItem.getName(), item.getName());
             if (sim > bestFuzzyScore) {
                 bestFuzzyScore = sim;
                 bestFuzzyItem = item;
             }
+            if (sim >= 0.50) {
+                suggestions.add(ExistingProductMatchDto.builder()
+                        .inventoryItemId(item.getId())
+                        .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                        .productName(item.getName())
+                        .category(item.getCategory() != null ? item.getCategory().getName() : "Food & Grocery")
+                        .currentStock(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
+                        .unit(item.getUnit())
+                        .matchScore(BigDecimal.valueOf(sim).setScale(2, RoundingMode.HALF_UP))
+                        .build());
+            }
         }
 
-        if (bestFuzzyScore >= 0.80 && bestFuzzyItem != null) {
+        // Sort suggestions descending by match score, limit to top 5
+        suggestions.sort((a, b) -> b.getMatchScore().compareTo(a.getMatchScore()));
+        if (suggestions.size() > 5) {
+            suggestions = new ArrayList<>(suggestions.subList(0, 5));
+        }
+
+        if (bestFuzzyScore >= 0.65 && bestFuzzyItem != null) {
             BigDecimal confidence = BigDecimal.valueOf(Math.min(99.0, bestFuzzyScore * 100.0)).setScale(2, RoundingMode.HALF_UP);
-            String status = confidence.compareTo(BigDecimal.valueOf(95.0)) >= 0 ? "AUTO_MATCHED" : "SUGGESTED";
-            return buildResult(scannedItem, bestFuzzyItem, bestFuzzyItem.getProduct(), confidence, status, standardUnitPrice);
+            String status = confidence.compareTo(BigDecimal.valueOf(85.0)) >= 0 ? "AUTO_MATCHED" : "SUGGESTED";
+            return buildResult(scannedItem, bestFuzzyItem, bestFuzzyItem.getProduct(), confidence, status, standardUnitPrice, suggestions);
         }
 
-        // 5. If confidence is below 80%, treat as new product candidate
+        // 5. If confidence is below 65%, treat as new product candidate
         BigDecimal confidence = BigDecimal.valueOf(Math.max(20.0, bestFuzzyScore * 100.0)).setScale(2, RoundingMode.HALF_UP);
         return ProductMatchResult.builder()
                 .confidence(confidence)
@@ -115,6 +140,7 @@ public class ProductMatchingEngine {
                 .resolvedUnitPrice(unitPrice)
                 .resolvedFinalPrice(finalPrice)
                 .standardUnitPrice(standardUnitPrice)
+                .suggestedMatches(suggestions)
                 .build();
     }
 
@@ -142,29 +168,54 @@ public class ProductMatchingEngine {
         return Optional.ofNullable(bestMatch);
     }
 
-    private double calculateSimilarity(String s1, String s2, String brand1, String brand2) {
+    private double calculateSimilarity(
+            String s1, String s2, String brand1, String brand2,
+            String raw1, String raw2
+    ) {
         if (s1 == null || s2 == null) return 0.0;
-        double textScore = jaroWinkler(s1.toUpperCase(), s2.toUpperCase());
+        if (s1.equalsIgnoreCase(s2) || (raw1 != null && raw2 != null && raw1.equalsIgnoreCase(raw2))) {
+            return 1.0;
+        }
 
-        // Token overlap check
-        Set<String> tokens1 = new HashSet<>(Arrays.asList(s1.toUpperCase().split("\\s+")));
-        Set<String> tokens2 = new HashSet<>(Arrays.asList(s2.toUpperCase().split("\\s+")));
+        Set<String> stopWords = Set.of("THE", "A", "AN", "AND", "OF", "PACK", "PKT", "PCS", "PIECE", "BOTTLE", "BOX", "POUCH", "PREMIUM", "SUPERIOR", "FRESH", "SHUDH", "SPECIAL");
+
+        Set<String> tokens1 = Arrays.stream(s1.toUpperCase().split("\\s+"))
+                .filter(t -> !t.isBlank() && !stopWords.contains(t))
+                .collect(Collectors.toSet());
+        Set<String> tokens2 = Arrays.stream(s2.toUpperCase().split("\\s+"))
+                .filter(t -> !t.isBlank() && !stopWords.contains(t))
+                .collect(Collectors.toSet());
+
+        if (tokens1.isEmpty() || tokens2.isEmpty()) {
+            return jaroWinkler(s1.toUpperCase(), s2.toUpperCase());
+        }
+
         Set<String> intersection = new HashSet<>(tokens1);
         intersection.retainAll(tokens2);
 
         double minTokens = Math.min(tokens1.size(), tokens2.size());
-        double tokenScore = (!tokens1.isEmpty() && !tokens2.isEmpty() && minTokens > 0)
-                ? (double) intersection.size() / minTokens
-                : 0.0;
+        double tokenScore = minTokens > 0 ? (double) intersection.size() / minTokens : 0.0;
+        boolean isContained = intersection.size() == (int) minTokens;
 
-        double combinedScore = (textScore * 0.4) + (tokenScore * 0.6);
+        double textScore = jaroWinkler(s1.toUpperCase(), s2.toUpperCase());
 
-        // Boost if brand matches
-        if (brand1 != null && brand2 != null && brand1.equalsIgnoreCase(brand2)) {
-            combinedScore = Math.min(1.0, combinedScore + 0.15);
+        double combinedScore;
+        if (isContained) {
+            combinedScore = 0.88 + (textScore * 0.08);
+        } else {
+            combinedScore = (textScore * 0.35) + (tokenScore * 0.65);
         }
 
-        return combinedScore;
+        // Brand weighting
+        if (brand1 != null && brand2 != null) {
+            if (brand1.equalsIgnoreCase(brand2)) {
+                combinedScore = Math.min(0.99, combinedScore + 0.10);
+            } else {
+                combinedScore = Math.max(0.20, combinedScore - 0.15);
+            }
+        }
+
+        return Math.min(1.0, Math.max(0.0, combinedScore));
     }
 
     public static double jaroWinkler(String s1, String s2) {
@@ -252,7 +303,8 @@ public class ProductMatchingEngine {
             Product prod,
             BigDecimal confidence,
             String status,
-            BigDecimal standardPrice
+            BigDecimal standardPrice,
+            List<ExistingProductMatchDto> suggestions
     ) {
         String name = inv != null ? inv.getName() : (prod != null ? prod.getName() : formatCapitalized(scanned.getName()));
         String brand = inv != null ? inv.getBrand() : (prod != null ? prod.getBrand() : null);
@@ -272,6 +324,7 @@ public class ProductMatchingEngine {
                 .resolvedUnitPrice(scanned.getUnitPrice())
                 .resolvedFinalPrice(scanned.getFinalPrice())
                 .standardUnitPrice(standardPrice)
+                .suggestedMatches(suggestions != null ? suggestions : Collections.emptyList())
                 .build();
     }
 

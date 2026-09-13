@@ -337,18 +337,15 @@ void main() {
     // 5. YOUR PANTRY VERIFICATION
     expect(find.text('Your Pantry'), findsOneWidget);
     expect(find.text('Smart Suggestions'), findsOneWidget);
-    expect(find.text('See All'), findsNWidgets(2)); // Quick Access & Categories "See All"
+    expect(find.text('See All'), findsOneWidget); // Pantry Categories "See All"
 
-    // 6. QUICK ACCESS ACTION SHORTCUTS
-    expect(find.text('Quick Access'), findsOneWidget);
-    expect(find.text('Low Stock'), findsNWidgets(2)); // Quick action + category pill
-    expect(find.text('Expiring Soon'), findsOneWidget);
-    expect(find.text('Shopping List'), findsOneWidget);
-    expect(find.text('Categories'), findsOneWidget);
+    // 6. QUICK ACCESS SECTION REMOVED
+    expect(find.text('Quick Access'), findsNothing);
 
     // 7. PANTRY CATEGORIES
     expect(find.text('Pantry Categories'), findsOneWidget);
     expect(find.text('All'), findsOneWidget);
+    expect(find.text('Low Stock'), findsOneWidget); // Category pill
     expect(find.text('Kitchen'), findsOneWidget);
     expect(find.text('Cleaning'), findsOneWidget);
     expect(find.text('Beverages'), findsOneWidget);

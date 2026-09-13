@@ -80,6 +80,46 @@ public class PurchasedBill extends BaseEntity {
     @Column(name = "confirmed_at")
     private Instant confirmedAt;
 
+    // --- AI Pipeline Fields ---
+
+    @Builder.Default
+    @Column(name = "processing_status", length = 30)
+    private String processingStatus = "UPLOADED";
+
+    @Column(name = "image_quality_score", precision = 5, scale = 2)
+    private BigDecimal imageQualityScore;
+
+    @Column(name = "ocr_provider", length = 50)
+    private String ocrProvider;
+
+    @Column(name = "ai_provider", length = 50)
+    private String aiProvider;
+
+    @Column(name = "overall_confidence", precision = 5, scale = 2)
+    private BigDecimal overallConfidence;
+
+    @Column(name = "image_hash", length = 64)
+    private String imageHash;
+
+    @Column(name = "item_fingerprint", length = 128)
+    private String itemFingerprint;
+
+    @Builder.Default
+    @Column(name = "needs_review")
+    private Boolean needsReview = false;
+
+    @Column(name = "review_notes", columnDefinition = "TEXT")
+    private String reviewNotes;
+
+    @Column(name = "validation_status", length = 30)
+    private String validationStatus;
+
+    @Column(name = "validation_discrepancy", precision = 12, scale = 2)
+    private BigDecimal validationDiscrepancy;
+
+    @Column(name = "processing_duration_ms")
+    private Integer processingDurationMs;
+
     @Builder.Default
     @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PurchasedBillItem> items = new ArrayList<>();

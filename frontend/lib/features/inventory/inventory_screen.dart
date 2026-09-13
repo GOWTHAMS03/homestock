@@ -11,6 +11,7 @@ import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../notifications/notifications_screen.dart';
 import '../shopping/shopping_controller.dart';
 import '../shopping/shopping_model.dart';
+import '../bill/screens/bill_scanner_screen.dart';
 import 'add_edit_item_screen.dart';
 import 'category_model.dart';
 import 'inventory_controller.dart';
@@ -2131,6 +2132,26 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     Navigator.of(ctx).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const AddEditItemScreen()),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.document_scanner_rounded, color: Color(0xFF16A34A)),
+                  ),
+                  title: const Text('Scan Grocery Bill (OCR)', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Extract receipt items, restock inventory & track spend', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BillScannerScreen()),
                     );
                   },
                 ),

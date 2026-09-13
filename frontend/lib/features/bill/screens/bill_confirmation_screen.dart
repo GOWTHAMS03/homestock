@@ -8,6 +8,8 @@ import '../../../core/widgets/homestock/homestock_card.dart';
 import '../../../core/widgets/homestock/homestock_pill_badge.dart';
 import '../controllers/bill_controller.dart';
 import '../models/bill_models.dart';
+import '../../inventory/inventory_controller.dart';
+import '../../shopping/shopping_controller.dart';
 
 class BillConfirmationScreen extends ConsumerStatefulWidget {
   const BillConfirmationScreen({super.key});
@@ -154,22 +156,31 @@ class _BillConfirmationScreenState extends ConsumerState<BillConfirmationScreen>
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 16),
-            ...item.suggestedMatches.map((m) {
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  child: const Icon(Icons.inventory_2_outlined, color: AppColors.primary, size: 20),
+            if (item.suggestedMatches.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'No matching products found in your inventory yet.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontStyle: FontStyle.italic),
                 ),
-                title: Text(m.productName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text('Current Stock: ${m.currentStock} ${m.unit}  •  Confidence: ${(m.matchScore * 100).toInt()}%'),
-                trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
-                onTap: () {
-                  ref.read(billScannerControllerProvider.notifier).assignMatch(index, m);
-                  Navigator.pop(ctx);
-                },
-              );
-            }),
+              )
+            else
+              ...item.suggestedMatches.map((m) {
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    child: const Icon(Icons.inventory_2_outlined, color: AppColors.primary, size: 20),
+                  ),
+                  title: Text(m.productName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('Current Stock: ${m.currentStock} ${m.unit}  •  Confidence: ${(m.matchScore * 100).toInt()}%'),
+                  trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                  onTap: () {
+                    ref.read(billScannerControllerProvider.notifier).assignMatch(index, m);
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
             const Divider(),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -215,6 +226,8 @@ class _BillConfirmationScreenState extends ConsumerState<BillConfirmationScreen>
     if (confirmed == true && mounted) {
       final res = await ref.read(billScannerControllerProvider.notifier).confirmBill();
       if (res != null && mounted) {
+        ref.read(inventoryControllerProvider.notifier).loadData();
+        ref.read(shoppingControllerProvider.notifier).loadShoppingList();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF059669),
@@ -389,7 +402,7 @@ class _BillConfirmationScreenState extends ConsumerState<BillConfirmationScreen>
       variant = HomeStockPillVariant.green;
       statusLabel = 'Matched (${(item.matchConfidence).toInt()}%)';
       statusIcon = Icons.check_circle_outline;
-    } else if (item.matchStatus == 'SUGGESTED_MATCH') {
+    } else if (item.matchStatus == 'SUGGESTED_MATCH' || item.matchStatus == 'SUGGESTED') {
       variant = HomeStockPillVariant.yellow;
       statusLabel = 'Suggestion (${(item.matchConfidence).toInt()}%)';
       statusIcon = Icons.help_outline;

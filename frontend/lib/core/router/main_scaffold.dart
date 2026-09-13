@@ -40,13 +40,13 @@ class MainScaffold extends ConsumerWidget {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(36),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Container(
-                height: 66,
+                height: 64,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(36),
@@ -69,7 +69,7 @@ class MainScaffold extends ConsumerWidget {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Row(
                   children: [
                     // 0. Home Tab
@@ -201,16 +201,16 @@ class _NavBarItemState extends State<_NavBarItem> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
-          height: 48,
+          height: 46,
           padding: EdgeInsets.only(
-            left: isSelected ? 5 : 12,
-            right: isSelected ? 14 : 12,
-            top: 4,
-            bottom: 4,
+            left: isSelected ? 4 : 8,
+            right: isSelected ? 10 : 8,
+            top: 2,
+            bottom: 2,
           ),
           decoration: BoxDecoration(
             color: isSelected ? widget.activePillBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(24),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -220,8 +220,8 @@ class _NavBarItemState extends State<_NavBarItem> {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 240),
                 curve: Curves.easeOutCubic,
-                width: isSelected ? 38 : 32,
-                height: isSelected ? 38 : 32,
+                width: isSelected ? 34 : 28,
+                height: isSelected ? 34 : 28,
                 decoration: BoxDecoration(
                   color: isSelected ? widget.activeCircleColor : Colors.transparent,
                   shape: BoxShape.circle,
@@ -249,7 +249,7 @@ class _NavBarItemState extends State<_NavBarItem> {
                         builder: (context, color, _) {
                           return Icon(
                             isSelected ? widget.selectedIcon : widget.icon,
-                            size: isSelected ? 20 : 24,
+                            size: isSelected ? 18 : 22,
                             color: color,
                           );
                         },
@@ -305,17 +305,19 @@ class _NavBarItemState extends State<_NavBarItem> {
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const SizedBox(width: 8),
-                            Text(
-                              widget.label,
-                              maxLines: 1,
-                              softWrap: false,
-                              overflow: TextOverflow.clip,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                                color: widget.activeTextColor,
-                                letterSpacing: -0.2,
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.0,
+                                  fontWeight: FontWeight.w700,
+                                  color: widget.activeTextColor,
+                                  letterSpacing: -0.2,
+                                ),
                               ),
                             ),
                           ],

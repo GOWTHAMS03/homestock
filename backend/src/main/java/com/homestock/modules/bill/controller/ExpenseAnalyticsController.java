@@ -33,14 +33,18 @@ public class ExpenseAnalyticsController {
         this.priceIntelligenceService = priceIntelligenceService;
     }
 
-    @GetMapping("/monthly")
+    @GetMapping(value = {"/monthly", "/expenses/monthly"})
     @PreAuthorize("@homeSecurity.isMember(#homeId)")
     @Operation(summary = "Get current monthly spending report, trend vs previous month, and summary metrics")
     public ResponseEntity<ApiResponse<MonthlyExpenseReportDto>> getCurrentMonthlyReport(
-            @PathVariable UUID homeId
+            @PathVariable UUID homeId,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month
     ) {
         LocalDate now = LocalDate.now();
-        MonthlyExpenseReportDto report = expenseIntelligenceService.getMonthlyReport(homeId, now.getYear(), now.getMonthValue());
+        int y = (year != null && year > 2000) ? year : now.getYear();
+        int m = (month != null && month >= 1 && month <= 12) ? month : now.getMonthValue();
+        MonthlyExpenseReportDto report = expenseIntelligenceService.getMonthlyReport(homeId, y, m);
         return ResponseEntity.ok(ApiResponse.success(report));
     }
 
@@ -72,7 +76,7 @@ public class ExpenseAnalyticsController {
         return ResponseEntity.ok(ApiResponse.success(list));
     }
 
-    @GetMapping("/shop")
+    @GetMapping(value = {"/shop", "/expenses/stores"})
     @PreAuthorize("@homeSecurity.isMember(#homeId)")
     @Operation(summary = "Get shop-wise spending breakdown and retailer visit counts")
     public ResponseEntity<ApiResponse<List<ShopExpenseDto>>> getShopBreakdown(
@@ -88,7 +92,7 @@ public class ExpenseAnalyticsController {
         return ResponseEntity.ok(ApiResponse.success(list));
     }
 
-    @GetMapping("/products/{productId}/price-history")
+    @GetMapping(value = {"/products/{productId}/price-history", "/expenses/price-history/{productId}"})
     @PreAuthorize("@homeSecurity.isMember(#homeId)")
     @Operation(summary = "Get product price intelligence, price per standard unit, and store comparison")
     public ResponseEntity<ApiResponse<ProductPriceIntelligenceDto>> getProductPriceHistory(

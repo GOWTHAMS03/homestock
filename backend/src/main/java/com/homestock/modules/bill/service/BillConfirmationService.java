@@ -5,6 +5,7 @@ import com.homestock.modules.bill.dto.*;
 import com.homestock.modules.bill.entity.ProductPriceHistory;
 import com.homestock.modules.bill.entity.PurchasedBill;
 import com.homestock.modules.bill.entity.PurchasedBillItem;
+import com.homestock.modules.bill.matching.ProductMatchingEngine;
 import com.homestock.modules.bill.matching.ProductNormalizationService;
 import com.homestock.modules.bill.repository.ProductPriceHistoryRepository;
 import com.homestock.modules.bill.repository.PurchasedBillItemRepository;
@@ -13,6 +14,7 @@ import com.homestock.modules.category.entity.Category;
 import com.homestock.modules.category.repository.CategoryRepository;
 import com.homestock.modules.dashboard.service.DashboardCacheService;
 import com.homestock.modules.home.entity.Home;
+import com.homestock.modules.home.repository.HomeRepository;
 import com.homestock.modules.inventory.entity.InventoryItem;
 import com.homestock.modules.inventory.entity.StockTransaction;
 import com.homestock.modules.inventory.entity.TransactionType;
@@ -26,6 +28,8 @@ import com.homestock.modules.purchase.repository.PurchaseItemRepository;
 import com.homestock.modules.purchase.repository.PurchaseRepository;
 import com.homestock.modules.shopping.entity.ShoppingListItem;
 import com.homestock.modules.shopping.repository.ShoppingListItemRepository;
+import com.homestock.modules.consumption.service.ConsumptionService;
+import com.homestock.modules.notification.service.NotificationEngine;
 import com.homestock.modules.store.entity.Store;
 import com.homestock.modules.store.repository.StoreRepository;
 import com.homestock.modules.sync.service.HomeChangeLogService;
@@ -63,6 +67,10 @@ public class BillConfirmationService {
     private final ProductNormalizationService normalizationService;
     private final DashboardCacheService dashboardCacheService;
     private final HomeChangeLogService homeChangeLogService;
+    private final HomeRepository homeRepository;
+    private final DuplicateBillDetector duplicateDetector;
+    private final NotificationEngine notificationEngine;
+    private final ConsumptionService consumptionService;
 
     public BillConfirmationService(
             PurchasedBillRepository billRepository,
@@ -78,7 +86,11 @@ public class BillConfirmationService {
             StoreRepository storeRepository,
             ProductNormalizationService normalizationService,
             DashboardCacheService dashboardCacheService,
-            HomeChangeLogService homeChangeLogService
+            HomeChangeLogService homeChangeLogService,
+            HomeRepository homeRepository,
+            DuplicateBillDetector duplicateDetector,
+            NotificationEngine notificationEngine,
+            ConsumptionService consumptionService
     ) {
         this.billRepository = billRepository;
         this.billItemRepository = billItemRepository;
@@ -94,6 +106,10 @@ public class BillConfirmationService {
         this.normalizationService = normalizationService;
         this.dashboardCacheService = dashboardCacheService;
         this.homeChangeLogService = homeChangeLogService;
+        this.homeRepository = homeRepository;
+        this.duplicateDetector = duplicateDetector;
+        this.notificationEngine = notificationEngine;
+        this.consumptionService = consumptionService;
     }
 
     @Transactional
@@ -103,33 +119,65 @@ public class BillConfirmationService {
             ConfirmBillRequest request,
             User currentUser
     ) {
-        PurchasedBill bill = billRepository.findById(billId)
-                .orElseThrow(() -> new ResourceNotFoundException("Bill not found"));
-
-        if (!bill.getHome().getId().equals(homeId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Bill does not belong to this household");
+        PurchasedBill bill = null;
+        if (billId != null) {
+            bill = billRepository.findById(billId).orElse(null);
+        }
+        if (bill == null && request != null && request.getBillId() != null) {
+            bill = billRepository.findById(request.getBillId()).orElse(null);
         }
 
-        Home home = bill.getHome();
+        Home home;
+        if (bill != null) {
+            if (!bill.getHome().getId().equals(homeId)) {
+                throw new org.springframework.security.access.AccessDeniedException("Bill does not belong to this household");
+            }
+            home = bill.getHome();
+        } else {
+            home = homeRepository.findById(homeId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Household not found"));
+            String defaultShopName = (request != null && request.getShopName() != null) ? request.getShopName() : "Retail Store";
+            LocalDate defaultBillDate = (request != null && request.getBillDate() != null) ? request.getBillDate() : LocalDate.now();
+            BigDecimal defaultTotal = (request != null && request.getTotalAmount() != null) ? request.getTotalAmount() : BigDecimal.ZERO;
+            String idempotencyKey = duplicateDetector.generateIdempotencyKey(homeId, defaultShopName, request != null ? request.getBillNumber() : null, defaultBillDate, defaultTotal);
+
+            bill = PurchasedBill.builder()
+                    .home(home)
+                    .shopName(defaultShopName)
+                    .billNumber(request != null ? request.getBillNumber() : null)
+                    .billDate(defaultBillDate)
+                    .subtotal((request != null && request.getSubtotal() != null) ? request.getSubtotal() : defaultTotal)
+                    .taxAmount((request != null && request.getTaxAmount() != null) ? request.getTaxAmount() : BigDecimal.ZERO)
+                    .discountAmount((request != null && request.getDiscountAmount() != null) ? request.getDiscountAmount() : BigDecimal.ZERO)
+                    .totalAmount(defaultTotal)
+                    .currency("INR")
+                    .idempotencyKey(idempotencyKey)
+                    .status("CONFIRMED")
+                    .rawOcrText(request != null ? request.getRawOcrText() : null)
+                    .recordedBy(currentUser)
+                    .build();
+            bill = billRepository.save(bill);
+        }
 
         // 1. Resolve Store
         Store store = null;
-        String shopName = request.getShopName() != null ? request.getShopName() : bill.getShopName();
-        if (shopName != null && !shopName.trim().isEmpty()) {
-            store = storeRepository.findByHomeIdAndNameIgnoreCase(homeId, shopName.trim())
+        String rawShop = request.getShopName() != null ? request.getShopName() : bill.getShopName();
+        String shopName = sanitize(rawShop);
+        if (shopName != null && !shopName.isBlank()) {
+            store = storeRepository.findByHomeIdAndNameIgnoreCase(homeId, shopName)
                     .orElseGet(() -> storeRepository.save(Store.builder()
                             .home(home)
-                            .name(shopName.trim())
+                            .name(shopName)
                             .build()));
         }
 
         LocalDate billDate = request.getBillDate() != null ? request.getBillDate() : bill.getBillDate();
-        String billNumber = request.getBillNumber() != null ? request.getBillNumber() : bill.getBillNumber();
+        String billNumber = sanitize(request.getBillNumber() != null ? request.getBillNumber() : bill.getBillNumber());
         BigDecimal totalAmount = request.getTotalAmount() != null ? request.getTotalAmount() : bill.getTotalAmount();
 
         // 2. Update Bill Header
         bill.setStore(store);
-        bill.setShopName(shopName);
+        bill.setShopName(shopName != null ? shopName : "Retail Store");
         bill.setBillNumber(billNumber);
         bill.setBillDate(billDate);
         bill.setSubtotal(request.getSubtotal() != null ? request.getSubtotal() : bill.getSubtotal());
@@ -149,7 +197,7 @@ public class BillConfirmationService {
                 .totalAmount(totalAmount)
                 .currency(bill.getCurrency())
                 .receiptImageUrl(bill.getReceiptImageUrl())
-                .notes("Generated from Bill #" + billNumber + (shopName != null ? " at " + shopName : ""))
+                .notes(sanitize("Generated from Bill #" + billNumber + (shopName != null ? " at " + shopName : "")))
                 .items(new ArrayList<>())
                 .build();
         purchase = purchaseRepository.save(purchase);
@@ -175,14 +223,71 @@ public class BillConfirmationService {
             if (inventoryItem == null && itemReq.getProductId() != null) {
                 product = productRepository.findById(itemReq.getProductId()).orElse(null);
                 if (product != null) {
-                    inventoryItem = inventoryItemRepository.findByHomeIdAndProductId(homeId, product.getId()).orElse(null);
+                    inventoryItem = inventoryItemRepository.findByHomeIdAndProductIdAndIsArchivedFalse(homeId, product.getId()).orElse(null);
+                }
+            }
+
+            String rawName = itemReq.getProductName() != null ? itemReq.getProductName() : itemReq.getRawItemName();
+            String sanitized = sanitize(rawName);
+            final String cleanName = (sanitized != null && !sanitized.isBlank()) ? sanitized : "Item";
+            ProductNormalizationService.NormalizedProductInfo norm = normalizationService.normalize(cleanName);
+
+            if (product == null) {
+                product = productRepository.findByNormalizedName(norm.normalizedName()).orElse(null);
+            }
+
+            // If still not resolved and not explicitly marked as a forced brand-new item, search household inventory
+            if (inventoryItem == null && !Boolean.TRUE.equals(itemReq.getCreateNewProduct())) {
+                // 1. Check barcode if present
+                if (itemReq.getBarcode() != null && !itemReq.getBarcode().isBlank()) {
+                    inventoryItem = inventoryItemRepository.findByHomeIdAndBarcodeAndIsArchivedFalse(homeId, itemReq.getBarcode()).orElse(null);
+                }
+
+                // 2. Check if household has an inventory item linked to the resolved product
+                if (inventoryItem == null && product != null) {
+                    inventoryItem = inventoryItemRepository.findByHomeIdAndProductIdAndIsArchivedFalse(homeId, product.getId()).orElse(null);
+                }
+
+                // 3. Search active household items by exact name, normalized name, or token containment
+                if (inventoryItem == null) {
+                    List<InventoryItem> activeHomeItems = inventoryItemRepository.findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(homeId);
+                    
+                    // Exact name or normalized name
+                    for (InventoryItem hItem : activeHomeItems) {
+                        if (hItem.getName().equalsIgnoreCase(cleanName) || hItem.getName().equalsIgnoreCase(itemReq.getRawItemName())) {
+                            inventoryItem = hItem;
+                            break;
+                        }
+                        ProductNormalizationService.NormalizedProductInfo hNorm = normalizationService.normalize(hItem.getName());
+                        if (hNorm.normalizedName().equalsIgnoreCase(norm.normalizedName())) {
+                            inventoryItem = hItem;
+                            break;
+                        }
+                    }
+
+                    // Token containment / similarity match
+                    if (inventoryItem == null) {
+                        InventoryItem bestCandidate = null;
+                        double bestSim = 0.0;
+                        for (InventoryItem hItem : activeHomeItems) {
+                            ProductNormalizationService.NormalizedProductInfo hNorm = normalizationService.normalize(hItem.getName());
+                            double sim = calculateSimilarity(norm.normalizedName(), hNorm.normalizedName(), norm.detectedBrand(), hItem.getBrand(), cleanName, hItem.getName());
+                            if (sim > bestSim) {
+                                bestSim = sim;
+                                bestCandidate = hItem;
+                            }
+                        }
+                        if (bestSim >= 0.70 && bestCandidate != null) {
+                            inventoryItem = bestCandidate;
+                        }
+                    }
                 }
             }
 
             // If not found in household inventory, create or link
+            boolean isNewItem = false;
             if (inventoryItem == null) {
-                String cleanName = itemReq.getProductName() != null ? itemReq.getProductName() : itemReq.getRawItemName();
-                ProductNormalizationService.NormalizedProductInfo norm = normalizationService.normalize(cleanName);
+                isNewItem = true;
 
                 if (product == null) {
                     product = productRepository.findByNormalizedName(norm.normalizedName())
@@ -218,28 +323,48 @@ public class BillConfirmationService {
                 inventoryItem = inventoryItemRepository.save(inventoryItem);
             }
 
-            // B. Increment Inventory Quantity & Record Transaction
+            // B. Increment Inventory Quantity with unit conversion & Record Transaction
             BigDecimal previousQuantity = inventoryItem.getQuantity() != null ? inventoryItem.getQuantity() : BigDecimal.ZERO;
-            BigDecimal newQuantity = previousQuantity.add(qty);
+            BigDecimal convertedQty = convertQuantity(qty, unit, inventoryItem.getUnit());
+            BigDecimal newQuantity = previousQuantity.add(convertedQty);
 
             inventoryItem.setQuantity(newQuantity);
-            inventoryItem.setPurchasePrice(unitPrice);
+            if (unitPrice != null && unitPrice.compareTo(BigDecimal.ZERO) > 0) {
+                inventoryItem.setPurchasePrice(unitPrice);
+            }
             inventoryItem.setPurchaseDate(billDate);
-            inventoryItemRepository.save(inventoryItem);
+            if (inventoryItem.getMaximumQuantity() != null && inventoryItem.getMaximumQuantity().compareTo(BigDecimal.ZERO) > 0) {
+                inventoryItem.setQuantityStatus(com.homestock.modules.consumption.entity.QuantityStatus.fromRatio(
+                        newQuantity.divide(inventoryItem.getMaximumQuantity(), 2, RoundingMode.HALF_UP)));
+            }
+            inventoryItem.setQuantitySource(com.homestock.modules.consumption.entity.QuantitySource.VERIFIED);
+            inventoryItem.setLastVerifiedAt(Instant.now());
+            inventoryItem.setConfidence(com.homestock.modules.consumption.entity.ConfidenceLevel.HIGH);
 
-            // Record Stock Transaction
+            if (inventoryItem.getProduct() == null && product != null) {
+                inventoryItem.setProduct(product);
+            }
+
+            InventoryItem savedInv = inventoryItemRepository.save(inventoryItem);
+            homeChangeLogService.recordChange(home, "INVENTORY_ITEM", savedInv.getId(), isNewItem ? "INSERT" : "UPDATE", null, null);
+
+            // Record Stock Transaction with reference to BILL
+            String storeDesc = (shopName != null && !shopName.isBlank()) ? " at " + shopName : "";
             StockTransaction tx = StockTransaction.builder()
                     .home(home)
-                    .item(inventoryItem)
+                    .item(savedInv)
                     .user(currentUser)
                     .transactionType(TransactionType.STOCK_IN)
-                    .quantityChange(qty)
+                    .quantityChange(convertedQty)
                     .previousQuantity(previousQuantity)
                     .newQuantity(newQuantity)
-                    .unit(unit)
-                    .reason("Purchased via Bill #" + billNumber + " [source: BILL_SCAN]")
+                    .unit(savedInv.getUnit())
+                    .reason("Purchased via Bill #" + billNumber + storeDesc)
+                    .referenceType("BILL")
+                    .referenceId(bill.getId())
                     .build();
-            stockTransactionRepository.save(tx);
+            StockTransaction savedTx = stockTransactionRepository.save(tx);
+            homeChangeLogService.recordChange(home, "STOCK_TRANSACTION", savedTx.getId(), "INSERT", null, null);
 
             // C. Shopping List Integration (Partial vs Full)
             ShoppingListItem shoppingItem = null;
@@ -249,7 +374,7 @@ public class BillConfirmationService {
                 // Heuristic match if user didn't explicitly pick one
                 List<ShoppingListItem> pending = shoppingListItemRepository.findPendingItemsByHomeId(homeId);
                 for (ShoppingListItem p : pending) {
-                    if (p.getItemName().equalsIgnoreCase(inventoryItem.getName())) {
+                    if (p.getItemName().equalsIgnoreCase(savedInv.getName())) {
                         shoppingItem = p;
                         break;
                     }
@@ -263,7 +388,7 @@ public class BillConfirmationService {
                 BigDecimal totalPurchased = currentPurchased.add(qty);
                 shoppingItem.setPurchasedQuantity(totalPurchased);
 
-                if (totalPurchased.compareTo(shoppingItem.getQuantity()) >= 0) {
+                if (shoppingItem.getQuantity() != null && totalPurchased.compareTo(shoppingItem.getQuantity()) >= 0) {
                     shoppingItem.setIsCompleted(true);
                     shoppingItem.setStatus("PURCHASED");
                     shoppingItem.setCompletedAt(Instant.now());
@@ -272,19 +397,23 @@ public class BillConfirmationService {
                     shoppingItem.setIsCompleted(false);
                     shoppingItem.setStatus("PARTIALLY_PURCHASED");
                 }
-                shoppingListItemRepository.save(shoppingItem);
+                ShoppingListItem savedShop = shoppingListItemRepository.save(shoppingItem);
+                homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", savedShop.getId(), "UPDATE", null, null);
             }
 
-            // D. Save Bill Item
+            // D. Feed Consumption Learning Engine
+            consumptionService.onPurchaseRecorded(home, savedInv, qty, billDate);
+
+            // E. Save Bill Item
             BigDecimal standardPrice = calculateStandardUnitPrice(finalPrice, qty, unit);
 
             PurchasedBillItem billItem = PurchasedBillItem.builder()
                     .bill(bill)
-                    .product(inventoryItem.getProduct())
-                    .inventoryItem(inventoryItem)
+                    .product(savedInv.getProduct())
+                    .inventoryItem(savedInv)
                     .shoppingListItem(shoppingItem)
                     .rawItemName(itemReq.getRawItemName())
-                    .normalizedItemName(inventoryItem.getName())
+                    .normalizedItemName(savedInv.getName())
                     .quantity(qty)
                     .unit(unit)
                     .mrp(itemReq.getMrp())
@@ -299,24 +428,25 @@ public class BillConfirmationService {
             billItem = billItemRepository.save(billItem);
             confirmedBillItems.add(billItem);
 
-            // E. Save Permanent Purchase Item
+            // F. Save Permanent Purchase Item
             PurchaseItem purchaseItem = PurchaseItem.builder()
                     .purchase(purchase)
-                    .inventoryItem(inventoryItem)
-                    .itemName(inventoryItem.getName())
-                    .category(inventoryItem.getCategory())
+                    .inventoryItem(savedInv)
+                    .itemName(savedInv.getName())
+                    .category(savedInv.getCategory())
                     .quantity(qty)
                     .unit(unit)
                     .unitPrice(unitPrice)
                     .totalPrice(finalPrice)
                     .build();
-            purchaseItemRepository.save(purchaseItem);
+            purchaseItem = purchaseItemRepository.save(purchaseItem);
+            purchase.getItems().add(purchaseItem);
 
-            // F. Record Product Price History
+            // G. Record Product Price History
             ProductPriceHistory priceHistory = ProductPriceHistory.builder()
                     .home(home)
-                    .product(inventoryItem.getProduct())
-                    .inventoryItem(inventoryItem)
+                    .product(savedInv.getProduct())
+                    .inventoryItem(savedInv)
                     .store(store)
                     .storeName(shopName)
                     .purchaseDate(billDate)
@@ -330,10 +460,13 @@ public class BillConfirmationService {
             priceHistoryRepository.save(priceHistory);
         }
 
-        // 4. Invalidate Dashboard Summary Cache & Record Change Log
-        dashboardCacheService.evict(homeId);
+        // 4. Change Log, Notifications & Cache Eviction
+        homeChangeLogService.recordChange(home, "PURCHASE", purchase.getId(), "INSERT", null, null);
         homeChangeLogService.recordChange(home, "PURCHASED_BILL", bill.getId(), "INSERT", null, "bill-" + bill.getId());
-        homeChangeLogService.recordChange(home, "INVENTORY_ITEM", home.getId(), "UPDATE", null, "stock-bill-" + bill.getId());
+
+        notificationEngine.notifyPurchaseRecorded(home, currentUser, purchase);
+        notificationEngine.notifyHomeChanged(home, currentUser.getId());
+        dashboardCacheService.evict(homeId);
 
         return mapToResponseDto(bill, confirmedBillItems);
     }
@@ -395,5 +528,87 @@ public class BillConfirmationService {
                 .createdAt(bill.getCreatedAt())
                 .items(itemDtos)
                 .build();
+    }
+
+    private String sanitize(String input) {
+        if (input == null) return null;
+        String s = input.replace("\u0000", "").replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "").trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private BigDecimal convertQuantity(BigDecimal qty, String fromUnit, String toUnit) {
+        if (qty == null) return BigDecimal.ZERO;
+        if (fromUnit == null || toUnit == null) return qty;
+
+        String from = fromUnit.trim().toLowerCase();
+        String to = toUnit.trim().toLowerCase();
+
+        if (from.equals(to)) return qty;
+
+        // Weight: g/gm/grams to kg
+        if ((from.equals("g") || from.equals("gm") || from.equals("grams")) && (to.equals("kg") || to.equals("kgs") || to.equals("kilo"))) {
+            return qty.divide(BigDecimal.valueOf(1000), 3, RoundingMode.HALF_UP);
+        }
+        // Weight: kg to g
+        if ((from.equals("kg") || from.equals("kgs") || from.equals("kilo")) && (to.equals("g") || to.equals("gm") || to.equals("grams"))) {
+            return qty.multiply(BigDecimal.valueOf(1000)).setScale(3, RoundingMode.HALF_UP);
+        }
+
+        // Volume: ml to l
+        if (from.equals("ml") && (to.equals("l") || to.equals("ltr") || to.equals("litre") || to.equals("litres"))) {
+            return qty.divide(BigDecimal.valueOf(1000), 3, RoundingMode.HALF_UP);
+        }
+        // Volume: l to ml
+        if ((from.equals("l") || from.equals("ltr") || from.equals("litre") || to.equals("litres")) && to.equals("ml")) {
+            return qty.multiply(BigDecimal.valueOf(1000)).setScale(3, RoundingMode.HALF_UP);
+        }
+
+        return qty;
+    }
+
+    private double calculateSimilarity(String s1, String s2, String brand1, String brand2, String raw1, String raw2) {
+        if (s1 == null || s2 == null) return 0.0;
+        if (s1.equalsIgnoreCase(s2) || (raw1 != null && raw2 != null && raw1.equalsIgnoreCase(raw2))) {
+            return 1.0;
+        }
+
+        java.util.Set<String> stopWords = java.util.Set.of("THE", "A", "AN", "AND", "OF", "PACK", "PKT", "PCS", "PIECE", "BOTTLE", "BOX", "POUCH", "PREMIUM", "SUPERIOR", "FRESH", "SHUDH", "SPECIAL");
+
+        java.util.Set<String> tokens1 = java.util.Arrays.stream(s1.toUpperCase().split("\\s+"))
+                .filter(t -> !t.isBlank() && !stopWords.contains(t))
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.Set<String> tokens2 = java.util.Arrays.stream(s2.toUpperCase().split("\\s+"))
+                .filter(t -> !t.isBlank() && !stopWords.contains(t))
+                .collect(java.util.stream.Collectors.toSet());
+
+        if (tokens1.isEmpty() || tokens2.isEmpty()) {
+            return ProductMatchingEngine.jaroWinkler(s1.toUpperCase(), s2.toUpperCase());
+        }
+
+        java.util.Set<String> intersection = new java.util.HashSet<>(tokens1);
+        intersection.retainAll(tokens2);
+
+        double minTokens = Math.min(tokens1.size(), tokens2.size());
+        double tokenScore = minTokens > 0 ? (double) intersection.size() / minTokens : 0.0;
+        boolean isContained = intersection.size() == (int) minTokens;
+
+        double textScore = ProductMatchingEngine.jaroWinkler(s1.toUpperCase(), s2.toUpperCase());
+
+        double combinedScore;
+        if (isContained) {
+            combinedScore = 0.88 + (textScore * 0.08);
+        } else {
+            combinedScore = (textScore * 0.35) + (tokenScore * 0.65);
+        }
+
+        if (brand1 != null && brand2 != null) {
+            if (brand1.equalsIgnoreCase(brand2)) {
+                combinedScore = Math.min(0.99, combinedScore + 0.10);
+            } else {
+                combinedScore = Math.max(0.20, combinedScore - 0.15);
+            }
+        }
+
+        return Math.min(1.0, Math.max(0.0, combinedScore));
     }
 }

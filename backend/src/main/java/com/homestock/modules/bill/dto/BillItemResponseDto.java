@@ -29,4 +29,11 @@ public class BillItemResponseDto {
     private BigDecimal standardUnitPrice;
     private BigDecimal matchConfidence;
     private String matchStatus;
+
+    // AI Pipeline confidence fields
+    private BigDecimal nameConfidence;
+    private BigDecimal quantityConfidence;
+    private BigDecimal priceConfidence;
+    private boolean needsReview;
+    private String reviewReason;
 }

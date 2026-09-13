@@ -33,6 +33,13 @@ public class BillResponseDto {
     private String recordedByName;
     private Instant confirmedAt;
     private Instant createdAt;
+
+    // AI Pipeline fields
+    private String processingStatus;
+    private BigDecimal overallConfidence;
+    private boolean needsReview;
+    private String validationStatus;
+
     @Builder.Default
     private List<BillItemResponseDto> items = new ArrayList<>();
 }

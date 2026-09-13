@@ -28,4 +28,10 @@ public class MonthlyExpenseReportDto {
     private List<CategoryExpenseDto> categoryBreakdown = new ArrayList<>();
     @Builder.Default
     private List<ShopExpenseDto> shopBreakdown = new ArrayList<>();
+    @Builder.Default
+    private List<PriceAnomalyDto> priceAnomalies = new ArrayList<>();
+    @Builder.Default
+    private List<BillingPeriodDto> availablePeriods = new ArrayList<>();
+    @Builder.Default
+    private List<MonthlyBillSummaryDto> bills = new ArrayList<>();
 }

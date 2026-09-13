@@ -145,7 +145,7 @@ class BillScanAndConfirmationIntegrationTest {
         assertNotNull(preview);
         assertNotNull(preview.getBillId());
         assertTrue(preview.getShopName().toUpperCase().contains("DMART"));
-        assertEquals(new BigDecimal("760.00"), preview.getTotal());
+        assertEquals(0, new BigDecimal("760.00").compareTo(preview.getTotal()));
         assertEquals(2, preview.getItems().size());
 
         // Check matching
@@ -228,5 +228,95 @@ class BillScanAndConfirmationIntegrationTest {
         assertEquals("Fortune Sunflower Oil", priceIntel.getProductName());
         assertEquals(new BigDecimal("130.00"), priceIntel.getCurrentPrice());
         assertEquals(new BigDecimal("130.00"), priceIntel.getMinPrice());
+    }
+
+    @Test
+    void testExistingInventoryItemUpdatedWithoutExplicitIdAndUnitConversion() {
+        UUID homeId = home.getId();
+
+        // 1. Create existing inventory item: "Aashirvaad Atta" (quantity: 2.0 KG, no product ID linked)
+        CreateInventoryItemRequest invReq = new CreateInventoryItemRequest();
+        invReq.setName("Aashirvaad Atta");
+        invReq.setBrand("Aashirvaad");
+        invReq.setQuantity(new BigDecimal("2.0"));
+        invReq.setUnit("KG");
+        invReq.setMinimumQuantity(new BigDecimal("1.0"));
+        InventoryItemDto existingAtta = inventoryService.createItem(homeId, invReq);
+
+        // Also create existing inventory item: "Amul Milk" (quantity: 1.0 L)
+        CreateInventoryItemRequest milkReq = new CreateInventoryItemRequest();
+        milkReq.setName("Amul Milk");
+        milkReq.setBrand("Amul");
+        milkReq.setQuantity(new BigDecimal("1.0"));
+        milkReq.setUnit("L");
+        milkReq.setMinimumQuantity(new BigDecimal("1.0"));
+        InventoryItemDto existingMilk = inventoryService.createItem(homeId, milkReq);
+
+        long initialCount = inventoryItemRepository.countByHomeIdAndIsArchivedFalse(homeId);
+
+        // 2. Scan bill containing "Aashirvaad Shudh Chakki Atta 5kg" and "Amul Taaza Milk 500ml"
+        String receiptText = """
+                MORE RETAIL
+                INVOICE: MR-10023
+                DATE: 12/09/2026
+                ----------------------------------------
+                AASHIRVAAD SHUDH CHAKKI ATTA 5KG   1   240.00   240.00
+                AMUL TAAZA MILK 500ML              2    30.00    60.00
+                ----------------------------------------
+                TOTAL:                                  300.00
+                """;
+
+        BillScanPreviewResponseDto preview = billScanService.scanBill(homeId, null, receiptText, currentUser);
+        assertNotNull(preview);
+        assertEquals(2, preview.getItems().size());
+
+        // Verify Atta matched to existing inventory item
+        BillScanItemPreviewDto attaPreview = preview.getItems().stream()
+                .filter(i -> i.getRawItemName().toUpperCase().contains("ATTA"))
+                .findFirst().orElseThrow();
+        assertEquals(existingAtta.getId(), attaPreview.getMatchedInventoryItemId());
+
+        // 3. Confirm Bill WITHOUT explicitly passing inventoryItemId or productId (simulate inferred/heuristic confirmation)
+        ConfirmBillRequest confirmReq = ConfirmBillRequest.builder()
+                .shopName("More Retail")
+                .billNumber("MR-10023")
+                .billDate(LocalDate.of(2026, 9, 12))
+                .totalAmount(new BigDecimal("300.00"))
+                .items(List.of(
+                        ConfirmBillItemRequest.builder()
+                                .rawItemName("AASHIRVAAD SHUDH CHAKKI ATTA 5KG")
+                                .productName("Aashirvaad Atta")
+                                .quantity(new BigDecimal("5.0"))
+                                .unit("KG")
+                                .unitPrice(new BigDecimal("240.00"))
+                                .finalPrice(new BigDecimal("240.00"))
+                                .build(),
+                        ConfirmBillItemRequest.builder()
+                                .rawItemName("AMUL TAAZA MILK 500ML")
+                                .productName("Amul Milk")
+                                .quantity(new BigDecimal("500.0")) // 500 ml -> should convert to 0.5 L
+                                .unit("ML")
+                                .unitPrice(new BigDecimal("30.00"))
+                                .finalPrice(new BigDecimal("60.00"))
+                                .build()
+                ))
+                .build();
+
+        BillResponseDto confirmed = billConfirmationService.confirmBill(homeId, preview.getBillId(), confirmReq, currentUser);
+        assertNotNull(confirmed);
+
+        // 4. Verify existing inventory items were updated, NOT duplicated
+        long finalCount = inventoryItemRepository.countByHomeIdAndIsArchivedFalse(homeId);
+        assertEquals(initialCount, finalCount, "No duplicate inventory items should be created");
+
+        // Atta: 2.0 KG initial + 5.0 KG purchased = 7.0 KG
+        com.homestock.modules.inventory.entity.InventoryItem updatedAtta =
+                inventoryItemRepository.findByIdAndHomeId(existingAtta.getId(), homeId).orElseThrow();
+        assertEquals(0, new BigDecimal("7.000").compareTo(updatedAtta.getQuantity()));
+
+        // Milk: 1.0 L initial + 500 ML (0.5 L) converted = 1.5 L
+        com.homestock.modules.inventory.entity.InventoryItem updatedMilk =
+                inventoryItemRepository.findByIdAndHomeId(existingMilk.getId(), homeId).orElseThrow();
+        assertEquals(0, new BigDecimal("1.500").compareTo(updatedMilk.getQuantity()));
     }
 }

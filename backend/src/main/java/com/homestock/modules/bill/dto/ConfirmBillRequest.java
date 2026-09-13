@@ -11,12 +11,14 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ConfirmBillRequest {
+    private UUID billId;
     private String shopName;
     private String billNumber;
     private LocalDate billDate;
@@ -32,4 +34,5 @@ public class ConfirmBillRequest {
     private List<ConfirmBillItemRequest> items;
 
     private String notes;
+    private String rawOcrText;
 }

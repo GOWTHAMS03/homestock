@@ -6,7 +6,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -19,4 +21,15 @@ public class OcrResult {
     @Builder.Default
     private double confidence = 0.95;
     private String providerName;
+
+    // Extended fields for multi-stage pipeline
+    @Builder.Default
+    private List<OcrWord> words = new ArrayList<>();
+    @Builder.Default
+    private List<OcrLine> detectedLines = new ArrayList<>();
+    private String detectedLanguage;
+    @Builder.Default
+    private Map<String, Double> fieldConfidences = new HashMap<>();
+    private String preprocessingVariant; // which variant produced this result
 }
+

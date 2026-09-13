@@ -47,4 +47,10 @@ public class StockTransaction extends BaseEntity {
 
     @Column(name = "reason", length = 255)
     private String reason;
+
+    @Column(name = "reference_type", length = 30)
+    private String referenceType; // BILL, MANUAL, CONSUMPTION, ADJUSTMENT, RETURN
+
+    @Column(name = "reference_id")
+    private java.util.UUID referenceId;
 }

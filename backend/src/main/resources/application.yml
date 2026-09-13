@@ -137,6 +137,11 @@ app:
     min-inactive-days: ${AWAY_MIN_INACTIVE_DAYS:3}
     confidence-threshold: ${AWAY_CONFIDENCE_THRESHOLD:0.40}
     max-summary-items: ${AWAY_MAX_SUMMARY_ITEMS:5}
+  bill:
+    ai:
+      gemini:
+        api-key: ${GEMINI_API_KEY:}
+        model: ${GEMINI_MODEL:gemini-flash-lite-latest}
 
 springdoc:
   api-docs:

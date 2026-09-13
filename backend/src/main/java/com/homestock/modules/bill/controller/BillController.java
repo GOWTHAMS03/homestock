@@ -12,14 +12,20 @@ import com.homestock.modules.user.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +33,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/homes/{homeId}/bills")
 @Tag(name = "Bill Scanner", description = "Smart Purchased Bill Scanning, Extraction, and Confirmation")
 public class BillController {
+
+    private static final Logger log = LoggerFactory.getLogger(BillController.class);
 
     private final BillScanService billScanService;
     private final BillConfirmationService billConfirmationService;
@@ -42,32 +50,64 @@ public class BillController {
         this.userRepository = userRepository;
     }
 
-    @PostMapping(value = "/scan", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    @PostMapping(value = "/scan", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@homeSecurity.isMember(#homeId)")
-    @Operation(summary = "Scan receipt image or text, extract items, detect duplicates, and preview matching")
-    public ResponseEntity<ApiResponse<BillScanPreviewResponseDto>> scanBill(
+    @Operation(summary = "Scan receipt JSON payload (raw OCR text or base64 images), extract items, detect duplicates, and preview matching")
+    public ResponseEntity<ApiResponse<BillScanPreviewResponseDto>> scanBillJson(
             @PathVariable UUID homeId,
-            @RequestParam(value = "files", required = false) List<MultipartFile> files,
-            @RequestParam(value = "rawText", required = false) String rawText,
-            @RequestBody(required = false) RawTextScanRequest bodyRequest
+            @RequestBody BillScanRequest request
     ) {
         User currentUser = getCurrentUser();
-        String text = rawText != null ? rawText : (bodyRequest != null ? bodyRequest.getRawText() : null);
+        List<MultipartFile> files = new ArrayList<>();
 
-        BillScanPreviewResponseDto preview = billScanService.scanBill(homeId, files, text, currentUser);
+        if (request != null) {
+            if (request.getBase64Images() != null) {
+                for (int i = 0; i < request.getBase64Images().size(); i++) {
+                    MultipartFile mf = decodeBase64ToMultipartFile(request.getBase64Images().get(i), "receipt_page_" + (i + 1));
+                    if (mf != null) {
+                        files.add(mf);
+                    }
+                }
+            }
+            if (request.getBase64Image() != null && !request.getBase64Image().isBlank()) {
+                MultipartFile mf = decodeBase64ToMultipartFile(request.getBase64Image(), "receipt_single");
+                if (mf != null) {
+                    files.add(mf);
+                }
+            }
+        }
+
+        String rawText = request != null ? request.getRawText() : null;
+        BillScanPreviewResponseDto preview = billScanService.scanBill(homeId, files, rawText, currentUser);
         return ResponseEntity.ok(ApiResponse.success(preview));
     }
 
-    @PostMapping("/{billId}/confirm")
+    @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
+    @Operation(summary = "Scan receipt multipart files or raw text, extract items, detect duplicates, and preview matching")
+    public ResponseEntity<ApiResponse<BillScanPreviewResponseDto>> scanBillMultipart(
+            @PathVariable UUID homeId,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @RequestParam(value = "rawText", required = false) String rawText,
+            @RequestParam(value = "storeName", required = false) String storeName,
+            @RequestParam(value = "billDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate billDate
+    ) {
+        User currentUser = getCurrentUser();
+        BillScanPreviewResponseDto preview = billScanService.scanBill(homeId, files, rawText, currentUser);
+        return ResponseEntity.ok(ApiResponse.success(preview));
+    }
+
+    @PostMapping(value = {"/confirm", "/{billId}/confirm"})
     @PreAuthorize("@homeSecurity.isMember(#homeId)")
     @Operation(summary = "Confirm scanned bill, atomically update inventory, shopping list, purchase history & price history")
     public ResponseEntity<ApiResponse<BillResponseDto>> confirmBill(
             @PathVariable UUID homeId,
-            @PathVariable UUID billId,
+            @PathVariable(required = false) UUID billId,
             @Valid @RequestBody ConfirmBillRequest request
     ) {
         User currentUser = getCurrentUser();
-        BillResponseDto confirmed = billConfirmationService.confirmBill(homeId, billId, request, currentUser);
+        UUID targetBillId = billId != null ? billId : (request != null ? request.getBillId() : null);
+        BillResponseDto confirmed = billConfirmationService.confirmBill(homeId, targetBillId, request, currentUser);
         return ResponseEntity.ok(ApiResponse.success(confirmed));
     }
 
@@ -95,6 +135,47 @@ public class BillController {
         return ResponseEntity.ok(ApiResponse.success(bills));
     }
 
+    private MultipartFile decodeBase64ToMultipartFile(String base64Str, String baseName) {
+        if (base64Str == null || base64Str.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            String trimmed = base64Str.trim();
+            String contentType = "image/jpeg";
+            String extension = ".jpg";
+
+            int commaIndex = trimmed.indexOf(',');
+            if (commaIndex != -1 && trimmed.substring(0, commaIndex).contains("base64")) {
+                String header = trimmed.substring(0, commaIndex);
+                if (header.contains("image/png")) {
+                    contentType = "image/png";
+                    extension = ".png";
+                } else if (header.contains("image/webp")) {
+                    contentType = "image/webp";
+                    extension = ".webp";
+                }
+                trimmed = trimmed.substring(commaIndex + 1);
+            }
+
+            // Remove any potential whitespace or newlines
+            trimmed = trimmed.replaceAll("\\s+", "");
+            byte[] bytes = Base64.getDecoder().decode(trimmed);
+            if (bytes.length == 0) {
+                return null;
+            }
+
+            return new CustomInMemoryMultipartFile(
+                    baseName,
+                    baseName + extension,
+                    contentType,
+                    bytes
+            );
+        } catch (Exception e) {
+            log.warn("Failed to decode base64 image chunk: {}", e.getMessage());
+            return null;
+        }
+    }
+
     private User getCurrentUser() {
         try {
             UUID userId = SecurityUtils.getCurrentUserId();
@@ -102,11 +183,5 @@ public class BillController {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    public static class RawTextScanRequest {
-        private String rawText;
-        public String getRawText() { return rawText; }
-        public void setRawText(String rawText) { this.rawText = rawText; }
     }
 }

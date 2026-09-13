@@ -1,5 +1,6 @@
 package com.homestock.modules.bill.matching;
 
+import com.homestock.modules.bill.dto.ExistingProductMatchDto;
 import com.homestock.modules.inventory.entity.InventoryItem;
 import com.homestock.modules.product.entity.Product;
 import com.homestock.modules.shopping.entity.ShoppingListItem;
@@ -9,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -28,4 +30,5 @@ public class ProductMatchResult {
     private BigDecimal resolvedUnitPrice;
     private BigDecimal resolvedFinalPrice;
     private BigDecimal standardUnitPrice;
+    private List<ExistingProductMatchDto> suggestedMatches;
 }

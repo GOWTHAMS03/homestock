@@ -173,10 +173,17 @@ class InventoryController extends StateNotifier<InventoryState> {
     }
   }
 
-  /// Manually trigger a refresh (pull-to-refresh).
+  /// Manually trigger a refresh (pull-to-refresh or post-confirmation).
   Future<void> loadData() async {
     if (_homeId == null) return;
-    await _fetchServerDataInBackground();
+    if (!_repo.isOnline) return;
+    try {
+      await _repo.fetchAndCacheCategories(_homeId);
+      await _repo.fetchAndCacheFromServer(_homeId);
+      await _repo.sync(_homeId);
+    } catch (_) {
+      await _fetchServerDataInBackground();
+    }
   }
 
   void selectCategory(String? categoryId) {

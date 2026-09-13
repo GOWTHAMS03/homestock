@@ -74,4 +74,41 @@ public class PurchasedBillItem extends BaseEntity {
     @Builder.Default
     @Column(name = "match_status", nullable = false, length = 30)
     private String matchStatus = "NEW_PRODUCT"; // AUTO_MATCHED, SUGGESTED, NEW_PRODUCT, MANUALLY_OVERRIDDEN
+
+    // --- AI Pipeline Confidence & Review Fields ---
+
+    @Column(name = "ocr_confidence", precision = 5, scale = 2)
+    private BigDecimal ocrConfidence;
+
+    @Column(name = "name_confidence", precision = 5, scale = 2)
+    private BigDecimal nameConfidence;
+
+    @Column(name = "quantity_confidence", precision = 5, scale = 2)
+    private BigDecimal quantityConfidence;
+
+    @Column(name = "price_confidence", precision = 5, scale = 2)
+    private BigDecimal priceConfidence;
+
+    @Builder.Default
+    @Column(name = "needs_review")
+    private Boolean needsReview = false;
+
+    @Column(name = "review_reason", columnDefinition = "TEXT")
+    private String reviewReason;
+
+    @Column(name = "ai_raw_name", length = 200)
+    private String aiRawName;
+
+    @Column(name = "user_corrected_name", length = 200)
+    private String userCorrectedName;
+
+    @Column(name = "user_corrected_price", precision = 12, scale = 2)
+    private BigDecimal userCorrectedPrice;
+
+    @Column(name = "user_corrected_quantity", precision = 12, scale = 3)
+    private BigDecimal userCorrectedQuantity;
+
+    @Builder.Default
+    @Column(name = "line_valid")
+    private Boolean lineValid = true;
 }

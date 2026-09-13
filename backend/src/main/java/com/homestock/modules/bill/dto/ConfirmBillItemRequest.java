@@ -45,4 +45,21 @@ public class ConfirmBillItemRequest {
     private BigDecimal finalPrice;
 
     private String barcode;
+    private String newProductName;
+    private String newProductCategory;
+    private Boolean createNewProduct;
+
+    public String getProductName() {
+        if (productName != null && !productName.isBlank()) {
+            return productName;
+        }
+        return newProductName;
+    }
+
+    public String getCategoryName() {
+        if (categoryName != null && !categoryName.isBlank()) {
+            return categoryName;
+        }
+        return newProductCategory;
+    }
 }

@@ -139,6 +139,17 @@ class MockBillApiService implements BillApiService {
       currentPrice: 145.00,
     );
   }
+
+  @override
+  Future<ProductPriceHistoryDto> getItemPriceHistory(String homeId, String itemId) async {
+    return const ProductPriceHistoryDto(
+      productId: 'item-1',
+      productName: 'Item 1',
+      lowestPrice: 50.00,
+      highestPrice: 75.00,
+      currentPrice: 70.00,
+    );
+  }
 }
 
 void main() {
@@ -208,6 +219,27 @@ void main() {
             'unit': 'pkt',
             'alertType': 'PRICE_HIKE',
           }
+        ],
+        'bills': [
+          {
+            'id': 'b-101',
+            'shopName': 'More Supermarket',
+            'billNumber': 'M0004587321',
+            'billDate': '2025-09-07',
+            'totalAmount': 1400.00,
+            'itemsCount': 2,
+            'items': [
+              {
+                'id': 'item-1',
+                'itemName': 'Aashirvaad Atta 5kg',
+                'quantity': 1.0,
+                'unit': 'kg',
+                'unitPrice': 245.00,
+                'finalPrice': 245.00,
+                'category': 'Staples',
+              }
+            ],
+          }
         ]
       };
 
@@ -217,6 +249,10 @@ void main() {
       expect(report.priceAnomalies.length, 1);
       expect(report.priceAnomalies.first.alertType, 'PRICE_HIKE');
       expect(report.priceAnomalies.first.percentageChange, closeTo(14.28, 0.01));
+      expect(report.bills.length, 1);
+      expect(report.bills.first.shopName, 'More Supermarket');
+      expect(report.bills.first.totalAmount, 1400.0);
+      expect(report.bills.first.items.first.itemName, 'Aashirvaad Atta 5kg');
     });
   });
 

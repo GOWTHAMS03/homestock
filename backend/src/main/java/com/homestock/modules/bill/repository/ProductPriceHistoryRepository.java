@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,4 +40,25 @@ public interface ProductPriceHistoryRepository extends JpaRepository<ProductPric
     @Query("SELECT h FROM ProductPriceHistory h WHERE h.home.id = :homeId " +
            "ORDER BY h.purchaseDate DESC")
     List<ProductPriceHistory> findRecentPriceChanges(@Param("homeId") UUID homeId, Pageable pageable);
+
+    @Query("SELECT h FROM ProductPriceHistory h WHERE h.home.id = :homeId " +
+           "AND h.purchaseDate >= :startDate AND h.purchaseDate <= :endDate " +
+           "ORDER BY h.purchaseDate DESC")
+    List<ProductPriceHistory> findInPeriod(
+            @Param("homeId") UUID homeId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("SELECT h FROM ProductPriceHistory h WHERE h.home.id = :homeId " +
+           "AND (h.product.id = :productId OR (:productId IS NULL AND h.inventoryItem.id = :itemId)) " +
+           "AND h.purchaseDate < :date " +
+           "ORDER BY h.purchaseDate DESC")
+    List<ProductPriceHistory> findPriorPurchase(
+            @Param("homeId") UUID homeId,
+            @Param("productId") UUID productId,
+            @Param("itemId") UUID itemId,
+            @Param("date") LocalDate date,
+            Pageable pageable
+    );
 }

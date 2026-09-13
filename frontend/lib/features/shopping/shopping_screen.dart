@@ -11,6 +11,7 @@ import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_model.dart';
 import '../purchase/add_purchase_screen.dart';
 import '../purchase/purchases_screen.dart';
+import '../bill/screens/bill_scanner_screen.dart';
 import '../smart_shopping/product_deal_search_screen.dart';
 import '../smart_shopping/smart_shopping_screen.dart';
 import '../voice/widgets/voice_input_button.dart';
@@ -685,6 +686,10 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             onSelected: (val) {
               if (val == 'clear_done') {
                 ref.read(shoppingControllerProvider.notifier).clearCompleted();
+              } else if (val == 'scan_bill') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const BillScannerScreen()),
+                );
               } else if (val == 'record_bill') {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AddPurchaseScreen()),
@@ -706,12 +711,22 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                   ),
                 ),
               const PopupMenuItem(
+                value: 'scan_bill',
+                child: Row(
+                  children: [
+                    Icon(Icons.document_scanner_rounded, size: 16, color: Color(0xFF10B981)),
+                    SizedBox(width: 8),
+                    Text('Scan Purchased Bill (OCR)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'record_bill',
                 child: Row(
                   children: [
                     Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFF64748B)),
                     SizedBox(width: 8),
-                    Text('Record Bill', style: TextStyle(fontSize: 13)),
+                    Text('Record Bill Manually', style: TextStyle(fontSize: 13)),
                   ],
                 ),
               ),

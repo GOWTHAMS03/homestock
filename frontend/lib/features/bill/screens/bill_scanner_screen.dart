@@ -74,6 +74,17 @@ class _BillScannerScreenState extends ConsumerState<BillScannerScreen>
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const BillConfirmationScreen()),
       );
+    } else if (!success && mounted) {
+      final err = ref.read(billScannerControllerProvider).errorMessage;
+      if (err != null && err.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
