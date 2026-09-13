@@ -27,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import com.homestock.modules.sync.service.HomeChangeLogService;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +48,7 @@ public class ShoppingService {
     private final CategoryRepository categoryRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final NotificationService notificationService;
+    private final HomeChangeLogService homeChangeLogService;
 
     @Transactional
     public ShoppingList getOrCreateDefaultListEntity(Home home) {
@@ -112,6 +115,7 @@ public class ShoppingService {
                 .build();
 
         ShoppingListItem saved = shoppingListItemRepository.save(item);
+        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", saved.getId(), "INSERT", null, null);
 
         // Notify family members
         notificationService.notifyHomeMembers(
@@ -147,7 +151,9 @@ public class ShoppingService {
             categoryRepository.findById(request.getCategoryId()).ifPresent(item::setCategory);
         }
 
-        return ShoppingListItemDto.fromEntity(shoppingListItemRepository.save(item));
+        ShoppingListItem saved = shoppingListItemRepository.save(item);
+        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", saved.getId(), "UPDATE", null, null);
+        return ShoppingListItemDto.fromEntity(saved);
     }
 
     @Transactional
@@ -176,7 +182,9 @@ public class ShoppingService {
             item.setCompletedAt(null);
         }
 
-        return ShoppingListItemDto.fromEntity(shoppingListItemRepository.save(item));
+        ShoppingListItem saved = shoppingListItemRepository.save(item);
+        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", saved.getId(), "UPDATE", null, null);
+        return ShoppingListItemDto.fromEntity(saved);
     }
 
     @Transactional
@@ -192,14 +200,20 @@ public class ShoppingService {
         }
 
         shoppingListItemRepository.delete(item);
+        homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", itemId, "DELETE", null, null);
     }
 
     @Transactional
     public void clearCompleted(UUID homeId, UUID listId) {
-        shoppingListRepository.findByIdAndHomeId(listId, homeId)
+        ShoppingList list = shoppingListRepository.findByIdAndHomeId(listId, homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shopping list not found"));
 
+        List<ShoppingListItem> completed = shoppingListItemRepository.findAllByShoppingListIdOrderByIsCompletedAscCreatedAtDesc(listId)
+                .stream().filter(i -> Boolean.TRUE.equals(i.getIsCompleted())).toList();
         shoppingListItemRepository.deleteAllCompletedByShoppingListId(listId);
+        for (ShoppingListItem item : completed) {
+            homeChangeLogService.recordChange(list.getHome(), "SHOPPING_LIST_ITEM", item.getId(), "DELETE", null, null);
+        }
     }
 
     /**
@@ -242,7 +256,8 @@ public class ShoppingService {
                 .notes("Auto-added: Low stock threshold reached")
                 .build();
 
-        shoppingListItemRepository.save(autoItem);
+        ShoppingListItem saved = shoppingListItemRepository.save(autoItem);
+        homeChangeLogService.recordChange(home, "SHOPPING_LIST_ITEM", saved.getId(), "INSERT", null, null);
         log.info("Auto-added low stock item '{}' to shopping list for home '{}'", inventoryItem.getName(), home.getName());
 
         // Send Low Stock Notification

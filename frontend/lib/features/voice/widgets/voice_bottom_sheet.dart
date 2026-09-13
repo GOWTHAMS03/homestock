@@ -9,18 +9,14 @@ import '../data/speech/offline_model_manager.dart';
 import '../models/voice_models.dart';
 import 'voice_model_settings.dart';
 import 'voice_settings_dialog.dart';
+import 'voice_command_sheet.dart';
 
 class VoiceBottomSheet extends ConsumerStatefulWidget {
   const VoiceBottomSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    HapticFeedback.lightImpact();
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => const VoiceBottomSheet(),
-    );
+    // Directly launch Gemini Voice AI sheet with zero offline model download requirements
+    return VoiceCommandSheet.show(context);
   }
 
   @override
@@ -67,23 +63,10 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
     final voiceState = ref.watch(voiceControllerProvider);
     final theme = Theme.of(context);
 
-    // Auto-dismiss on success after short delay
+    // Haptic feedback on success (manual close, no auto-dismiss)
     ref.listen<VoiceState>(voiceControllerProvider, (previous, next) {
       if (next.status == VoiceStatus.success && previous?.status != VoiceStatus.success) {
         HapticFeedback.mediumImpact();
-        final nav = next.executionResponse?.navigation;
-        final navigator = Navigator.of(context);
-        final router = GoRouter.of(context);
-        Future.delayed(const Duration(milliseconds: 1600), () {
-          if (!mounted) return;
-          if (navigator.canPop()) {
-            navigator.pop();
-            if (nav != null && nav['route'] != null) {
-              final route = nav['route'] as String;
-              router.push(route);
-            }
-          }
-        });
       }
     });
 

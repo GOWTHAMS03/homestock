@@ -332,7 +332,7 @@ void main() {
     // 4. SEARCH / SCAN / VOICE VERIFICATION
     expect(find.text('Search "Milk, Rice, Eggs..."'), findsOneWidget);
     expect(find.text('Scan'), findsOneWidget);
-    expect(find.text('Voice'), findsOneWidget);
+    expect(find.text('Homie'), findsOneWidget);
 
     // 5. YOUR PANTRY VERIFICATION
     expect(find.text('Your Pantry'), findsOneWidget);

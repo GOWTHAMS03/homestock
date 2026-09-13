@@ -53,6 +53,22 @@ public class MultiPassOcrOrchestrator {
      * @return The best OCR result from all preprocessing variants
      */
     public MultiPassOcrResult runMultiPass(byte[] rawImageBytes, String mimeType) {
+        return runMultiPass(rawImageBytes, mimeType, com.homestock.modules.bill.entity.DocumentType.PRINTED);
+    }
+
+    /**
+     * Runs multi-pass OCR on the given image bytes with DocumentType awareness.
+     *
+     * @param rawImageBytes Raw image bytes
+     * @param mimeType      MIME type of the image
+     * @param documentType  Classification of the document (PRINTED, HANDWRITTEN, MIXED)
+     * @return The best OCR result from all preprocessing variants
+     */
+    public MultiPassOcrResult runMultiPass(
+            byte[] rawImageBytes,
+            String mimeType,
+            com.homestock.modules.bill.entity.DocumentType documentType
+    ) {
         long startTime = System.currentTimeMillis();
 
         // 0. High-res downscaling: mobile cameras take 3000-4000px photos (12MP+).
@@ -80,9 +96,11 @@ public class MultiPassOcrOrchestrator {
                     .build();
         }
 
-        // 2. Generate preprocessing variants
+        // 2. Generate preprocessing variants according to document type
         List<ImagePreprocessor.PreprocessedVariant> variants =
-                imagePreprocessor.generateVariants(imageBytes, qualityReport);
+                (documentType == com.homestock.modules.bill.entity.DocumentType.HANDWRITTEN)
+                        ? imagePreprocessor.generateHandwritingVariants(imageBytes, qualityReport)
+                        : imagePreprocessor.generateVariants(imageBytes, qualityReport);
 
         // 3. Run OCR on each variant with early exit if first pass is already high-quality
         List<ScoredOcrResult> scoredResults = new ArrayList<>();

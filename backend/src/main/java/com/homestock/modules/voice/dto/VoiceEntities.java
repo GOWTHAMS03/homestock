@@ -20,6 +20,8 @@ public class VoiceEntities {
     private BigDecimal price;
     private String category;
     private String store;
+    private String target; // "SHOPPING_LIST" or "INVENTORY"
+    private String barcode;
 
     // Matched HomeStock inventory linkage
     private UUID matchedInventoryItemId;

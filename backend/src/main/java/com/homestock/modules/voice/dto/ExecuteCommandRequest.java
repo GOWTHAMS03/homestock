@@ -22,4 +22,8 @@ public class ExecuteCommandRequest {
     private boolean confirmed;
 
     private String selectedOptionId;
+
+    private String idempotencyKey;
+
+    private UUID userId;
 }

@@ -352,6 +352,17 @@ class VoiceCommandResult {
   final String message;
   final List<DisambiguationOption> disambiguationOptions;
 
+  // AI Voice Engine fields
+  final double intentConfidence;
+  final double productMatchConfidence;
+  final String detectedLanguage;
+  final String? voiceCommandId;
+  final String? idempotencyKey;
+  final String commandMode;
+  final String? executionStatus;
+  final bool needsQuantity;
+  final bool needsProduct;
+
   const VoiceCommandResult({
     required this.transcript,
     required this.intent,
@@ -360,6 +371,15 @@ class VoiceCommandResult {
     this.requiresConfirmation = false,
     required this.message,
     this.disambiguationOptions = const [],
+    this.intentConfidence = 1.0,
+    this.productMatchConfidence = 1.0,
+    this.detectedLanguage = 'EN',
+    this.voiceCommandId,
+    this.idempotencyKey,
+    this.commandMode = 'COMMAND',
+    this.executionStatus,
+    this.needsQuantity = false,
+    this.needsProduct = false,
   });
 
   factory VoiceCommandResult.fromJson(Map<String, dynamic> json) {
@@ -374,6 +394,15 @@ class VoiceCommandResult {
               ?.map((e) => DisambiguationOption.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      intentConfidence: (json['intentConfidence'] as num?)?.toDouble() ?? 1.0,
+      productMatchConfidence: (json['productMatchConfidence'] as num?)?.toDouble() ?? 1.0,
+      detectedLanguage: json['detectedLanguage'] as String? ?? 'EN',
+      voiceCommandId: json['voiceCommandId'] as String?,
+      idempotencyKey: json['idempotencyKey'] as String?,
+      commandMode: json['commandMode'] as String? ?? 'COMMAND',
+      executionStatus: json['executionStatus'] as String?,
+      needsQuantity: json['needsQuantity'] as bool? ?? false,
+      needsProduct: json['needsProduct'] as bool? ?? false,
     );
   }
 
@@ -386,6 +415,15 @@ class VoiceCommandResult {
       'requiresConfirmation': requiresConfirmation,
       'message': message,
       'disambiguationOptions': disambiguationOptions.map((o) => o.toJson()).toList(),
+      'intentConfidence': intentConfidence,
+      'productMatchConfidence': productMatchConfidence,
+      'detectedLanguage': detectedLanguage,
+      if (voiceCommandId != null) 'voiceCommandId': voiceCommandId,
+      if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
+      'commandMode': commandMode,
+      if (executionStatus != null) 'executionStatus': executionStatus,
+      'needsQuantity': needsQuantity,
+      'needsProduct': needsProduct,
     };
   }
 
@@ -397,6 +435,15 @@ class VoiceCommandResult {
     bool? requiresConfirmation,
     String? message,
     List<DisambiguationOption>? disambiguationOptions,
+    double? intentConfidence,
+    double? productMatchConfidence,
+    String? detectedLanguage,
+    String? voiceCommandId,
+    String? idempotencyKey,
+    String? commandMode,
+    String? executionStatus,
+    bool? needsQuantity,
+    bool? needsProduct,
   }) {
     return VoiceCommandResult(
       transcript: transcript ?? this.transcript,
@@ -406,6 +453,15 @@ class VoiceCommandResult {
       requiresConfirmation: requiresConfirmation ?? this.requiresConfirmation,
       message: message ?? this.message,
       disambiguationOptions: disambiguationOptions ?? this.disambiguationOptions,
+      intentConfidence: intentConfidence ?? this.intentConfidence,
+      productMatchConfidence: productMatchConfidence ?? this.productMatchConfidence,
+      detectedLanguage: detectedLanguage ?? this.detectedLanguage,
+      voiceCommandId: voiceCommandId ?? this.voiceCommandId,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      commandMode: commandMode ?? this.commandMode,
+      executionStatus: executionStatus ?? this.executionStatus,
+      needsQuantity: needsQuantity ?? this.needsQuantity,
+      needsProduct: needsProduct ?? this.needsProduct,
     );
   }
 }
@@ -415,12 +471,14 @@ class ExecuteCommandRequest {
   final VoiceCommandResult commandResult;
   final bool confirmed;
   final String? selectedOptionId;
+  final String? idempotencyKey;
 
   const ExecuteCommandRequest({
     required this.homeId,
     required this.commandResult,
     this.confirmed = true,
     this.selectedOptionId,
+    this.idempotencyKey,
   });
 
   Map<String, dynamic> toJson() {
@@ -429,6 +487,7 @@ class ExecuteCommandRequest {
       'commandResult': commandResult.toJson(),
       'confirmed': confirmed,
       if (selectedOptionId != null) 'selectedOptionId': selectedOptionId,
+      if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
     };
   }
 }
@@ -439,6 +498,11 @@ class ExecuteCommandResponse {
   final String message;
   final dynamic data;
   final Map<String, dynamic>? navigation;
+  final String? responseLanguage;
+  final String? voiceCommandId;
+  final String? executionStatus;
+  final double? intentConfidence;
+  final double? productMatchConfidence;
 
   const ExecuteCommandResponse({
     required this.success,
@@ -446,6 +510,11 @@ class ExecuteCommandResponse {
     required this.message,
     this.data,
     this.navigation,
+    this.responseLanguage,
+    this.voiceCommandId,
+    this.executionStatus,
+    this.intentConfidence,
+    this.productMatchConfidence,
   });
 
   factory ExecuteCommandResponse.fromJson(Map<String, dynamic> json) {
@@ -455,6 +524,11 @@ class ExecuteCommandResponse {
       message: json['message'] as String? ?? '',
       data: json['data'],
       navigation: json['navigation'] as Map<String, dynamic>?,
+      responseLanguage: json['responseLanguage'] as String?,
+      voiceCommandId: json['voiceCommandId'] as String?,
+      executionStatus: json['executionStatus'] as String?,
+      intentConfidence: (json['intentConfidence'] as num?)?.toDouble(),
+      productMatchConfidence: (json['productMatchConfidence'] as num?)?.toDouble(),
     );
   }
 }

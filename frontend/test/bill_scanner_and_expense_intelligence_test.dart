@@ -92,7 +92,7 @@ class MockBillApiService implements BillApiService {
 
   @override
   Future<MonthlyExpenseReportDto> getMonthlyExpenseReport(String homeId, {int? year, int? month}) async {
-    return const MonthlyExpenseReportDto(
+    return MonthlyExpenseReportDto(
       year: 2026,
       month: 9,
       totalSpend: 4250.50,
@@ -117,6 +117,37 @@ class MockBillApiService implements BillApiService {
           percentageChange: 16.0,
           unit: 'l',
           alertType: 'PRICE_HIKE',
+        ),
+      ],
+      bills: [
+        MonthlyBillSummaryDto(
+          id: 'bill-sept-1',
+          shopName: 'Star Supermarket',
+          billNumber: 'STAR-101',
+          billDate: '2026-09-10',
+          createdAt: DateTime(2026, 9, 10, 14, 30),
+          totalAmount: 1200.0,
+          itemsCount: 1,
+          items: [
+            BillItemSummaryDto(
+              id: 'bi-1',
+              itemName: 'Basmati Rice',
+              quantity: 2.0,
+              unit: 'kg',
+              unitPrice: 600.0,
+              finalPrice: 1200.0,
+              category: 'Staples & Oil',
+            ),
+          ],
+        ),
+        MonthlyBillSummaryDto(
+          id: 'bill-aug-old',
+          shopName: 'Old August Mart',
+          billNumber: 'AUG-999',
+          billDate: '2026-08-25',
+          createdAt: DateTime(2026, 8, 25, 11, 0),
+          totalAmount: 500.0,
+          itemsCount: 1,
         ),
       ],
     );
@@ -405,6 +436,35 @@ void main() {
       expect(find.text('Sunflower Oil'), findsOneWidget);
       expect(find.text('Spending by Category'), findsOneWidget);
       expect(find.text('Top Retailers & Supermarkets'), findsOneWidget);
+    });
+
+    testWidgets('ExpenseIntelligenceScreen strictly filters bills to selected month and shows accurate data', (tester) async {
+      final mockService = MockBillApiService();
+      final expenseController = ExpenseIntelligenceController(mockService, 'home-123');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            billApiServiceProvider.overrideWithValue(mockService),
+            expenseIntelligenceControllerProvider.overrideWith((ref) => expenseController),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const ExpenseIntelligenceScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Should display September bill in overview (filtered to 1 bill for this month)
+      expect(find.text('Bills in this Month (1)'), findsOneWidget);
+      expect(find.text('Star Supermarket'), findsOneWidget);
+      // August bill must NOT be shown in this month's view
+      expect(find.text('Old August Mart'), findsNothing);
+      // Verify formatted date contains 10 Sep 2026
+      expect(find.textContaining('10 Sep 2026'), findsWidgets);
     });
   });
 }

@@ -52,7 +52,7 @@ public class ExpenseIntelligenceService {
         LocalDate startDate = ym.atDay(1);
         LocalDate endDate = ym.atEndOfMonth();
 
-        // 1. Fetch all PurchasedBills in Period
+        // 1. Fetch all Confirmed PurchasedBills in Period
         List<PurchasedBill> scannedBills = billRepository.findBillsInPeriod(homeId, startDate, endDate);
         List<MonthlyBillSummaryDto> monthlyBills = new ArrayList<>();
         Set<String> matchedPurchaseIdentifiers = new HashSet<>();
@@ -61,14 +61,25 @@ public class ExpenseIntelligenceService {
             List<PurchasedBillItem> items = billItemRepository.findByBillId(b.getId());
             List<BillItemSummaryDto> itemSummaries = new ArrayList<>();
             for (PurchasedBillItem item : items) {
+                String cat = "Groceries";
+                if (item.getInventoryItem() != null && item.getInventoryItem().getCategory() != null) {
+                    cat = item.getInventoryItem().getCategory().getName();
+                } else if (item.getProduct() != null) {
+                    if (item.getProduct().getCategory() != null) {
+                        cat = item.getProduct().getCategory().getName();
+                    } else if (item.getProduct().getCategoryName() != null && !item.getProduct().getCategoryName().isBlank()) {
+                        cat = item.getProduct().getCategoryName();
+                    }
+                }
+
                 itemSummaries.add(BillItemSummaryDto.builder()
                         .id(item.getId())
                         .itemName(item.getNormalizedItemName() != null ? item.getNormalizedItemName() : item.getRawItemName())
-                        .quantity(item.getQuantity())
-                        .unit(item.getUnit())
-                        .unitPrice(item.getUnitPrice())
-                        .finalPrice(item.getFinalPrice())
-                        .category(item.getProduct() != null && item.getProduct().getCategory() != null ? item.getProduct().getCategory().getName() : "Groceries")
+                        .quantity(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ONE)
+                        .unit(item.getUnit() != null ? item.getUnit() : "pcs")
+                        .unitPrice(item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO)
+                        .finalPrice(item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO)
+                        .category(cat)
                         .build());
             }
 
@@ -77,51 +88,69 @@ public class ExpenseIntelligenceService {
                     .shopName(b.getShopName() != null ? b.getShopName() : "Retail Store")
                     .billNumber(b.getBillNumber() != null ? b.getBillNumber() : "N/A")
                     .billDate(b.getBillDate())
+                    .createdAt(b.getCreatedAt())
                     .totalAmount(b.getTotalAmount() != null ? b.getTotalAmount() : BigDecimal.ZERO)
-                    .subtotal(b.getSubtotal())
-                    .taxAmount(b.getTaxAmount())
-                    .discountAmount(b.getDiscountAmount())
+                    .subtotal(b.getSubtotal() != null ? b.getSubtotal() : b.getTotalAmount())
+                    .taxAmount(b.getTaxAmount() != null ? b.getTaxAmount() : BigDecimal.ZERO)
+                    .discountAmount(b.getDiscountAmount() != null ? b.getDiscountAmount() : BigDecimal.ZERO)
                     .itemsCount(items.size())
                     .status(b.getStatus())
                     .source("AI_SCANNED")
                     .items(itemSummaries)
                     .build());
 
-            if (b.getBillNumber() != null) {
+            if (b.getBillNumber() != null && !b.getBillNumber().isBlank() && !b.getBillNumber().equalsIgnoreCase("N/A")) {
                 matchedPurchaseIdentifiers.add(b.getBillNumber().trim().toLowerCase());
             }
         }
 
-        // 2. Fetch Household Purchases in Period
+        // 2. Fetch Household Purchases in Period and deduplicate against scanned bills
         List<Purchase> purchases = purchaseRepository.findAllByHomeIdAndPurchaseDateBetween(homeId, startDate, endDate);
-        int matchedScannedCount = 0;
 
         for (Purchase p : purchases) {
-            boolean isFirstMatchingDuplicate = false;
-            if (p.getNotes() != null) {
+            boolean isDuplicateOfScannedBill = false;
+            String notes = p.getNotes() != null ? p.getNotes().toLowerCase() : "";
+
+            // Check 1: Bill Number in purchase notes
+            if (!notes.isBlank()) {
                 for (String billNum : matchedPurchaseIdentifiers) {
-                    if (p.getNotes().toLowerCase().contains(billNum)) {
-                        if (matchedScannedCount == 0 && !scannedBills.isEmpty()) {
-                            isFirstMatchingDuplicate = true;
-                            matchedScannedCount++;
-                        }
+                    if (notes.contains(billNum)) {
+                        isDuplicateOfScannedBill = true;
                         break;
                     }
                 }
             }
 
-            if (!isFirstMatchingDuplicate) {
+            // Check 2: Note indicates generation from a bill and matches scanned bill by date and total
+            if (!isDuplicateOfScannedBill && notes.contains("generated from bill")) {
+                for (PurchasedBill b : scannedBills) {
+                    if (b.getBillDate() != null && b.getBillDate().equals(p.getPurchaseDate())
+                            && b.getTotalAmount() != null && b.getTotalAmount().compareTo(p.getTotalAmount()) == 0) {
+                        isDuplicateOfScannedBill = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!isDuplicateOfScannedBill) {
                 List<PurchaseItem> pItems = purchaseItemRepository.findAllByPurchaseId(p.getId());
                 List<BillItemSummaryDto> itemSummaries = new ArrayList<>();
                 for (PurchaseItem pi : pItems) {
+                    String cat = "Groceries";
+                    if (pi.getCategory() != null) {
+                        cat = pi.getCategory().getName();
+                    } else if (pi.getInventoryItem() != null && pi.getInventoryItem().getCategory() != null) {
+                        cat = pi.getInventoryItem().getCategory().getName();
+                    }
+
                     itemSummaries.add(BillItemSummaryDto.builder()
                             .id(pi.getId())
                             .itemName(pi.getItemName())
-                            .quantity(pi.getQuantity())
-                            .unit(pi.getUnit())
-                            .unitPrice(pi.getUnitPrice())
-                            .finalPrice(pi.getTotalPrice())
-                            .category(pi.getCategory() != null ? pi.getCategory().getName() : "Groceries")
+                            .quantity(pi.getQuantity() != null ? pi.getQuantity() : BigDecimal.ONE)
+                            .unit(pi.getUnit() != null ? pi.getUnit() : "pcs")
+                            .unitPrice(pi.getUnitPrice() != null ? pi.getUnitPrice() : BigDecimal.ZERO)
+                            .finalPrice(pi.getTotalPrice() != null ? pi.getTotalPrice() : BigDecimal.ZERO)
+                            .category(cat)
                             .build());
                 }
 
@@ -135,8 +164,9 @@ public class ExpenseIntelligenceService {
                         .shopName(storeName)
                         .billNumber(billRef)
                         .billDate(p.getPurchaseDate())
-                        .totalAmount(p.getTotalAmount())
-                        .subtotal(p.getTotalAmount())
+                        .createdAt(p.getCreatedAt())
+                        .totalAmount(p.getTotalAmount() != null ? p.getTotalAmount() : BigDecimal.ZERO)
+                        .subtotal(p.getTotalAmount() != null ? p.getTotalAmount() : BigDecimal.ZERO)
                         .taxAmount(BigDecimal.ZERO)
                         .discountAmount(BigDecimal.ZERO)
                         .itemsCount(pItems.size())
@@ -152,7 +182,12 @@ public class ExpenseIntelligenceService {
             if (b1.getBillDate() == null && b2.getBillDate() == null) return 0;
             if (b1.getBillDate() == null) return 1;
             if (b2.getBillDate() == null) return -1;
-            return b2.getBillDate().compareTo(b1.getBillDate());
+            int dateComp = b2.getBillDate().compareTo(b1.getBillDate());
+            if (dateComp != 0) return dateComp;
+            if (b1.getCreatedAt() != null && b2.getCreatedAt() != null) {
+                return b2.getCreatedAt().compareTo(b1.getCreatedAt());
+            }
+            return 0;
         });
 
         // Compute total spend from unified bills list
@@ -167,7 +202,12 @@ public class ExpenseIntelligenceService {
                 .mapToLong(MonthlyBillSummaryDto::getItemsCount)
                 .sum();
 
-        BigDecimal totalQuantity = BigDecimal.valueOf(itemsCount);
+        BigDecimal totalQuantity = monthlyBills.stream()
+                .filter(b -> b.getItems() != null)
+                .flatMap(b -> b.getItems().stream())
+                .map(BillItemSummaryDto::getQuantity)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal avgBill = (billsCount > 0)
                 ? totalSpend.divide(BigDecimal.valueOf(billsCount), 2, RoundingMode.HALF_UP)
@@ -186,11 +226,81 @@ public class ExpenseIntelligenceService {
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
-        // 5. Category Breakdown
-        List<CategoryExpenseDto> categoryList = getCategoryBreakdown(homeId, year, month, totalSpend);
+        // 5. Category Breakdown computed directly from unified monthlyBills line items
+        Map<String, CategoryAccumulator> catMap = new LinkedHashMap<>();
+        for (MonthlyBillSummaryDto b : monthlyBills) {
+            if (b.getItems() != null) {
+                for (BillItemSummaryDto item : b.getItems()) {
+                    String cName = (item.getCategory() != null && !item.getCategory().isBlank())
+                            ? item.getCategory() : "Other";
+                    BigDecimal price = item.getFinalPrice() != null ? item.getFinalPrice() : BigDecimal.ZERO;
+                    BigDecimal q = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
+                    catMap.computeIfAbsent(cName, CategoryAccumulator::new).add(price, 1, q);
+                }
+            }
+        }
 
-        // 6. Shop Breakdown
-        List<ShopExpenseDto> shopList = getShopBreakdown(homeId, year, month, totalSpend);
+        List<CategoryExpenseDto> categoryList = new ArrayList<>();
+        for (CategoryAccumulator acc : catMap.values()) {
+            BigDecimal pct = BigDecimal.ZERO;
+            if (totalSpend.compareTo(BigDecimal.ZERO) > 0) {
+                pct = acc.totalAmount.divide(totalSpend, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
+                        .setScale(1, RoundingMode.HALF_UP);
+            }
+            categoryList.add(CategoryExpenseDto.builder()
+                    .categoryName(acc.name)
+                    .totalAmount(acc.totalAmount.setScale(2, RoundingMode.HALF_UP))
+                    .spendingPercentage(pct)
+                    .purchaseCount(acc.count)
+                    .quantityPurchased(acc.quantity.setScale(2, RoundingMode.HALF_UP))
+                    .build());
+        }
+
+        // Reconcile any unitemized spend into General & Other to ensure exact 100% total
+        BigDecimal catSum = categoryList.stream()
+                .map(CategoryExpenseDto::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalSpend.compareTo(catSum) > 0) {
+            BigDecimal diff = totalSpend.subtract(catSum);
+            BigDecimal pct = diff.divide(totalSpend, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .setScale(1, RoundingMode.HALF_UP);
+            categoryList.add(CategoryExpenseDto.builder()
+                    .categoryName("Other Groceries")
+                    .totalAmount(diff.setScale(2, RoundingMode.HALF_UP))
+                    .spendingPercentage(pct)
+                    .purchaseCount(1L)
+                    .quantityPurchased(BigDecimal.ONE)
+                    .build());
+        }
+        categoryList.sort((c1, c2) -> c2.getTotalAmount().compareTo(c1.getTotalAmount()));
+
+        // 6. Shop Breakdown computed directly from unified monthlyBills
+        Map<String, ShopAccumulator> shopMap = new LinkedHashMap<>();
+        for (MonthlyBillSummaryDto b : monthlyBills) {
+            String sName = (b.getShopName() != null && !b.getShopName().isBlank())
+                    ? b.getShopName() : "Retail Store";
+            BigDecimal amt = b.getTotalAmount() != null ? b.getTotalAmount() : BigDecimal.ZERO;
+            shopMap.computeIfAbsent(sName, ShopAccumulator::new).add(amt, 1);
+        }
+
+        List<ShopExpenseDto> shopList = new ArrayList<>();
+        for (ShopAccumulator acc : shopMap.values()) {
+            BigDecimal pct = BigDecimal.ZERO;
+            if (totalSpend.compareTo(BigDecimal.ZERO) > 0) {
+                pct = acc.totalAmount.divide(totalSpend, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
+                        .setScale(1, RoundingMode.HALF_UP);
+            }
+            shopList.add(ShopExpenseDto.builder()
+                    .shopName(acc.name)
+                    .totalAmount(acc.totalAmount.setScale(2, RoundingMode.HALF_UP))
+                    .spendingPercentage(pct)
+                    .billsCount(acc.count)
+                    .build());
+        }
+        shopList.sort((s1, s2) -> s2.getTotalAmount().compareTo(s1.getTotalAmount()));
 
         // 7. Calculate Price Anomalies / Inflation Spikes
         List<PriceAnomalyDto> priceAnomalies = calculatePriceAnomalies(homeId, startDate, endDate);
@@ -359,74 +469,42 @@ public class ExpenseIntelligenceService {
     }
 
     public List<CategoryExpenseDto> getCategoryBreakdown(UUID homeId, int year, int month) {
-        YearMonth ym = YearMonth.of(year, month);
-        BigDecimal totalSpend = billRepository.calculateTotalSpendInPeriod(homeId, ym.atDay(1), ym.atEndOfMonth());
-        return getCategoryBreakdown(homeId, year, month, totalSpend != null ? totalSpend : BigDecimal.ZERO);
-    }
-
-    private List<CategoryExpenseDto> getCategoryBreakdown(UUID homeId, int year, int month, BigDecimal totalSpend) {
-        YearMonth ym = YearMonth.of(year, month);
-        List<Object[]> rawList = billItemRepository.getCategorySpendingBreakdown(homeId, ym.atDay(1), ym.atEndOfMonth());
-        List<CategoryExpenseDto> result = new ArrayList<>();
-
-        for (Object[] row : rawList) {
-            if (row[0] != null && row[1] != null) {
-                String catName = (String) row[0];
-                BigDecimal amount = BigDecimal.valueOf(((Number) row[1]).doubleValue()).setScale(2, RoundingMode.HALF_UP);
-                long count = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-                BigDecimal qty = row[3] != null ? BigDecimal.valueOf(((Number) row[3]).doubleValue()).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
-
-                BigDecimal pct = BigDecimal.ZERO;
-                if (totalSpend.compareTo(BigDecimal.ZERO) > 0) {
-                    pct = amount.divide(totalSpend, 4, RoundingMode.HALF_UP)
-                            .multiply(BigDecimal.valueOf(100))
-                            .setScale(1, RoundingMode.HALF_UP);
-                }
-
-                result.add(CategoryExpenseDto.builder()
-                        .categoryName(catName)
-                        .totalAmount(amount)
-                        .spendingPercentage(pct)
-                        .purchaseCount(count)
-                        .quantityPurchased(qty)
-                        .build());
-            }
-        }
-        return result;
+        return getMonthlyReport(homeId, year, month).getCategoryBreakdown();
     }
 
     public List<ShopExpenseDto> getShopBreakdown(UUID homeId, int year, int month) {
-        YearMonth ym = YearMonth.of(year, month);
-        BigDecimal totalSpend = billRepository.calculateTotalSpendInPeriod(homeId, ym.atDay(1), ym.atEndOfMonth());
-        return getShopBreakdown(homeId, year, month, totalSpend != null ? totalSpend : BigDecimal.ZERO);
+        return getMonthlyReport(homeId, year, month).getShopBreakdown();
     }
 
-    private List<ShopExpenseDto> getShopBreakdown(UUID homeId, int year, int month, BigDecimal totalSpend) {
-        YearMonth ym = YearMonth.of(year, month);
-        List<Object[]> rawList = billRepository.getShopSpendingBreakdown(homeId, ym.atDay(1), ym.atEndOfMonth());
-        List<ShopExpenseDto> result = new ArrayList<>();
+    private static class CategoryAccumulator {
+        final String name;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        long count = 0;
+        BigDecimal quantity = BigDecimal.ZERO;
 
-        for (Object[] row : rawList) {
-            if (row[0] != null && row[1] != null) {
-                String shop = (String) row[0];
-                BigDecimal amount = BigDecimal.valueOf(((Number) row[1]).doubleValue()).setScale(2, RoundingMode.HALF_UP);
-                long count = row[2] != null ? ((Number) row[2]).longValue() : 0L;
-
-                BigDecimal pct = BigDecimal.ZERO;
-                if (totalSpend.compareTo(BigDecimal.ZERO) > 0) {
-                    pct = amount.divide(totalSpend, 4, RoundingMode.HALF_UP)
-                            .multiply(BigDecimal.valueOf(100))
-                            .setScale(1, RoundingMode.HALF_UP);
-                }
-
-                result.add(ShopExpenseDto.builder()
-                        .shopName(shop)
-                        .totalAmount(amount)
-                        .spendingPercentage(pct)
-                        .billsCount(count)
-                        .build());
-            }
+        CategoryAccumulator(String name) {
+            this.name = name;
         }
-        return result;
+
+        void add(BigDecimal amount, long c, BigDecimal qty) {
+            if (amount != null) this.totalAmount = this.totalAmount.add(amount);
+            this.count += c;
+            if (qty != null) this.quantity = this.quantity.add(qty);
+        }
+    }
+
+    private static class ShopAccumulator {
+        final String name;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        long count = 0;
+
+        ShopAccumulator(String name) {
+            this.name = name;
+        }
+
+        void add(BigDecimal amount, long c) {
+            if (amount != null) this.totalAmount = this.totalAmount.add(amount);
+            this.count += c;
+        }
     }
 }

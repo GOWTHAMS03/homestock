@@ -6,8 +6,16 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/homestock/homestock_app_bar.dart';
 import '../home_switcher/home_controller.dart';
+import '../shopping/shopping_controller.dart';
+import '../shopping/shopping_model.dart';
 import 'deal_search_models.dart';
+import 'location_deals_controller.dart';
+import 'location_deals_models.dart';
+import 'location_service.dart';
+import 'nearby_shop_detail_screen.dart';
 import 'product_deal_controller.dart';
+import 'widgets/manual_location_dialog.dart';
+import 'widgets/shop_radar_map_view.dart';
 
 /// Screen for Real-World Product Deal Search.
 /// Supports both generic intent discovery ("Oil", "Rice", "Milk", "samayal ennai")
@@ -111,6 +119,10 @@ class _ProductDealSearchScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(productDealControllerProvider);
     final controller = ref.read(productDealControllerProvider.notifier);
+    final locState = ref.watch(locationDealsControllerProvider);
+    final locController = ref.read(locationDealsControllerProvider.notifier);
+    final coreLocState = ref.watch(locationControllerProvider);
+    final coreLocNotifier = ref.read(locationControllerProvider.notifier);
     final hsColors = context.hsColors;
 
     return Scaffold(
@@ -124,21 +136,68 @@ class _ProductDealSearchScreenState
       body: SafeArea(
         child: Column(
           children: [
-            // Search Bar & Quick Categories
-            _buildSearchBar(hsColors),
+            // 1. Location Bar (📍 Mettur [Change] | 5 KM ▼ | [List] [Map])
+            _buildLocationBar(locState, locController, coreLocState, coreLocNotifier, hsColors),
 
-            // Content Area
-            Expanded(
-              child: RefreshIndicator(
-                color: hsColors.primary,
-                onRefresh: () async {
-                  final homeId = ref.read(homeControllerProvider).activeHome?.id;
-                  if (homeId != null) {
-                    await controller.searchDeals(homeId: homeId);
+            // 1b. Location Status / Warning Banner
+            LocationStatusBanner(
+              state: coreLocState,
+              onTryAgain: () async {
+                final granted = await coreLocNotifier.requestPermissionAndAcquire();
+                if (granted) {
+                  final loc = ref.read(locationControllerProvider).currentLocation;
+                  if (loc != null) {
+                    locController.setLocation(loc.toUserLocationContext());
                   }
-                },
-                child: _buildBody(state, controller, hsColors),
-              ),
+                }
+              },
+              onOpenSettings: () => coreLocNotifier.openAppSettings(),
+              onOpenLocationSettings: () => coreLocNotifier.openLocationSettings(),
+              onChooseManually: () async {
+                final selected = await showDialog<UserLocationContext>(
+                  context: context,
+                  builder: (_) => ManualLocationDialog(
+                    currentContext: locState.location,
+                    onSearchAreas: (q) => locController.searchAreas(q),
+                  ),
+                );
+                if (selected != null) {
+                  locController.setLocation(selected);
+                  coreLocNotifier.setManualLocation(selected.toLocationResult());
+                }
+              },
+            ),
+
+            // 2. Shopping List Intelligence Banner
+            _buildShoppingListIntelligenceBanner(context, locState, locController, hsColors),
+
+            // 3. Search Bar & Quick Categories
+            _buildSearchBar(hsColors, locController),
+
+            // 4. Content Area
+            Expanded(
+              child: locState.viewMode == DealsViewMode.map
+                  ? ListView(
+                      children: [
+                        const SizedBox(height: 12),
+                        ShopRadarMapView(
+                          shops: locState.nearbyShops,
+                          radiusKm: locState.radiusKm,
+                          locationLabel: locState.location.displayLabel,
+                        ),
+                      ],
+                    )
+                  : RefreshIndicator(
+                      color: hsColors.primary,
+                      onRefresh: () async {
+                        final homeId = ref.read(homeControllerProvider).activeHome?.id;
+                        if (homeId != null) {
+                          await controller.searchDeals(homeId: homeId);
+                        }
+                        await locController.loadNearbyShops();
+                      },
+                      child: _buildBody(state, controller, hsColors),
+                    ),
             ),
           ],
         ),
@@ -146,7 +205,8 @@ class _ProductDealSearchScreenState
     );
   }
 
-  Widget _buildSearchBar(HomeStockThemeColors hsColors) {
+  Widget _buildSearchBar(
+      HomeStockThemeColors hsColors, LocationDealsController locController) {
     return Container(
       color: hsColors.surface,
       padding: const EdgeInsets.fromLTRB(
@@ -190,6 +250,11 @@ class _ProductDealSearchScreenState
                       }
                     },
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Voice & Tanglish Deal Search',
+                  icon: Icon(Icons.mic_rounded, color: hsColors.primary, size: 20),
+                  onPressed: () => _openVoiceSearchDialog(context, locController, hsColors),
                 ),
                 if (_searchController.text.isNotEmpty)
                   IconButton(
@@ -1329,6 +1394,898 @@ class _ProductDealSearchScreenState
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationBar(
+    LocationDealsState locState,
+    LocationDealsController locController,
+    LocationState coreLocState,
+    LocationController coreLocNotifier,
+    HomeStockThemeColors hsColors,
+  ) {
+    final isManual = locState.location.isManual;
+    final sourceSubtitle = isManual
+        ? 'Manual location'
+        : (coreLocState.currentLocation?.freshnessLabel ??
+            (coreLocState.isLoading ? 'Finding location...' : 'Current location'));
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: hsColors.surface,
+        border: Border(
+          bottom: BorderSide(color: hsColors.outline.withValues(alpha: 0.4), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Location Pill
+          Expanded(
+            child: InkWell(
+              onTap: () => _openLocationPicker(context, locController, coreLocNotifier),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: hsColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: hsColors.outline.withValues(alpha: 0.6)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      !isManual
+                          ? Icons.my_location_rounded
+                          : Icons.location_on_rounded,
+                      size: 16,
+                      color: isManual ? const Color(0xFFD97706) : hsColors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            locState.location.displayLabel,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            sourceSubtitle,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Change',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: hsColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+
+          // Subtle Refresh Button (↻)
+          if (!isManual)
+            IconButton(
+              tooltip: coreLocState.isRefreshing ? 'Updating location...' : 'Refresh location',
+              visualDensity: VisualDensity.compact,
+              icon: coreLocState.isRefreshing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                      ),
+                    )
+                  : Icon(Icons.refresh_rounded, size: 18, color: hsColors.primary),
+              onPressed: coreLocState.isRefreshing
+                  ? null
+                  : () async {
+                      await coreLocNotifier.refreshLocation();
+                      final fresh = ref.read(locationControllerProvider).currentLocation;
+                      if (fresh != null) {
+                        locController.setLocation(fresh.toUserLocationContext());
+                      }
+                    },
+            ),
+          const SizedBox(width: 4),
+
+          // Radius dropdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: hsColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: hsColors.outline.withValues(alpha: 0.6)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<double>(
+                value: locState.radiusKm,
+                isDense: true,
+                icon: const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                items: const [
+                  DropdownMenuItem(value: 1.0, child: Text('1 KM')),
+                  DropdownMenuItem(value: 2.0, child: Text('2 KM')),
+                  DropdownMenuItem(value: 5.0, child: Text('5 KM')),
+                  DropdownMenuItem(value: 10.0, child: Text('10 KM')),
+                  DropdownMenuItem(value: 20.0, child: Text('20 KM')),
+                ],
+                onChanged: (newRadius) {
+                  if (newRadius != null) {
+                    locController.updateRadius(newRadius);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // List vs Radar Map Toggle
+          Container(
+            decoration: BoxDecoration(
+              color: hsColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildViewModeButton(
+                  icon: Icons.view_list_rounded,
+                  isActive: locState.viewMode == DealsViewMode.list,
+                  hsColors: hsColors,
+                  onTap: () => locController.setViewMode(DealsViewMode.list),
+                ),
+                _buildViewModeButton(
+                  icon: Icons.radar_rounded,
+                  isActive: locState.viewMode == DealsViewMode.map,
+                  hsColors: hsColors,
+                  onTap: () => locController.setViewMode(DealsViewMode.map),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewModeButton({
+    required IconData icon,
+    required bool isActive,
+    required HomeStockThemeColors hsColors,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? hsColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: isActive ? Colors.white : AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+
+  void _openLocationPicker(
+    BuildContext context,
+    LocationDealsController locController,
+    LocationController coreLocNotifier,
+  ) {
+    final locState = ref.read(locationDealsControllerProvider);
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Select Your Shopping Location',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Deals, delivery estimates, and local shop prices will be tuned to this area.',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.my_location_rounded, color: Color(0xFF0284C7)),
+                ),
+                title: const Text(
+                  'Detect Real Live Location (GPS)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Auto-detects live coordinates with explanation & privacy guarantees',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final granted = await coreLocNotifier.requestLocationWithExplanation(context);
+                  if (granted) {
+                    final loc = ref.read(locationControllerProvider).currentLocation;
+                    if (loc != null) {
+                      locController.setLocation(loc.toUserLocationContext());
+                    }
+                  }
+                },
+              ),
+              const Divider(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.search_rounded, color: Color(0xFFD97706)),
+                ),
+                title: const Text(
+                  'Search City / Area / Pincode',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'e.g. Any city, village, locality, or pincode',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final selected = await showDialog<UserLocationContext>(
+                    context: context,
+                    builder: (_) => ManualLocationDialog(
+                      currentContext: locState.location,
+                      onSearchAreas: (q) => locController.searchAreas(q),
+                    ),
+                  );
+                  if (selected != null) {
+                    locController.setLocation(selected);
+                    coreLocNotifier.setManualLocation(selected.toLocationResult());
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShoppingListIntelligenceBanner(
+    BuildContext context,
+    LocationDealsState locState,
+    LocationDealsController locController,
+    HomeStockThemeColors hsColors,
+  ) {
+    List<ShoppingItemModel> pendingItems = const [];
+    try {
+      final shoppingState = ref.watch(shoppingControllerProvider);
+      pendingItems = shoppingState.list?.items.where((it) => !it.isCompleted).toList() ?? [];
+    } catch (_) {
+      pendingItems = const [];
+    }
+
+    if (pendingItems.isEmpty && locState.basketResult == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFEEF2FF),
+            Colors.white,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFC7D2FE), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.indigo.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF4F46E5), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Shopping List Deals',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E1B4B),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4F46E5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${pendingItems.length} items',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Compare single-store convenience vs multi-store maximum savings.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.indigo.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (locState.basketResult != null)
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                  onPressed: () => locController.clearBasketOptimization(),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          if (locState.isBasketLoading) ...[
+            const LinearProgressIndicator(color: Color(0xFF4F46E5)),
+            const SizedBox(height: 8),
+            const Text(
+              'Analyzing local supermarket stocks & online delivery costs...',
+              style: TextStyle(fontSize: 12, color: Color(0xFF4F46E5), fontWeight: FontWeight.w600),
+            ),
+          ] else if (locState.basketResult != null) ...[
+            _buildBasketOptimizationCards(locState.basketResult!, hsColors, locController),
+          ] else ...[
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                label: const Text(
+                  'Find Best Basket Deals',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  final homeId = ref.read(homeControllerProvider).activeHome?.id ?? 'default_home';
+                  final items = pendingItems.map((e) => {
+                    'itemName': e.itemName,
+                    'quantity': e.quantity,
+                    'unit': e.unit,
+                    'category': e.categoryName,
+                  }).toList();
+                  locController.optimizeBasket(homeId: homeId, items: items);
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBasketOptimizationCards(
+    BasketOptimizationResult basket,
+    HomeStockThemeColors hsColors,
+    LocationDealsController locController,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // AI Recommendation
+        if (basket.geminiAiRecommendation.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.lightbulb_rounded, size: 18, color: Color(0xFF16A34A)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    basket.geminiAiRecommendation,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF166534),
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // 2 Options: Single Store vs Split Savings
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (basket.bestSingleStoreOption != null)
+              Expanded(
+                child: _buildBasketOptionCard(
+                  basket.bestSingleStoreOption!,
+                  isSavingsOption: false,
+                  hsColors: hsColors,
+                ),
+              ),
+            if (basket.bestSingleStoreOption != null && basket.maximumSavingsOption != null)
+              const SizedBox(width: 10),
+            if (basket.maximumSavingsOption != null)
+              Expanded(
+                child: _buildBasketOptionCard(
+                  basket.maximumSavingsOption!,
+                  isSavingsOption: true,
+                  hsColors: hsColors,
+                ),
+              ),
+          ],
+        ),
+
+        if (basket.tradeOffExplanation.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            basket.tradeOffExplanation,
+            style: const TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBasketOptionCard(
+    BasketOption option, {
+    required bool isSavingsOption,
+    required HomeStockThemeColors hsColors,
+  }) {
+    final borderColor = isSavingsOption ? const Color(0xFF10B981) : const Color(0xFF6366F1);
+    final bgColor = isSavingsOption ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC);
+    final badgeText = isSavingsOption ? 'MAX SAVINGS' : '1-TRIP CONVENIENCE';
+    final badgeColor = isSavingsOption ? const Color(0xFF059669) : const Color(0xFF4F46E5);
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor.withValues(alpha: 0.5), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: badgeColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              badgeText,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: badgeColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            option.storeNames.join(' + '),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '₹${option.effectiveGrandTotal.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: isSavingsOption ? const Color(0xFF059669) : const Color(0xFF1E293B),
+            ),
+          ),
+          if (option.potentialSavings > 0)
+            Text(
+              'Saves ₹${option.potentialSavings.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF059669),
+              ),
+            ),
+          if (option.estimatedDeliveryOrTravelCost > 0)
+            Text(
+              '+ ₹${option.estimatedDeliveryOrTravelCost.toStringAsFixed(0)} travel/delivery',
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppColors.textMuted,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _openVoiceSearchDialog(
+    BuildContext context,
+    LocationDealsController locController,
+    HomeStockThemeColors hsColors,
+  ) {
+    final voiceTextController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final locState = ref.watch(locationDealsControllerProvider);
+            final voiceResult = locState.voiceResult;
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  top: AppSpacing.lg,
+                  bottom: MediaQuery.of(dialogCtx).viewInsets.bottom + AppSpacing.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: hsColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.mic_rounded, color: hsColors.primary, size: 22),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Voice & Tanglish Deal Finder',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Powered by Gemini 3.1 Flash-Lite NLP',
+                                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                          onPressed: () {
+                            locController.clearVoiceResult();
+                            Navigator.pop(dialogCtx);
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Input Text
+                    TextField(
+                      controller: voiceTextController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. "ennaiku entha shop la oil kammiya iruku?"',
+                        hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                        filled: true,
+                        fillColor: hsColors.surfaceVariant,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: hsColors.outline),
+                        ),
+                        suffixIcon: locState.isVoiceSearching
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : IconButton(
+                                icon: Icon(Icons.send_rounded, color: hsColors.primary),
+                                onPressed: () async {
+                                  final query = voiceTextController.text.trim();
+                                  if (query.isNotEmpty) {
+                                    await locController.searchVoice(query);
+                                    setDialogState(() {});
+                                  }
+                                },
+                              ),
+                      ),
+                      onSubmitted: (val) async {
+                        if (val.trim().isNotEmpty) {
+                          await locController.searchVoice(val.trim());
+                          setDialogState(() {});
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Example Tanglish Prompts
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _buildPromptChip('ennaiku oil best price?', voiceTextController, () {
+                          voiceTextController.text = 'ennaiku oil best price?';
+                          locController.searchVoice(voiceTextController.text);
+                        }),
+                        _buildPromptChip('5kg ponni rice offers', voiceTextController, () {
+                          voiceTextController.text = '5kg ponni rice offers';
+                          locController.searchVoice(voiceTextController.text);
+                        }),
+                        _buildPromptChip('milk and atta Salem rate', voiceTextController, () {
+                          voiceTextController.text = 'milk and atta Salem rate';
+                          locController.searchVoice(voiceTextController.text);
+                        }),
+                      ],
+                    ),
+
+                    if (voiceResult != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF86EFAC)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16A34A),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    voiceResult.intent,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Lang: ${voiceResult.detectedLanguage}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF166534),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              voiceResult.conversationalReply,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF14532D),
+                                height: 1.3,
+                              ),
+                            ),
+                            if (voiceResult.bestNearbyDeal != null) ...[
+                              const Divider(height: 16),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => NearbyShopDetailScreen(
+                                        shopId: voiceResult.bestNearbyDeal!.shopId,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.storefront_rounded, size: 16, color: Color(0xFF16A34A)),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          '${voiceResult.bestNearbyDeal!.shopName} (${voiceResult.bestNearbyDeal!.distanceLabel ?? ''})',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF14532D),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        '₹${voiceResult.bestNearbyDeal!.effectivePrice.toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF16A34A),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Color(0xFF16A34A)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF166534),
+                                  side: const BorderSide(color: Color(0xFF16A34A)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () {
+                                  final term = voiceResult.parsedProduct ?? voiceTextController.text;
+                                  Navigator.pop(dialogCtx);
+                                  _searchController.text = term;
+                                  _performSearch(term);
+                                },
+                                child: Text('Search Catalog for "${voiceResult.parsedProduct ?? 'item'}"'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPromptChip(String label, TextEditingController controller, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF475569),
+          ),
         ),
       ),
     );

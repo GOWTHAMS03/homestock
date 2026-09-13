@@ -58,6 +58,9 @@ public class BillScanService {
     private final BillMathValidator mathValidator;
     private final ConfidenceScorer confidenceScorer;
     private final BillExtractionAuditRepository auditRepository;
+    private final DocumentTypeClassifier documentTypeClassifier;
+    private final HandwritingReceiptAiProvider handwritingAiProvider;
+    private final ExtractionResultMerger extractionResultMerger;
 
     public BillScanService(
             OcrProvider ocrProvider,
@@ -71,7 +74,10 @@ public class BillScanService {
             List<ReceiptAiProvider> aiProviders,
             BillMathValidator mathValidator,
             ConfidenceScorer confidenceScorer,
-            BillExtractionAuditRepository auditRepository
+            BillExtractionAuditRepository auditRepository,
+            DocumentTypeClassifier documentTypeClassifier,
+            HandwritingReceiptAiProvider handwritingAiProvider,
+            ExtractionResultMerger extractionResultMerger
     ) {
         this.ocrProvider = ocrProvider;
         this.billParser = billParser;
@@ -85,6 +91,9 @@ public class BillScanService {
         this.mathValidator = mathValidator;
         this.confidenceScorer = confidenceScorer;
         this.auditRepository = auditRepository;
+        this.documentTypeClassifier = documentTypeClassifier;
+        this.handwritingAiProvider = handwritingAiProvider;
+        this.extractionResultMerger = extractionResultMerger;
     }
 
     @Transactional
@@ -99,13 +108,14 @@ public class BillScanService {
         Home home = homeRepository.findById(homeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Household not found"));
 
-        // ====== STAGE 1: Image/Text Ingestion ======
+        // ====== STAGE 1: Image/Text Ingestion & Document Classification ======
         String extractedText;
         byte[] primaryImageBytes = null;
         String primaryMimeType = "image/jpeg";
         ImageQualityReport qualityReport = null;
         String ocrProviderName = ocrProvider.getProviderName();
         double ocrConfidence = 0.90;
+        com.homestock.modules.bill.entity.DocumentType documentType = com.homestock.modules.bill.entity.DocumentType.PRINTED;
 
         if (files != null && !files.isEmpty()) {
             // Binary image flow → multi-pass OCR pipeline
@@ -125,10 +135,19 @@ public class BillScanService {
                 }
             }
 
-            // Run multi-pass OCR (includes quality analysis + preprocessing)
+            // Step 1.1: Early Document Classification
+            if (primaryImageBytes != null) {
+                DocumentTypeClassifier.ClassificationResult classification =
+                        documentTypeClassifier.classify(primaryImageBytes, primaryMimeType, null, null);
+                documentType = classification.getDocumentType();
+                log.info("Document classified as: {} (confidence={}, reason={})",
+                        documentType, classification.getConfidence(), classification.getReason());
+            }
+
+            // Step 1.2: Run multi-pass OCR (includes quality analysis + preprocessing)
             if (primaryImageBytes != null) {
                 MultiPassOcrOrchestrator.MultiPassOcrResult multiPassResult =
-                        ocrOrchestrator.runMultiPass(primaryImageBytes, primaryMimeType);
+                        ocrOrchestrator.runMultiPass(primaryImageBytes, primaryMimeType, documentType);
 
                 qualityReport = multiPassResult.getQualityReport();
                 OcrResult bestOcr = multiPassResult.getBestResult();
@@ -157,31 +176,84 @@ public class BillScanService {
         } else if (rawTextPayload != null && !rawTextPayload.trim().isEmpty()) {
             extractedText = rawTextPayload;
             ocrConfidence = 0.95;
+            DocumentTypeClassifier.ClassificationResult textClass =
+                    documentTypeClassifier.classify(null, null, rawTextPayload,
+                            Arrays.stream(rawTextPayload.split("\\r?\\n")).filter(l -> !l.trim().isEmpty()).toList());
+            documentType = textClass.getDocumentType();
         } else {
             throw new IllegalArgumentException("Either bill image files or raw text payload must be provided");
         }
 
-        // ====== STAGE 2: AI Receipt Understanding ======
+        // ====== STAGE 2: AI Receipt Understanding (Document-Type Aware) ======
         ReceiptExtractionResult aiResult = null;
         String aiProviderName = null;
 
-        // Try AI providers in priority order with multimodal vision
-        for (ReceiptAiProvider aiProvider : aiProviders) {
-            if (aiProvider.isAvailable()) {
-                try {
-                    List<String> ocrLines = extractedText != null
-                            ? Arrays.stream(extractedText.split("\\r?\\n")).filter(l -> !l.trim().isEmpty()).toList()
-                            : List.of();
+        List<String> ocrLines = extractedText != null
+                ? Arrays.stream(extractedText.split("\\r?\\n")).filter(l -> !l.trim().isEmpty()).toList()
+                : List.of();
 
-                    aiResult = aiProvider.extractWithImage(primaryImageBytes, primaryMimeType, extractedText, ocrLines);
+        if (documentType == com.homestock.modules.bill.entity.DocumentType.HANDWRITTEN) {
+            // Dedicated handwriting extraction pipeline
+            if (handwritingAiProvider.isAvailable() && primaryImageBytes != null) {
+                try {
+                    aiResult = handwritingAiProvider.extractWithImage(primaryImageBytes, primaryMimeType, extractedText, ocrLines);
                     if (aiResult != null && !aiResult.getItems().isEmpty()) {
-                        aiProviderName = aiProvider.getProviderName();
-                        log.info("AI extraction via {} produced {} items",
+                        aiProviderName = handwritingAiProvider.getProviderName();
+                        log.info("AI handwriting extraction via {} produced {} items",
                                 aiProviderName, aiResult.getItems().size());
-                        break;
                     }
                 } catch (Exception e) {
-                    log.warn("AI provider {} failed: {}", aiProvider.getProviderName(), e.getMessage());
+                    log.warn("Handwriting AI provider failed: {}", e.getMessage());
+                }
+            }
+        } else if (documentType == com.homestock.modules.bill.entity.DocumentType.MIXED) {
+            // Mixed pipeline: extract printed and handwritten parts, then merge
+            ReceiptExtractionResult printedResult = null;
+            ReceiptExtractionResult handwrittenResult = null;
+
+            for (ReceiptAiProvider aiProvider : aiProviders) {
+                if (aiProvider.isAvailable() && !(aiProvider instanceof HandwritingReceiptAiProvider)) {
+                    try {
+                        printedResult = aiProvider.extractWithImage(primaryImageBytes, primaryMimeType, extractedText, ocrLines);
+                        if (printedResult != null && !printedResult.getItems().isEmpty()) {
+                            break;
+                        }
+                    } catch (Exception e) {
+                        log.warn("Printed AI provider failed in mixed mode: {}", e.getMessage());
+                    }
+                }
+            }
+
+            if (handwritingAiProvider.isAvailable() && primaryImageBytes != null) {
+                try {
+                    handwrittenResult = handwritingAiProvider.extractWithImage(primaryImageBytes, primaryMimeType, extractedText, ocrLines);
+                } catch (Exception e) {
+                    log.warn("Handwriting AI provider failed in mixed mode: {}", e.getMessage());
+                }
+            }
+
+            aiResult = extractionResultMerger.merge(printedResult, handwrittenResult);
+            if (aiResult != null && !aiResult.getItems().isEmpty()) {
+                aiProviderName = aiResult.getAiProvider();
+                log.info("Mixed bill extraction merged {} items", aiResult.getItems().size());
+            }
+        }
+
+        // Standard or fallback AI extraction (for PRINTED documents or as fallback)
+        if (aiResult == null || aiResult.getItems().isEmpty()) {
+            for (ReceiptAiProvider aiProvider : aiProviders) {
+                if (aiProvider.isAvailable() && !(aiProvider instanceof HandwritingReceiptAiProvider)) {
+                    try {
+                        aiResult = aiProvider.extractWithImage(primaryImageBytes, primaryMimeType, extractedText, ocrLines);
+                        if (aiResult != null && !aiResult.getItems().isEmpty()) {
+                            aiProviderName = aiProvider.getProviderName();
+                            log.info("AI extraction via {} produced {} items",
+                                    aiProviderName, aiResult.getItems().size());
+                            break;
+                        }
+                    } catch (Exception e) {
+                        log.warn("AI provider {} failed: {}", aiProvider.getProviderName(), e.getMessage());
+                    }
                 }
             }
         }
@@ -294,6 +366,7 @@ public class BillScanService {
 
         PurchasedBill bill = PurchasedBill.builder()
                 .home(home)
+                .documentType(documentType)
                 .shopName(safeShop)
                 .billNumber(safeBillNo)
                 .billDate(billDate != null ? billDate : LocalDate.now())
@@ -434,7 +507,7 @@ public class BillScanService {
 
         // ====== STAGE 8: Overall Confidence Scoring ======
         ConfidenceScorer.BillConfidenceResult confidenceResult = confidenceScorer.calculateBillConfidence(
-                imageQualityScore, ocrConfidence, aiResult, validation, matchConfidences
+                imageQualityScore, ocrConfidence, aiResult, validation, matchConfidences, documentType
         );
 
         // Update bill with final confidence
@@ -447,9 +520,9 @@ public class BillScanService {
         }
 
         int pipelineDuration = (int) (System.currentTimeMillis() - pipelineStart);
-        log.info("Bill scan pipeline completed in {}ms: {} items, confidence={}, needsReview={}, aiProvider={}",
+        log.info("Bill scan pipeline completed in {}ms: {} items, confidence={}, needsReview={}, aiProvider={}, docType={}",
                 pipelineDuration, previewItems.size(), confidenceResult.getOverallConfidence(),
-                needsReviewCount, aiProviderName);
+                needsReviewCount, aiProviderName, documentType);
 
         return BillScanPreviewResponseDto.builder()
                 .billId(bill.getId())
@@ -470,6 +543,7 @@ public class BillScanService {
                 .suggestedCount(suggestedCount)
                 .newProductCount(newCount)
                 // New pipeline fields
+                .documentType(documentType)
                 .imageQualityScore(imageQualityScore)
                 .imageQualityMessage(qualityReport != null ? qualityReport.getMessage() : null)
                 .ocrConfidence(BigDecimal.valueOf(ocrConfidence).setScale(2, RoundingMode.HALF_UP))
@@ -641,6 +715,7 @@ public class BillScanService {
                 .totalAmount(bill.getTotalAmount())
                 .currency(bill.getCurrency())
                 .status(bill.getStatus())
+                .documentType(bill.getDocumentType())
                 .processingStatus(bill.getProcessingStatus())
                 .receiptImageUrl(bill.getReceiptImageUrl())
                 .recordedByUserId(bill.getRecordedBy() != null ? bill.getRecordedBy().getId() : null)

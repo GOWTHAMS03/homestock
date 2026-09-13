@@ -240,5 +240,57 @@ void main() {
       // Verify smart inventory insight
       expect(find.text('Inventory updated'), findsOneWidget);
     });
+
+    testWidgets('renders exact creation time in purchase details and does not default to 12:00 AM',
+        (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final createdAtTime = DateTime(2026, 9, 13, 14, 45); // 2:45 PM
+      final purchase = PurchaseModel(
+        id: 'test-purchase-time',
+        storeName: 'Reliance Smart',
+        recordedByName: 'Gowtham',
+        purchaseDate: '2026-09-13',
+        createdAt: createdAtTime,
+        totalAmount: 180.0,
+        currency: 'INR',
+        items: [
+          PurchaseItemModel(
+            id: 'item-tea',
+            itemName: 'Taj Mahal Tea',
+            quantity: 1.0,
+            unitPrice: 180.0,
+            totalPrice: 180.0,
+            unit: 'box',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inventoryControllerProvider.overrideWith(
+              (ref) => MockInventoryController(const InventoryState()),
+            ),
+          ],
+          child: MaterialApp(
+            home: ProcessedProductsScreen(
+              purchase: purchase,
+              isJustCompleted: false,
+              source: 'Receipt Entry',
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Must display 02:45 PM and NOT 12:00 AM
+      expect(find.textContaining('02:45 PM'), findsOneWidget);
+      expect(find.textContaining('12:00 AM'), findsNothing);
+      expect(find.text('Taj Mahal Tea'), findsOneWidget);
+    });
   });
 }

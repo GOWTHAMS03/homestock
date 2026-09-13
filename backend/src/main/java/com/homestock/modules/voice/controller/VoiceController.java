@@ -2,10 +2,14 @@ package com.homestock.modules.voice.controller;
 
 import com.homestock.core.common.ApiResponse;
 import com.homestock.modules.voice.dto.*;
+import com.homestock.modules.voice.service.VoiceAuditService;
 import com.homestock.modules.voice.service.VoiceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +25,11 @@ import java.util.UUID;
 public class VoiceController {
 
     private final VoiceService voiceService;
+    private final VoiceAuditService voiceAuditService;
+
+    // =========================================================================
+    // Legacy Endpoints (Preserved for 100% Backward Compatibility)
+    // =========================================================================
 
     /**
      * Transcribe an audio file to text using Whisper.
@@ -37,7 +46,7 @@ public class VoiceController {
     }
 
     /**
-     * Parse text transcript into an intent and extracted entities.
+     * Parse text transcript into an intent and extracted entities using regex/dictionary.
      */
     @PostMapping("/command")
     @com.homestock.core.redis.RateLimited(keyPrefix = "voice_command", limit = 20, windowSeconds = 60)
@@ -71,10 +80,82 @@ public class VoiceController {
     @PreAuthorize("@homeSecurity.isMember(#request.homeId)")
     public ResponseEntity<ApiResponse<ExecuteCommandResponse>> executeCommand(
             @Valid @RequestBody ExecuteCommandRequest request) {
-        log.info("Executing voice command intent {} for home {}",
-                request.getCommandResult() != null ? request.getCommandResult().getIntent() : "UNKNOWN",
-                request.getHomeId());
+        VoiceIntent intent = request.getCommandResult() != null ? request.getCommandResult().getIntent() : VoiceIntent.UNKNOWN;
+        log.info("Executing voice command intent {} for home {}", intent, request.getHomeId());
+
+        if (intent == null || intent == VoiceIntent.UNKNOWN) {
+            ExecuteCommandResponse failedResp = ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(VoiceIntent.UNKNOWN)
+                    .message("Cannot execute unrecognized command. Please try speaking again.")
+                    .executionStatus("FAILED")
+                    .build();
+            return ResponseEntity.ok(ApiResponse.success("Command unrecognized", failedResp));
+        }
+
         ExecuteCommandResponse response = voiceService.execute(request);
         return ResponseEntity.ok(ApiResponse.success(response.getMessage(), response));
+    }
+
+    // =========================================================================
+    // Gemini Flash-Lite Production AI Voice Endpoints
+    // =========================================================================
+
+    /**
+     * End-to-end Gemini Flash-Lite audio understanding:
+     * Voice Audio -> Gemini Multimodal -> Structured JSON -> Validation -> Resolution -> Candidate Ranking
+     */
+    @PostMapping(value = "/ai/command", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_ai_command", limit = 30, windowSeconds = 60)
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
+    public ResponseEntity<ApiResponse<VoiceCommandResult>> processAiVoiceCommand(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam("homeId") UUID homeId,
+            @RequestParam(value = "idempotencyKey", required = false) String idempotencyKey) {
+        if (idempotencyKey != null && idempotencyKey.contains(",")) {
+            idempotencyKey = idempotencyKey.split(",")[0].trim();
+        }
+        log.info("Processing Gemini AI voice command for home {} (size={} bytes, idemKey={})",
+                homeId, file.getSize(), idempotencyKey);
+        VoiceCommandResult result = voiceService.processAiAudio(file, homeId, idempotencyKey);
+        return ResponseEntity.ok(ApiResponse.success("Voice command understood successfully", result));
+    }
+
+    /**
+     * Parse text command using Gemini Flash-Lite for natural language & multilingual understanding.
+     */
+    @PostMapping("/ai/parse")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_ai_parse", limit = 30, windowSeconds = 60)
+    @PreAuthorize("@homeSecurity.isMember(#request.homeId)")
+    public ResponseEntity<ApiResponse<VoiceCommandResult>> parseAiCommand(
+            @Valid @RequestBody ParseCommandRequest request) {
+        log.info("Parsing text command via Gemini AI: '{}' for home {}", request.getTranscript(), request.getHomeId());
+        VoiceCommandResult result = voiceService.processAiText(request.getTranscript(), request.getHomeId());
+        return ResponseEntity.ok(ApiResponse.success("Text command processed successfully", result));
+    }
+
+    /**
+     * Handle multi-turn conversation follow-up (e.g. User said "add rice", bot asked "How much?", user says "2 kilo").
+     */
+    @PostMapping("/ai/follow-up")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_ai_follow_up", limit = 30, windowSeconds = 60)
+    @PreAuthorize("@homeSecurity.isMember(#request.homeId)")
+    public ResponseEntity<ApiResponse<VoiceCommandResult>> followUpCommand(
+            @Valid @RequestBody FollowUpRequest request) {
+        log.info("Processing voice follow-up: '{}' for home {}", request.getTranscript(), request.getHomeId());
+        VoiceCommandResult result = voiceService.processFollowUp(request.getHomeId(), request.getTranscript());
+        return ResponseEntity.ok(ApiResponse.success("Follow-up merged successfully", result));
+    }
+
+    /**
+     * Retrieve voice command audit trail for the home.
+     */
+    @GetMapping("/audit")
+    @PreAuthorize("@homeSecurity.isMember(#homeId)")
+    public ResponseEntity<ApiResponse<Page<VoiceAuditDto>>> getAuditHistory(
+            @RequestParam("homeId") UUID homeId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<VoiceAuditDto> history = voiceAuditService.getAuditHistory(homeId, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Voice audit history retrieved", history));
     }
 }

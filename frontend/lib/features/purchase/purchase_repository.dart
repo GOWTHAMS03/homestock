@@ -332,6 +332,9 @@ class PurchaseRepository {
         if (pendingEntityIds.contains(purchaseId)) continue;
         final rawItems = json['items'] as List? ?? [];
 
+        final createdAtStr = json['createdAt'] as String?;
+        final parsedCreated = createdAtStr != null ? DateTime.tryParse(createdAtStr)?.toLocal() : null;
+
         await _purchaseDao.upsertPurchase(LocalPurchasesCompanion(
           id: Value(purchaseId),
           homeId: Value(homeId),
@@ -343,7 +346,7 @@ class PurchaseRepository {
           currency: Value(json['currency'] as String? ?? 'INR'),
           notes: Value(json['notes'] as String?),
           isLocalOnly: const Value(false),
-          updatedAt: Value(DateTime.now()),
+          updatedAt: Value(parsedCreated ?? DateTime.now()),
         ));
 
         final itemCompanions = rawItems.map((item) {
@@ -396,6 +399,7 @@ class PurchaseRepository {
       totalAmount: p.totalAmount,
       currency: p.currency,
       notes: p.notes,
+      createdAt: p.updatedAt,
       items: items
           .map((i) => PurchaseItemModel(
                 id: i.id,

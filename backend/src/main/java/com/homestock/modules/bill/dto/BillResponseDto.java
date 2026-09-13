@@ -35,6 +35,7 @@ public class BillResponseDto {
     private Instant createdAt;
 
     // AI Pipeline fields
+    private com.homestock.modules.bill.entity.DocumentType documentType;
     private String processingStatus;
     private BigDecimal overallConfidence;
     private boolean needsReview;

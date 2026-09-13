@@ -221,6 +221,14 @@ class BillScanAndConfirmationIntegrationTest {
         assertEquals(1, monthly.getBillsCount());
         assertFalse(monthly.getCategoryBreakdown().isEmpty());
         assertFalse(monthly.getShopBreakdown().isEmpty());
+        assertEquals(1, monthly.getBills().size());
+        assertNotNull(monthly.getBills().get(0).getCreatedAt());
+        assertEquals(2, monthly.getBills().get(0).getItems().size());
+        // Verify 100% accurate spend math across categories
+        BigDecimal categorySum = monthly.getCategoryBreakdown().stream()
+                .map(CategoryExpenseDto::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, monthly.getTotalSpend().compareTo(categorySum));
 
         // 9. Verify Price Intelligence store & standard unit price metrics
         ProductPriceIntelligenceDto priceIntel = priceIntelligenceService.getInventoryItemPriceIntelligence(homeId, existingInvItem.getId());

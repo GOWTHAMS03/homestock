@@ -375,9 +375,42 @@ class VoiceController extends StateNotifier<VoiceState> {
         return;
       }
 
+      // Attempt 1: Online Gemini Flash-Lite multimodal understanding
+      final isOnline = _ref.read(connectivityMonitorProvider).isOnline;
+      if (isOnline) {
+        try {
+          final voiceRepo = _ref.read(voiceRepositoryProvider);
+          final aiResult = await voiceRepo.processAiAudio(path, homeId);
+
+          if (aiResult.intent != VoiceIntentType.unknown) {
+            state = state.copyWith(
+              transcript: aiResult.transcript,
+              commandResult: aiResult,
+              selectedOptionId: aiResult.disambiguationOptions.isNotEmpty
+                  ? aiResult.disambiguationOptions.first.id
+                  : null,
+            );
+
+            // Dual confidence auto-execution
+            if (aiResult.intentConfidence >= 0.80 &&
+                aiResult.productMatchConfidence >= 0.95 &&
+                !aiResult.requiresConfirmation &&
+                !aiResult.needsQuantity) {
+              await confirmAndExecute();
+            } else {
+              state = state.copyWith(status: VoiceStatus.parsed);
+            }
+            _cleanUpAudioFile(path);
+            return;
+          }
+        } catch (e) {
+          debugPrint('Gemini Voice AI failed: $e, falling back to local hybrid ASR');
+        }
+      }
+
       final langHint = state.languageHint == 'auto' ? null : state.languageHint;
 
-      // 1. Transcribe via Hybrid ASR (with privacy deletion)
+      // Attempt 2: Hybrid ASR (with on-device Whisper.cpp fallback)
       final transcript = await _voiceService.transcribeAudio(
         path,
         languageHint: langHint,
@@ -392,7 +425,7 @@ class VoiceController extends StateNotifier<VoiceState> {
         return;
       }
 
-      // 2. Process command
+      // Process command
       await processVoiceCommand(transcriptText, isOffline: transcript.isOffline);
     } catch (e) {
       debugPrint('Voice processing error: $e');
@@ -484,11 +517,46 @@ class VoiceController extends StateNotifier<VoiceState> {
 
   /// Executes the parsed voice command locally via Drift DB and sync queue
   Future<bool> confirmAndExecute() async {
-    final cmd = state.normalizedCommand;
     final homeId = _homeId;
-    if (cmd == null || homeId == null) return false;
+    if (homeId == null) return false;
 
     state = state.copyWith(status: VoiceStatus.executing);
+
+    // 1. If online and we have a server command result, execute on backend with audit
+    final isOnline = _ref.read(connectivityMonitorProvider).isOnline;
+    if (state.commandResult != null && isOnline) {
+      try {
+        final voiceRepo = _ref.read(voiceRepositoryProvider);
+        final serverResponse = await voiceRepo.executeCommand(
+          ExecuteCommandRequest(
+            homeId: homeId,
+            commandResult: state.commandResult!,
+            confirmed: true,
+            selectedOptionId: state.selectedOptionId,
+            idempotencyKey: state.commandResult!.idempotencyKey,
+          ),
+        );
+
+        state = state.copyWith(
+          status: serverResponse.success ? VoiceStatus.success : VoiceStatus.error,
+          executionResponse: serverResponse,
+          errorMessage: serverResponse.success ? null : serverResponse.message,
+        );
+
+        if (serverResponse.success) {
+          _refreshDomains(state.commandResult!.intent);
+        }
+        return serverResponse.success;
+      } catch (e) {
+        debugPrint('Server command execution failed ($e), falling back to local DB executor');
+      }
+    }
+
+    final cmd = state.normalizedCommand;
+    if (cmd == null) {
+      state = state.copyWith(status: VoiceStatus.error, errorMessage: 'No command to execute.');
+      return false;
+    }
 
     try {
       final execResult = await _voiceService.executeCommand(

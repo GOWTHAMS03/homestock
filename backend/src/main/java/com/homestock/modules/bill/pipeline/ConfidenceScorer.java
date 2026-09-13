@@ -38,7 +38,7 @@ public class ConfidenceScorer {
     private double rejectThreshold;
 
     /**
-     * Calculate overall bill confidence from all pipeline stages.
+     * Calculate overall bill confidence from all pipeline stages (default PRINTED).
      */
     public BillConfidenceResult calculateBillConfidence(
             BigDecimal imageQuality,
@@ -46,6 +46,20 @@ public class ConfidenceScorer {
             ReceiptExtractionResult aiResult,
             BillMathValidator.BillValidationResult validation,
             List<BigDecimal> matchConfidences
+    ) {
+        return calculateBillConfidence(imageQuality, ocrConfidence, aiResult, validation, matchConfidences, com.homestock.modules.bill.entity.DocumentType.PRINTED);
+    }
+
+    /**
+     * Calculate overall bill confidence from all pipeline stages with DocumentType awareness.
+     */
+    public BillConfidenceResult calculateBillConfidence(
+            BigDecimal imageQuality,
+            double ocrConfidence,
+            ReceiptExtractionResult aiResult,
+            BillMathValidator.BillValidationResult validation,
+            List<BigDecimal> matchConfidences,
+            com.homestock.modules.bill.entity.DocumentType documentType
     ) {
         double imgConf = imageQuality != null ? imageQuality.doubleValue() : 0.7;
         double ocrConf = Math.max(0, Math.min(1, ocrConfidence));
@@ -75,12 +89,20 @@ public class ConfidenceScorer {
             if (matchConf > 1.0) matchConf = matchConf / 100.0;
         }
 
-        // Weighted composite — validation and AI have highest weight
-        double composite = (imgConf * 0.10)
-                + (ocrConf * 0.15)
-                + (aiConf * 0.30)
-                + (validConf * 0.25)
-                + (matchConf * 0.20);
+        // Weighted composite — for handwritten documents, multimodal vision carries primary weight
+        double composite;
+        if (documentType == com.homestock.modules.bill.entity.DocumentType.HANDWRITTEN) {
+            composite = (imgConf * 0.10)
+                    + (aiConf * 0.45)
+                    + (validConf * 0.25)
+                    + (matchConf * 0.20);
+        } else {
+            composite = (imgConf * 0.10)
+                    + (ocrConf * 0.15)
+                    + (aiConf * 0.30)
+                    + (validConf * 0.25)
+                    + (matchConf * 0.20);
+        }
 
         // Apply penalty for validation failures
         if (validation != null && !validation.isReconciled()) {
@@ -103,9 +125,9 @@ public class ConfidenceScorer {
 
         composite = Math.max(0.0, Math.min(1.0, composite));
 
-        // Determine action
+        // Determine action — handwritten bills always require user confirmation
         String action;
-        if (composite >= autoAcceptThreshold) {
+        if (composite >= autoAcceptThreshold && documentType != com.homestock.modules.bill.entity.DocumentType.HANDWRITTEN) {
             action = "AUTO_ACCEPT";
         } else if (composite >= needsReviewThreshold) {
             action = "NEEDS_CONFIRMATION";

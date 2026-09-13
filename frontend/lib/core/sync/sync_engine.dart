@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:uuid/uuid.dart';
 
 import '../database/app_database.dart';
 import '../database/daos/inventory_dao.dart';
@@ -26,6 +27,7 @@ import 'sync_status.dart';
 /// - Idempotency via operationId
 /// - 8-state strict lifecycle pipeline
 class SyncEngine with WidgetsBindingObserver {
+  static const _uuid = Uuid();
   final AppDatabase _db;
   final ApiClient _apiClient;
   final ConnectivityMonitor _connectivity;
@@ -617,10 +619,30 @@ class SyncEngine with WidgetsBindingObserver {
       );
     }).toList();
 
-    // Build purchases
+    // Build purchases and purchase items
+    final purchaseItems = <LocalPurchaseItemsCompanion>[];
     final purchases = pullResponse.purchases.map((json) {
+      final purchaseId = json['id'] as String;
+      final createdAtStr = json['createdAt'] as String?;
+      final parsedCreated = createdAtStr != null ? DateTime.tryParse(createdAtStr) : null;
+
+      final rawItems = (json['items'] as List?) ?? [];
+      for (final item in rawItems) {
+        purchaseItems.add(LocalPurchaseItemsCompanion(
+          id: Value(item['id'] as String? ?? _uuid.v4()),
+          purchaseId: Value(purchaseId),
+          inventoryItemId: Value(item['inventoryItemId'] as String?),
+          itemName: Value(item['itemName'] as String? ?? ''),
+          categoryName: Value(item['categoryName'] as String?),
+          quantity: Value((item['quantity'] as num?)?.toDouble() ?? 1.0),
+          unit: Value(item['unit'] as String? ?? 'pcs'),
+          unitPrice: Value((item['unitPrice'] as num?)?.toDouble() ?? 0.0),
+          totalPrice: Value((item['totalPrice'] as num?)?.toDouble() ?? 0.0),
+        ));
+      }
+
       return LocalPurchasesCompanion(
-        id: Value(json['id'] as String),
+        id: Value(purchaseId),
         homeId: Value(homeId),
         storeId: Value(json['storeId'] as String?),
         storeName: Value(json['storeName'] as String?),
@@ -631,13 +653,13 @@ class SyncEngine with WidgetsBindingObserver {
         currency: Value(json['currency'] as String? ?? 'INR'),
         notes: Value(json['notes'] as String?),
         isLocalOnly: const Value(false),
-        updatedAt: Value(DateTime.now()),
+        updatedAt: Value(parsedCreated ?? DateTime.now()),
       );
     }).toList();
 
-    // Build purchase items
-    final purchaseItems = pullResponse.purchaseItems.map((json) {
-      return LocalPurchaseItemsCompanion(
+    // Also include any standalone purchaseItems from pullResponse if present
+    for (final json in pullResponse.purchaseItems) {
+      purchaseItems.add(LocalPurchaseItemsCompanion(
         id: Value(json['id'] as String),
         purchaseId: Value(json['purchaseId'] as String? ?? ''),
         inventoryItemId: Value(json['inventoryItemId'] as String?),
@@ -649,8 +671,8 @@ class SyncEngine with WidgetsBindingObserver {
             Value((json['unitPrice'] as num?)?.toDouble() ?? 0.0),
         totalPrice:
             Value((json['totalPrice'] as num?)?.toDouble() ?? 0.0),
-      );
-    }).toList();
+      ));
+    }
 
     // Build stores
     final stores = pullResponse.stores.map((json) {

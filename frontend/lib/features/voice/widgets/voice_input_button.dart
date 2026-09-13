@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/constants/app_colors.dart';
-import 'voice_bottom_sheet.dart';
+import 'voice_command_sheet.dart';
 
 enum VoiceButtonVariant {
   iconOnly,
@@ -19,28 +19,28 @@ class VoiceInputButton extends StatelessWidget {
   const VoiceInputButton({
     super.key,
     this.variant = VoiceButtonVariant.iconOnly,
-    this.tooltip = 'Speak voice command',
+    this.tooltip = 'Speak to Homie',
     this.color,
     this.size = 22.0,
   });
 
   const VoiceInputButton.floating({
     super.key,
-    this.tooltip = 'Speak voice command',
+    this.tooltip = 'Speak to Homie',
     this.color,
     this.size = 26.0,
   }) : variant = VoiceButtonVariant.floating;
 
   const VoiceInputButton.compactChip({
     super.key,
-    this.tooltip = 'Speak voice command',
+    this.tooltip = 'Speak to Homie',
     this.color,
     this.size = 18.0,
   }) : variant = VoiceButtonVariant.compactChip;
 
   void _onTap(BuildContext context) {
     HapticFeedback.lightImpact();
-    VoiceBottomSheet.show(context);
+    VoiceCommandSheet.show(context);
   }
 
   @override
@@ -76,7 +76,7 @@ class VoiceInputButton extends StatelessWidget {
                 Icon(Icons.mic, size: size, color: effectiveColor),
                 const SizedBox(width: 4),
                 Text(
-                  'Voice',
+                  'Homie',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

@@ -55,7 +55,7 @@ void main() {
       );
 
       expect(find.byIcon(Icons.mic), findsOneWidget);
-      expect(find.text('Voice'), findsOneWidget);
+      expect(find.text('Homie'), findsOneWidget);
     });
   });
 }

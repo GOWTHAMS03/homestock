@@ -97,8 +97,11 @@ class PurchasesScreen extends ConsumerWidget {
   }
 
   Widget _buildPurchaseCard(BuildContext context, PurchaseModel purchase) {
-    final dateStr = DateFormat('dd MMM yyyy, hh:mm a')
-        .format(DateTime.tryParse(purchase.purchaseDate) ?? DateTime.now());
+    final displayDate = (purchase.createdAt ?? DateTime.tryParse(purchase.purchaseDate) ?? DateTime.now()).toLocal();
+    final hasTime = purchase.createdAt != null || (displayDate.hour != 0 || displayDate.minute != 0);
+    final dateStr = hasTime
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(displayDate)
+        : DateFormat('dd MMM yyyy').format(displayDate);
 
     return HomeStockCard(
       padding: EdgeInsets.zero,

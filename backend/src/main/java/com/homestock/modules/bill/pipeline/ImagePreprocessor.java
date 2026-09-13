@@ -86,6 +86,87 @@ public class ImagePreprocessor {
         return variants;
     }
 
+    /**
+     * Generates preprocessing variants specifically optimized for handwritten documents.
+     * Avoids aggressive thresholding which destroys faint pen and pencil strokes.
+     */
+    public List<PreprocessedVariant> generateHandwritingVariants(byte[] imageBytes, ImageQualityReport qualityReport) {
+        List<PreprocessedVariant> variants = new ArrayList<>();
+        variants.add(new PreprocessedVariant("original", imageBytes));
+
+        try {
+            BufferedImage original = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (original == null) {
+                return variants;
+            }
+
+            // Variant 1: Gentle Contrast Grayscale (preserves faint pen/pencil marks)
+            BufferedImage gray = toGrayscale(original);
+            BufferedImage gentleContrast = enhanceGentleContrast(gray);
+            byte[] gentleBytes = toJpegBytes(gentleContrast);
+            if (gentleBytes != null) {
+                variants.add(new PreprocessedVariant("gentle_contrast", gentleBytes));
+            }
+
+            // Variant 2: Subtle Stroke Enhancement (sharpens handwriting contours)
+            BufferedImage strokeEnhanced = subtleSharpen(gentleContrast);
+            byte[] strokeBytes = toJpegBytes(strokeEnhanced);
+            if (strokeBytes != null) {
+                variants.add(new PreprocessedVariant("stroke_enhanced", strokeBytes));
+            }
+
+            log.info("Generated {} handwriting preprocessing variants", variants.size());
+        } catch (Exception e) {
+            log.warn("Handwriting image preprocessing failed: {}", e.getMessage());
+        }
+
+        return variants;
+    }
+
+    private BufferedImage enhanceGentleContrast(BufferedImage src) {
+        int width = src.getWidth();
+        int height = src.getHeight();
+        int min = 255, max = 0;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int gray = src.getRGB(x, y) & 0xFF;
+                if (gray < min) min = gray;
+                if (gray > max) max = gray;
+            }
+        }
+        if (max <= min) return src;
+
+        // Clip very conservatively (1/150) so faint ink is never lost
+        int clipMin = min + (max - min) / 150;
+        int clipMax = max - (max - min) / 150;
+        if (clipMax <= clipMin) { clipMin = min; clipMax = max; }
+
+        double scale = 255.0 / (clipMax - clipMin);
+        BufferedImage result = new BufferedImage(width, height, src.getType());
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int gray = src.getRGB(x, y) & 0xFF;
+                int stretched = (int) Math.max(0, Math.min(255, (gray - clipMin) * scale));
+                int rgb = (stretched << 16) | (stretched << 8) | stretched;
+                result.setRGB(x, y, 0xFF000000 | rgb);
+            }
+        }
+        return result;
+    }
+
+    private BufferedImage subtleSharpen(BufferedImage src) {
+        float[] kernel = {
+                0, -0.25f, 0,
+                -0.25f, 2.0f, -0.25f,
+                0, -0.25f, 0
+        };
+        BufferedImageOp op = new ConvolveOp(new Kernel(3, 3, kernel), ConvolveOp.EDGE_NO_OP, null);
+        BufferedImage result = new BufferedImage(src.getWidth(), src.getHeight(), src.getType());
+        op.filter(src, result);
+        return result;
+    }
+
     private BufferedImage toGrayscale(BufferedImage src) {
         BufferedImage gray = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
         Graphics2D g = gray.createGraphics();

@@ -14,6 +14,7 @@ import com.homestock.modules.inventory.service.InventoryService;
 import com.homestock.modules.shopping.dto.CreateShoppingItemRequest;
 import com.homestock.modules.shopping.dto.ShoppingListDto;
 import com.homestock.modules.shopping.dto.ShoppingListItemDto;
+import com.homestock.modules.shopping.dto.UpdateShoppingItemRequest;
 import com.homestock.modules.shopping.entity.ShoppingListItem;
 import com.homestock.modules.shopping.repository.ShoppingListItemRepository;
 import com.homestock.modules.shopping.repository.ShoppingListRepository;
@@ -42,6 +43,8 @@ public class VoiceCommandExecutor {
     private final InventoryItemRepository inventoryItemRepository;
     private final HomeRepository homeRepository;
     private final HomeSecurityService homeSecurityService;
+    private final ProductResolutionService productResolutionService;
+    private final com.homestock.modules.product.repository.ProductRepository productRepository;
 
     @Transactional
     public ExecuteCommandResponse execute(ExecuteCommandRequest request) {
@@ -63,35 +66,43 @@ public class VoiceCommandExecutor {
             throw new AccessDeniedException("User is not a member of home " + homeId);
         }
 
-        return switch (intent) {
+        ExecuteCommandResponse response = switch (intent) {
             case ADD_SHOPPING_ITEM -> executeAddShoppingItem(homeId, entities);
             case REMOVE_SHOPPING_ITEM -> executeRemoveShoppingItem(homeId, entities, commandResult, request);
+            case UPDATE_SHOPPING_ITEM -> executeUpdateShoppingItem(homeId, entities);
             case COMPLETE_SHOPPING_ITEM -> executeCompleteShoppingItem(homeId, entities);
+            case CLEAR_SHOPPING_LIST -> executeClearShoppingList(homeId);
             case STOCK_IN -> executeStockIn(homeId, entities);
             case STOCK_OUT -> executeStockOut(homeId, entities);
             case UPDATE_STOCK -> executeUpdateStock(homeId, entities, request);
             case ADD_INVENTORY_ITEM -> executeAddInventoryItem(homeId, entities, commandResult, request);
+            case REMOVE_INVENTORY_ITEM -> executeRemoveInventoryItem(homeId, entities);
             case GET_ITEM_STATUS -> executeGetItemStatus(homeId, entities);
             case GET_SHOPPING_LIST -> executeGetShoppingList(homeId);
             case GET_LOW_STOCK_ITEMS -> executeGetLowStockItems(homeId);
             case GET_EXPIRING_ITEMS -> executeGetExpiringItems(homeId);
             case SEARCH_INVENTORY -> executeSearchInventory(homeId, entities);
+            case SEARCH_PRODUCT -> executeSearchProduct(homeId, entities);
+            case GET_PRODUCT_DETAILS -> executeGetProductDetails(homeId, entities);
             case OPEN_SHOPPING_LIST -> ExecuteCommandResponse.builder()
                     .success(true)
                     .intent(intent)
                     .message("Opening shopping list")
+                    .executionStatus("EXECUTED")
                     .navigation(Map.of("route", "/shopping"))
                     .build();
             case OPEN_INVENTORY -> ExecuteCommandResponse.builder()
                     .success(true)
                     .intent(intent)
                     .message("Opening inventory")
+                    .executionStatus("EXECUTED")
                     .navigation(Map.of("route", "/inventory"))
                     .build();
             case OPEN_ANALYTICS -> ExecuteCommandResponse.builder()
                     .success(true)
                     .intent(intent)
                     .message("Opening analytics")
+                    .executionStatus("EXECUTED")
                     .navigation(Map.of("route", "/analytics"))
                     .build();
             case SMART_PRICE_CHECK -> executeSmartPriceCheck(homeId, entities);
@@ -99,8 +110,23 @@ public class VoiceCommandExecutor {
                     .success(false)
                     .intent(intent)
                     .message("I could not determine how to execute this command. Please try again.")
+                    .executionStatus("FAILED")
                     .build();
         };
+
+        if (response.getResponseLanguage() == null && commandResult.getDetectedLanguage() != null) {
+            response.setResponseLanguage(commandResult.getDetectedLanguage());
+        }
+        if (response.getVoiceCommandId() == null && commandResult.getVoiceCommandId() != null) {
+            response.setVoiceCommandId(commandResult.getVoiceCommandId());
+        }
+        if (response.getExecutionStatus() == null) {
+            response.setExecutionStatus(response.isSuccess() ? "EXECUTED" : "FAILED");
+        }
+        response.setIntentConfidence(commandResult.getIntentConfidence());
+        response.setProductMatchConfidence(commandResult.getProductMatchConfidence());
+
+        return response;
     }
 
     private ExecuteCommandResponse executeAddShoppingItem(UUID homeId, VoiceEntities entities) {
@@ -117,25 +143,67 @@ public class VoiceCommandExecutor {
                     .build();
         }
 
+        String trimmedName = itemName.trim();
         ShoppingListDto defaultList = shoppingService.getDefaultShoppingList(homeId);
-        CreateShoppingItemRequest req = new CreateShoppingItemRequest();
-        req.setItemName(capitalize(itemName.trim()));
-        req.setQuantity(entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE);
-        req.setUnit(entities.getUnit() != null ? entities.getUnit() : "pcs");
-        req.setInventoryItemId(entities.getMatchedInventoryItemId());
+        List<ShoppingListItem> existingPending = shoppingListItemRepository.findPendingItemsByHomeId(homeId);
 
-        ShoppingListItemDto created = shoppingService.addItem(homeId, defaultList.getId(), req);
+        BigDecimal addQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
+        String unit = entities.getUnit() != null ? entities.getUnit() : "pcs";
 
-        String quantityStr = req.getQuantity().stripTrailingZeros().toPlainString();
-        String msg = String.format("Added %s %s %s to shopping list", quantityStr, req.getUnit(), req.getItemName());
+        // Check if item is already on pending shopping list (new vs existing check)
+        Optional<ShoppingListItem> existingOpt = existingPending.stream()
+                .filter(i -> i.getItemName().equalsIgnoreCase(trimmedName)
+                        || (entities.getMatchedInventoryItemId() != null
+                        && i.getInventoryItem() != null
+                        && entities.getMatchedInventoryItemId().equals(i.getInventoryItem().getId()))
+                        || i.getItemName().toLowerCase().contains(trimmedName.toLowerCase())
+                        || trimmedName.toLowerCase().contains(i.getItemName().toLowerCase()))
+                .findFirst();
 
-        return ExecuteCommandResponse.builder()
-                .success(true)
-                .intent(VoiceIntent.ADD_SHOPPING_ITEM)
-                .message(msg)
-                .data(created)
-                .navigation(Map.of("route", "/shopping"))
-                .build();
+        if (existingOpt.isPresent()) {
+            // Existing item on shopping list -> update quantity
+            ShoppingListItem existing = existingOpt.get();
+            BigDecimal currentQty = existing.getQuantity() != null ? existing.getQuantity() : BigDecimal.ZERO;
+            BigDecimal newQty = currentQty.add(addQty);
+
+            UpdateShoppingItemRequest updateReq = new UpdateShoppingItemRequest();
+            updateReq.setItemName(existing.getItemName());
+            updateReq.setQuantity(newQty);
+            updateReq.setUnit(existing.getUnit() != null ? existing.getUnit() : unit);
+
+            ShoppingListItemDto updated = shoppingService.updateItem(homeId, existing.getShoppingList().getId(), existing.getId(), updateReq);
+            String qtyStr = newQty.stripTrailingZeros().toPlainString();
+            String addedStr = addQty.stripTrailingZeros().toPlainString();
+
+            return ExecuteCommandResponse.builder()
+                    .success(true)
+                    .intent(VoiceIntent.ADD_SHOPPING_ITEM)
+                    .message(String.format("Updated %s on shopping list: added %s %s (total %s %s)",
+                            existing.getItemName(), addedStr, updateReq.getUnit(), qtyStr, updateReq.getUnit()))
+                    .data(updated)
+                    .navigation(Map.of("route", "/shopping"))
+                    .build();
+        } else {
+            // New item on shopping list -> add new item
+            CreateShoppingItemRequest req = new CreateShoppingItemRequest();
+            req.setItemName(capitalize(trimmedName));
+            req.setQuantity(addQty);
+            req.setUnit(unit);
+            req.setInventoryItemId(entities.getMatchedInventoryItemId());
+
+            ShoppingListItemDto created = shoppingService.addItem(homeId, defaultList.getId(), req);
+
+            String quantityStr = req.getQuantity().stripTrailingZeros().toPlainString();
+            String msg = String.format("Added %s %s %s to shopping list", quantityStr, req.getUnit(), req.getItemName());
+
+            return ExecuteCommandResponse.builder()
+                    .success(true)
+                    .intent(VoiceIntent.ADD_SHOPPING_ITEM)
+                    .message(msg)
+                    .data(created)
+                    .navigation(Map.of("route", "/shopping"))
+                    .build();
+        }
     }
 
     private ExecuteCommandResponse executeRemoveShoppingItem(UUID homeId, VoiceEntities entities,
@@ -238,10 +306,33 @@ public class VoiceCommandExecutor {
 
         InventoryItem item = resolveInventoryItem(homeId, entities);
         if (item == null) {
+            String itemName = entities.getItemName();
+            if (itemName == null || itemName.isBlank()) {
+                return ExecuteCommandResponse.builder()
+                        .success(false)
+                        .intent(VoiceIntent.STOCK_IN)
+                        .message("Item name cannot be empty.")
+                        .build();
+            }
+
+            BigDecimal initialQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
+            CreateInventoryItemRequest req = new CreateInventoryItemRequest();
+            req.setName(capitalize(itemName.trim()));
+            req.setQuantity(initialQty);
+            req.setUnit(entities.getUnit() != null ? entities.getUnit() : "pcs");
+            req.setBrand(entities.getBrand());
+            req.setPurchasePrice(entities.getPrice());
+
+            InventoryItemDto created = inventoryService.createItem(homeId, req);
             return ExecuteCommandResponse.builder()
-                    .success(false)
+                    .success(true)
                     .intent(VoiceIntent.STOCK_IN)
-                    .message("Item '" + entities.getItemName() + "' not found in inventory.")
+                    .message(String.format("Added new product %s (%s %s) to inventory",
+                            created.getName(),
+                            created.getQuantity().stripTrailingZeros().toPlainString(),
+                            created.getUnit()))
+                    .data(created)
+                    .navigation(Map.of("route", "/inventory", "itemId", created.getId().toString()))
                     .build();
         }
 
@@ -368,25 +459,51 @@ public class VoiceCommandExecutor {
                     .build();
         }
 
-        CreateInventoryItemRequest req = new CreateInventoryItemRequest();
-        req.setName(capitalize(itemName.trim()));
-        req.setQuantity(entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE);
-        req.setUnit(entities.getUnit() != null ? entities.getUnit() : "pcs");
-        req.setBrand(entities.getBrand());
-        req.setPurchasePrice(entities.getPrice());
+        BigDecimal addQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
 
-        InventoryItemDto created = inventoryService.createItem(homeId, req);
+        // Check new or existing product
+        InventoryItem existingItem = resolveInventoryItem(homeId, entities);
+        if (existingItem != null) {
+            // Existing product found -> update stock
+            StockUpdateRequest stockReq = new StockUpdateRequest();
+            stockReq.setTransactionType(TransactionType.STOCK_IN);
+            stockReq.setQuantityChange(addQty);
+            stockReq.setReason("Voice command: added to existing stock");
 
-        return ExecuteCommandResponse.builder()
-                .success(true)
-                .intent(VoiceIntent.ADD_INVENTORY_ITEM)
-                .message(String.format("Added %s (%s %s) to inventory",
-                        created.getName(),
-                        created.getQuantity().stripTrailingZeros().toPlainString(),
-                        created.getUnit()))
-                .data(created)
-                .navigation(Map.of("route", "/inventory", "itemId", created.getId().toString()))
-                .build();
+            InventoryItemDto updated = inventoryService.updateStock(homeId, existingItem.getId(), stockReq);
+            String qtyStr = updated.getQuantity().stripTrailingZeros().toPlainString();
+            String addedStr = addQty.stripTrailingZeros().toPlainString();
+
+            return ExecuteCommandResponse.builder()
+                    .success(true)
+                    .intent(VoiceIntent.ADD_INVENTORY_ITEM)
+                    .message(String.format("Updated existing %s: added %s %s (total stock now %s %s)",
+                            updated.getName(), addedStr, updated.getUnit(), qtyStr, updated.getUnit()))
+                    .data(updated)
+                    .navigation(Map.of("route", "/inventory", "itemId", existingItem.getId().toString()))
+                    .build();
+        } else {
+            // New product not in inventory -> add new product
+            CreateInventoryItemRequest req = new CreateInventoryItemRequest();
+            req.setName(capitalize(itemName.trim()));
+            req.setQuantity(addQty);
+            req.setUnit(entities.getUnit() != null ? entities.getUnit() : "pcs");
+            req.setBrand(entities.getBrand());
+            req.setPurchasePrice(entities.getPrice());
+
+            InventoryItemDto created = inventoryService.createItem(homeId, req);
+
+            return ExecuteCommandResponse.builder()
+                    .success(true)
+                    .intent(VoiceIntent.ADD_INVENTORY_ITEM)
+                    .message(String.format("Added new product %s (%s %s) to inventory",
+                            created.getName(),
+                            created.getQuantity().stripTrailingZeros().toPlainString(),
+                            created.getUnit()))
+                    .data(created)
+                    .navigation(Map.of("route", "/inventory", "itemId", created.getId().toString()))
+                    .build();
+        }
     }
 
     private ExecuteCommandResponse executeGetItemStatus(UUID homeId, VoiceEntities entities) {
@@ -589,6 +706,152 @@ public class VoiceCommandExecutor {
         }
 
         return null;
+    }
+
+    private ExecuteCommandResponse executeClearShoppingList(UUID homeId) {
+        if (!homeSecurityService.canEditShoppingList(homeId)) {
+            throw new AccessDeniedException("Permission denied to edit shopping list");
+        }
+        ShoppingListDto defaultList = shoppingService.getDefaultShoppingList(homeId);
+        List<ShoppingListItem> items = shoppingListItemRepository
+                .findAllByShoppingListIdOrderByIsCompletedAscCreatedAtDesc(defaultList.getId());
+        shoppingListItemRepository.deleteAll(items);
+        return ExecuteCommandResponse.builder()
+                .success(true)
+                .intent(VoiceIntent.CLEAR_SHOPPING_LIST)
+                .message("Shopping list has been cleared.")
+                .executionStatus("EXECUTED")
+                .navigation(Map.of("route", "/shopping"))
+                .build();
+    }
+
+    private ExecuteCommandResponse executeUpdateShoppingItem(UUID homeId, VoiceEntities entities) {
+        if (!homeSecurityService.canEditShoppingList(homeId)) {
+            throw new AccessDeniedException("Permission denied to edit shopping list");
+        }
+        String itemName = entities.getItemName();
+        if (itemName == null || itemName.isBlank()) {
+            return ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(VoiceIntent.UPDATE_SHOPPING_ITEM)
+                    .message("Item name was not specified.")
+                    .executionStatus("FAILED")
+                    .build();
+        }
+
+        ShoppingListDto defaultList = shoppingService.getDefaultShoppingList(homeId);
+        List<ShoppingListItem> items = shoppingListItemRepository
+                .findAllByShoppingListIdOrderByIsCompletedAscCreatedAtDesc(defaultList.getId());
+
+        ShoppingListItem matched = null;
+        for (ShoppingListItem item : items) {
+            if (item.getItemName().equalsIgnoreCase(itemName.trim())
+                    || (entities.getMatchedInventoryItemId() != null && item.getInventoryItem() != null
+                    && item.getInventoryItem().getId().equals(entities.getMatchedInventoryItemId()))) {
+                matched = item;
+                break;
+            }
+        }
+
+        if (matched == null) {
+            return ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(VoiceIntent.UPDATE_SHOPPING_ITEM)
+                    .message("Could not find '" + itemName + "' in your shopping list.")
+                    .executionStatus("FAILED")
+                    .build();
+        }
+
+        if (entities.getQuantity() != null) {
+            matched.setQuantity(entities.getQuantity());
+        }
+        if (entities.getUnit() != null && !entities.getUnit().isBlank()) {
+            matched.setUnit(entities.getUnit());
+        }
+        ShoppingListItem saved = shoppingListItemRepository.save(matched);
+
+        return ExecuteCommandResponse.builder()
+                .success(true)
+                .intent(VoiceIntent.UPDATE_SHOPPING_ITEM)
+                .message("Updated " + saved.getItemName() + " to " + saved.getQuantity() + " " + saved.getUnit() + " in shopping list.")
+                .data(ShoppingListItemDto.fromEntity(saved))
+                .executionStatus("EXECUTED")
+                .navigation(Map.of("route", "/shopping"))
+                .build();
+    }
+
+    private ExecuteCommandResponse executeRemoveInventoryItem(UUID homeId, VoiceEntities entities) {
+        if (!homeSecurityService.canManageInventory(homeId)) {
+            throw new AccessDeniedException("Permission denied to manage inventory");
+        }
+        InventoryItem item = resolveInventoryItem(homeId, entities);
+        if (item == null) {
+            return ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(VoiceIntent.REMOVE_INVENTORY_ITEM)
+                    .message("Could not find item '" + (entities.getItemName() != null ? entities.getItemName() : "unknown") + "' in inventory.")
+                    .executionStatus("FAILED")
+                    .build();
+        }
+
+        item.setIsArchived(true);
+        inventoryItemRepository.save(item);
+        inventoryService.deleteItem(homeId, item.getId());
+
+        return ExecuteCommandResponse.builder()
+                .success(true)
+                .intent(VoiceIntent.REMOVE_INVENTORY_ITEM)
+                .message("Removed " + item.getName() + " from inventory.")
+                .executionStatus("EXECUTED")
+                .navigation(Map.of("route", "/inventory"))
+                .build();
+    }
+
+    private ExecuteCommandResponse executeSearchProduct(UUID homeId, VoiceEntities entities) {
+        String query = entities.getItemName() != null ? entities.getItemName().trim() : "";
+        ProductMatchResult match = productResolutionService.resolveProduct(homeId, query, query);
+
+        List<InventoryItem> localMatches = inventoryItemRepository.findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(homeId)
+                .stream()
+                .filter(i -> i.getName().toLowerCase().contains(query.toLowerCase()))
+                .limit(5)
+                .toList();
+
+        var catalogMatches = productRepository.searchProducts(query);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("query", query);
+        data.put("bestMatch", match);
+        data.put("inventoryItems", localMatches.stream().map(InventoryItemDto::fromEntity).toList());
+        data.put("catalogMatches", catalogMatches);
+
+        String msg = localMatches.isEmpty()
+                ? "Searched product catalog for '" + query + "'."
+                : "Found " + localMatches.size() + " inventory item(s) matching '" + query + "'.";
+
+        return ExecuteCommandResponse.builder()
+                .success(true)
+                .intent(VoiceIntent.SEARCH_PRODUCT)
+                .message(msg)
+                .data(data)
+                .executionStatus("EXECUTED")
+                .navigation(Map.of("route", "/inventory", "query", query))
+                .build();
+    }
+
+    private ExecuteCommandResponse executeGetProductDetails(UUID homeId, VoiceEntities entities) {
+        InventoryItem item = resolveInventoryItem(homeId, entities);
+        if (item != null) {
+            return ExecuteCommandResponse.builder()
+                    .success(true)
+                    .intent(VoiceIntent.GET_PRODUCT_DETAILS)
+                    .message(item.getName() + ": " + item.getQuantity() + " " + item.getUnit() + " in stock.")
+                    .data(InventoryItemDto.fromEntity(item))
+                    .executionStatus("EXECUTED")
+                    .navigation(Map.of("route", "/inventory/" + item.getId()))
+                    .build();
+        }
+        return executeSearchProduct(homeId, entities);
     }
 
     private String capitalize(String str) {

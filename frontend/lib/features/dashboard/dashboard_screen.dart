@@ -23,7 +23,7 @@ import '../inventory/inventory_model.dart';
 import '../inventory/item_detail_screen.dart';
 import '../notifications/notification_controller.dart';
 import '../shopping/shopping_controller.dart';
-import '../voice/widgets/voice_bottom_sheet.dart';
+import '../voice/widgets/voice_command_sheet.dart';
 import 'dashboard_controller.dart';
 import 'dashboard_model.dart';
 import 'what_do_i_need_sheet.dart';
@@ -1406,19 +1406,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             color: const Color(0xFFE2E8F0),
           ),
 
-          // [ Voice ] Button
+          // [ Voice AI ] Button
           InkWell(
-            onTap: () => VoiceBottomSheet.show(context),
-            borderRadius: const BorderRadius.horizontal(right: Radius.circular(28)),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
+            onTap: () => VoiceCommandSheet.show(context),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              margin: const EdgeInsets.only(right: 6, top: 4, bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFC7D2FE), width: 1),
+              ),
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.mic_rounded, size: 18, color: Color(0xFF6366F1)),
+                  Icon(Icons.mic_rounded, size: 17, color: Color(0xFF4F46E5)),
                   SizedBox(width: 4),
                   Text(
-                    'Voice',
+                    'Homie',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,

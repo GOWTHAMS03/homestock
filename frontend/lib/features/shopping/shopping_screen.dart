@@ -935,7 +935,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                     tooltip: 'Scan Barcode',
                     onPressed: () => BarcodeScannerWidget.open(context),
                   ),
-                  const VoiceInputButton(size: 20, color: Color(0xFF6366F1), tooltip: 'Voice shopping command'),
+                  const VoiceInputButton(size: 20, color: Color(0xFF6366F1), tooltip: 'Homie voice command'),
                   const SizedBox(width: 4),
                 ],
               ],

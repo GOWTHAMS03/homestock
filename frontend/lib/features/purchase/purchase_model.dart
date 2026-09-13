@@ -74,6 +74,7 @@ class PurchaseModel {
   final double totalAmount;
   final String currency;
   final String? notes;
+  final DateTime? createdAt;
   final List<PurchaseItemModel> items;
 
   PurchaseModel({
@@ -84,11 +85,16 @@ class PurchaseModel {
     required this.totalAmount,
     required this.currency,
     this.notes,
+    this.createdAt,
     required this.items,
   });
 
   factory PurchaseModel.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] as List? ?? [];
+    DateTime? createdTime;
+    if (json['createdAt'] != null) {
+      createdTime = DateTime.tryParse(json['createdAt'].toString())?.toLocal();
+    }
     return PurchaseModel(
       id: json['id'] ?? '',
       storeName: json['storeName'],
@@ -97,6 +103,7 @@ class PurchaseModel {
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
       currency: json['currency'] ?? 'INR',
       notes: json['notes'],
+      createdAt: createdTime,
       items: rawItems.map((i) => PurchaseItemModel.fromJson(i)).toList(),
     );
   }
@@ -109,6 +116,7 @@ class PurchaseModel {
     'totalAmount': totalAmount,
     'currency': currency,
     'notes': notes,
+    'createdAt': createdAt?.toIso8601String(),
     'items': items.map((i) => i.toJson()).toList(),
   };
 }

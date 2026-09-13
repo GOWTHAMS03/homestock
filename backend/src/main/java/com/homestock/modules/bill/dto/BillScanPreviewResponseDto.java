@@ -36,6 +36,7 @@ public class BillScanPreviewResponseDto {
     private int newProductCount;
 
     // AI Pipeline fields
+    private com.homestock.modules.bill.entity.DocumentType documentType;
     private BigDecimal imageQualityScore;
     private String imageQualityMessage;
     private BigDecimal ocrConfidence;

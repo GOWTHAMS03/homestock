@@ -6,7 +6,7 @@ import '../../core/constants/household_staples.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/skeleton_loader.dart';
 import '../voice/widgets/voice_input_button.dart';
-import '../voice/widgets/voice_bottom_sheet.dart';
+import '../voice/widgets/voice_command_sheet.dart';
 import '../barcode/widgets/barcode_scanner_widget.dart';
 import '../notifications/notifications_screen.dart';
 import '../shopping/shopping_controller.dart';
@@ -835,7 +835,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   tooltip: 'Scan Barcode',
                   onPressed: () => BarcodeScannerWidget.open(context),
                 ),
-                const VoiceInputButton(size: 20, color: Color(0xFF6366F1), tooltip: 'Voice search'),
+                const VoiceInputButton(size: 20, color: Color(0xFF6366F1), tooltip: 'Homie voice search'),
                 const SizedBox(width: 4),
               ],
             ),
@@ -2183,12 +2183,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     ),
                     child: const Icon(Icons.mic_rounded, color: Color(0xFF8B5CF6)),
                   ),
-                  title: const Text('Voice Input', style: TextStyle(fontWeight: FontWeight.w700)),
+                  title: const Text('Voice Input (Homie)', style: TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: const Text('Say "Add 2 packets of milk to inventory"', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                   onTap: () {
                     Navigator.of(ctx).pop();
-                    VoiceBottomSheet.show(context);
+                    VoiceCommandSheet.show(context);
                   },
                 ),
               ],

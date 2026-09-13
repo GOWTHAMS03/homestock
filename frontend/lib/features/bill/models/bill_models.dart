@@ -582,6 +582,7 @@ class MonthlyBillSummaryDto {
   final String shopName;
   final String billNumber;
   final String? billDate;
+  final DateTime? createdAt;
   final double totalAmount;
   final double subtotal;
   final double taxAmount;
@@ -596,6 +597,7 @@ class MonthlyBillSummaryDto {
     required this.shopName,
     this.billNumber = 'N/A',
     this.billDate,
+    this.createdAt,
     required this.totalAmount,
     this.subtotal = 0.0,
     this.taxAmount = 0.0,
@@ -612,6 +614,9 @@ class MonthlyBillSummaryDto {
       shopName: json['shopName']?.toString() ?? 'Retail Store',
       billNumber: json['billNumber']?.toString() ?? 'N/A',
       billDate: json['billDate']?.toString(),
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())?.toLocal()
+          : null,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
       taxAmount: (json['taxAmount'] as num?)?.toDouble() ?? 0.0,

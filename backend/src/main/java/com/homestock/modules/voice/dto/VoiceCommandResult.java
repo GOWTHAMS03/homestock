@@ -21,4 +21,20 @@ public class VoiceCommandResult {
     private String message;
     @Builder.Default
     private List<DisambiguationOption> disambiguationOptions = new ArrayList<>();
+
+    // Production AI Engine Fields
+    @Builder.Default
+    private double intentConfidence = 1.0;
+    @Builder.Default
+    private double productMatchConfidence = 1.0;
+    @Builder.Default
+    private String detectedLanguage = "EN";
+    private String voiceCommandId;
+    private String idempotencyKey;
+    @Builder.Default
+    private String commandMode = "COMMAND";
+    private ProductMatchResult productMatch;
+    private String executionStatus;
+    private boolean needsQuantity;
+    private boolean needsProduct;
 }

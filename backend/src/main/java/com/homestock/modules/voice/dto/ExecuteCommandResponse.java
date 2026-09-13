@@ -17,4 +17,11 @@ public class ExecuteCommandResponse {
     private String message;
     private Object data;
     private Map<String, Object> navigation;
+
+    // Production AI Engine Fields
+    private String responseLanguage;
+    private String voiceCommandId;
+    private double intentConfidence;
+    private double productMatchConfidence;
+    private String executionStatus;
 }

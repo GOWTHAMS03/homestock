@@ -82,6 +82,11 @@ public class PurchasedBill extends BaseEntity {
 
     // --- AI Pipeline Fields ---
 
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(name = "document_type", length = 30)
+    private DocumentType documentType = DocumentType.PRINTED;
+
     @Builder.Default
     @Column(name = "processing_status", length = 30)
     private String processingStatus = "UPLOADED";

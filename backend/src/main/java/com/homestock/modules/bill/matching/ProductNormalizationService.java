@@ -10,6 +10,16 @@ import java.util.regex.Pattern;
 @Service
 public class ProductNormalizationService {
 
+    private final TamilNormalizationService tamilNormalizationService;
+
+    public ProductNormalizationService() {
+        this.tamilNormalizationService = new TamilNormalizationService();
+    }
+
+    public ProductNormalizationService(TamilNormalizationService tamilNormalizationService) {
+        this.tamilNormalizationService = tamilNormalizationService != null ? tamilNormalizationService : new TamilNormalizationService();
+    }
+
     // Known brand aliases and canonical forms
     private static final Map<String, String> BRAND_ALIASES = Map.ofEntries(
             Map.entry("AASHIRWAD", "AASHIRVAAD"),
@@ -63,14 +73,26 @@ public class ProductNormalizationService {
             return new NormalizedProductInfo("", "", null, "pcs", "");
         }
 
-        String text = rawName.trim().toUpperCase();
+        String originalRaw = rawName.trim();
+        String text = originalRaw.toUpperCase();
 
-        // 1. Fix common OCR mistakes
-        text = fixOcrMistakes(text);
-
-        // 2. Extract Pack Size and Unit
+        // 1. Check for Tamil script or Tanglish transliteration first
         BigDecimal packSize = null;
         String unit = "pcs";
+        TamilNormalizationService.TamilNormalizationResult tamilResult =
+                tamilNormalizationService.normalizeTamilOrTanglish(originalRaw);
+
+        if (tamilResult.isTamilOrTanglish() && tamilResult.englishEquivalent() != null) {
+            text = tamilResult.englishEquivalent().toUpperCase();
+            if (tamilResult.detectedUnit() != null) {
+                unit = tamilResult.detectedUnit();
+            }
+        }
+
+        // 2. Fix common OCR mistakes
+        text = fixOcrMistakes(text);
+
+        // 3. Extract Pack Size and Unit
         Matcher unitMatcher = UNIT_PATTERN.matcher(text);
         if (unitMatcher.find()) {
             try {
@@ -82,15 +104,15 @@ public class ProductNormalizationService {
         // Strip the unit and pack size from name for canonical base matching
         String nameWithoutUnit = unitMatcher.replaceAll(" ").trim();
 
-        // 3. Extract Brand
+        // 4. Extract Brand
         String detectedBrand = extractBrand(text);
 
-        // 4. Clean extra characters and punctuation
+        // 5. Clean extra characters and punctuation
         String cleaned = nameWithoutUnit.replaceAll("[^A-Z0-9\\s]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
 
-        // 5. Replace synonyms (e.g. "WHEAT FLOUR" -> "ATTA")
+        // 6. Replace synonyms (e.g. "WHEAT FLOUR" -> "ATTA")
         for (Map.Entry<String, String> entry : COMMODITY_SYNONYMS.entrySet()) {
             if (cleaned.contains(entry.getKey())) {
                 cleaned = cleaned.replace(entry.getKey(), entry.getValue()).trim();

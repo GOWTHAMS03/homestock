@@ -8,6 +8,7 @@ import '../../core/constants/app_spacing.dart';
 import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_model.dart';
 import '../inventory/item_detail_screen.dart';
+import '../purchase/purchase_controller.dart';
 import '../purchase/purchase_model.dart';
 import '../purchase/purchases_screen.dart';
 
@@ -81,6 +82,15 @@ class _ProcessedProductsScreenState extends ConsumerState<ProcessedProductsScree
     } else {
       _animController.value = 1.0;
     }
+
+    // If purchase items are empty, load fresh purchases in background
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.purchase.items.isEmpty) {
+        try {
+          ref.read(purchaseControllerProvider.notifier).loadPurchases();
+        } catch (_) {}
+      }
+    });
   }
 
   @override
@@ -108,18 +118,48 @@ class _ProcessedProductsScreenState extends ConsumerState<ProcessedProductsScree
       (i) => i.name.toLowerCase().trim() == normalized,
     );
     if (nameMatch.isNotEmpty) return nameMatch.first;
+
+    // Fuzzy / partial name match
+    final partial = inventoryItems.where(
+      (i) => i.name.toLowerCase().contains(normalized) || normalized.contains(i.name.toLowerCase()),
+    );
+    if (partial.isNotEmpty) return partial.first;
+
     return null;
   }
 
   @override
   Widget build(BuildContext context) {
     final invState = ref.watch(inventoryControllerProvider);
-    final items = widget.purchase.items;
-    final totalSpent = widget.purchase.totalAmount;
+
+    // Resolve most complete purchase model
+    PurchaseModel activePurchase = widget.purchase;
+    if (activePurchase.items.isEmpty) {
+      try {
+        final purchaseState = ref.watch(purchaseControllerProvider);
+        final matching = purchaseState.purchases.where((p) => p.id == widget.purchase.id);
+        if (matching.isNotEmpty && matching.first.items.isNotEmpty) {
+          activePurchase = matching.first;
+        }
+      } catch (_) {}
+    }
+
+    final items = activePurchase.items;
+    final totalSpent = activePurchase.totalAmount;
     final totalSpentStr = '₹${totalSpent.toStringAsFixed(0)}';
 
-    final parsedDate = DateTime.tryParse(widget.purchase.purchaseDate) ?? DateTime.now();
-    final dateStr = DateFormat('MMM dd, yyyy • hh:mm a').format(parsedDate);
+    // Accurately format creation time instead of defaulting to 12:00 AM
+    DateTime displayDate;
+    if (activePurchase.createdAt != null) {
+      displayDate = activePurchase.createdAt!.toLocal();
+    } else {
+      final parsed = DateTime.tryParse(activePurchase.purchaseDate);
+      displayDate = parsed != null ? parsed.toLocal() : DateTime.now();
+    }
+    final hasRealTime = activePurchase.createdAt != null || (displayDate.hour != 0 || displayDate.minute != 0);
+    final dateStr = hasRealTime
+        ? DateFormat('MMM dd, yyyy • hh:mm a').format(displayDate)
+        : DateFormat('MMM dd, yyyy').format(displayDate);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

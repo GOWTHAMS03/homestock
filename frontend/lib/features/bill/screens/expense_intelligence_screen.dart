@@ -103,7 +103,7 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
                             case 0:
                               return _buildOverviewTab(report, state);
                             case 1:
-                              return _buildBillsTab(report);
+                              return _buildBillsTab(report, state);
                             case 2:
                               return _buildCategoriesTab(report.categoryBreakdown);
                             case 3:
@@ -415,12 +415,23 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
     );
   }
 
+  List<MonthlyBillSummaryDto> _getFilteredBills(MonthlyExpenseReportDto? report, int year, int month) {
+    if (report == null) return const [];
+    return report.bills.where((b) {
+      if (b.billDate == null || b.billDate!.trim().isEmpty) return true;
+      final parsed = DateTime.tryParse(b.billDate!.trim());
+      if (parsed == null) return true;
+      return parsed.year == year && parsed.month == month;
+    }).toList();
+  }
+
   // ──────────────────────── Segmented Tabs ────────────────────────
 
   Widget _buildCustomTabBar(MonthlyExpenseReportDto report, ExpenseIntelligenceState state) {
     final alertCount = report.priceAnomalies.length;
     final catCount = report.categoryBreakdown.length;
-    final billCount = report.bills.isNotEmpty ? report.bills.length : report.totalBills;
+    final monthlyBills = _getFilteredBills(report, state.selectedYear, state.selectedMonth);
+    final billCount = monthlyBills.isNotEmpty ? monthlyBills.length : report.totalBills;
     final storeCount = state.storeComparison.isNotEmpty
         ? state.storeComparison.length
         : report.topRetailers.length;
@@ -583,56 +594,62 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
         ],
 
         // Bills in this Month Preview Card
-        if (report.bills.isNotEmpty) ...[
-          HomeStockCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        () {
+          final monthlyBills = _getFilteredBills(report, state.selectedYear, state.selectedMonth);
+          if (monthlyBills.isEmpty) return const SizedBox.shrink();
+          return Column(
+            children: [
+              HomeStockCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryContainer,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.receipt_long, color: AppColors.primary, size: 16),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.receipt_long, color: AppColors.primary, size: 16),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Bills in this Month (${monthlyBills.length})',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Bills in this Month (${report.bills.length})',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                        InkWell(
+                          onTap: () => _tabController.animateTo(1),
+                          child: const Text(
+                            'View All',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          ),
                         ),
                       ],
                     ),
-                    InkWell(
-                      onTap: () => _tabController.animateTo(1),
-                      child: const Text(
-                        'View All',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
+                    const SizedBox(height: 12),
+                    ...monthlyBills.take(3).map((b) => _buildMonthlyBillCard(b)),
+                    if (monthlyBills.length > 3)
+                      Center(
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.arrow_forward, size: 14),
+                          label: Text('View all ${monthlyBills.length} bills'),
+                          onPressed: () => _tabController.animateTo(1),
+                        ),
                       ),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                ...report.bills.take(3).map((b) => _buildMonthlyBillCard(b)),
-                if (report.bills.length > 3)
-                  Center(
-                    child: TextButton.icon(
-                      icon: const Icon(Icons.arrow_forward, size: 14),
-                      label: Text('View all ${report.bills.length} bills'),
-                      onPressed: () => _tabController.animateTo(1),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          );
+        }(),
 
         // Category Preview Card
         if (report.categoryBreakdown.isNotEmpty) ...[
@@ -848,8 +865,8 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
 
   // ──────────────────────── Tab 1: Monthly Bills ────────────────────────
 
-  Widget _buildBillsTab(MonthlyExpenseReportDto report) {
-    final bills = report.bills;
+  Widget _buildBillsTab(MonthlyExpenseReportDto report, ExpenseIntelligenceState state) {
+    final bills = _getFilteredBills(report, state.selectedYear, state.selectedMonth);
 
     if (bills.isEmpty) {
       return Container(
@@ -900,6 +917,8 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
       );
     }
 
+    final totalFilteredBillsSpend = bills.fold<double>(0.0, (sum, b) => sum + b.totalAmount);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -929,7 +948,7 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
                 ],
               ),
               Text(
-                'Total: ₹${report.totalSpend.toStringAsFixed(2)}',
+                'Total: ₹${totalFilteredBillsSpend.toStringAsFixed(2)}',
                 style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8), fontSize: 15),
               ),
             ],
@@ -945,11 +964,13 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
 
   Widget _buildMonthlyBillCard(MonthlyBillSummaryDto bill) {
     String formattedDate = bill.billDate ?? '';
-    if (bill.billDate != null) {
-      try {
-        final parsed = DateTime.parse(bill.billDate!);
-        formattedDate = DateFormat('dd MMM yyyy').format(parsed);
-      } catch (_) {}
+    final dateObj = bill.createdAt ?? (bill.billDate != null ? DateTime.tryParse(bill.billDate!) : null);
+    if (dateObj != null) {
+      final localDate = dateObj.toLocal();
+      final hasTime = bill.createdAt != null || (localDate.hour != 0 || localDate.minute != 0);
+      formattedDate = hasTime
+          ? DateFormat('dd MMM yyyy, hh:mm a').format(localDate)
+          : DateFormat('dd MMM yyyy').format(localDate);
     }
 
     return Container(

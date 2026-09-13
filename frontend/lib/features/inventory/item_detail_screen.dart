@@ -129,33 +129,8 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.outOfStockText),
-            tooltip: 'Archive Item',
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Archive Item?'),
-                  content: Text('Are you sure you want to remove ${item.name} from your inventory?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.outOfStockText),
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Archive'),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirm == true && context.mounted) {
-                final homeId = ref.read(homeControllerProvider).activeHome?.id;
-                if (homeId != null) {
-                  await ref.read(inventoryRepositoryProvider).deleteItem(homeId, item.id);
-                  ref.read(inventoryControllerProvider.notifier).loadData();
-                  if (context.mounted) context.pop();
-                }
-              }
-            },
+            tooltip: 'Delete Item',
+            onPressed: () => _confirmDeleteItem(context, item),
           ),
           const SizedBox(width: 4),
         ],
@@ -413,9 +388,91 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                 ),
               );
             }),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          // Delete Action Button (Danger Zone)
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.delete_outline_rounded, color: AppColors.outOfStockText, size: 20),
+              label: const Text(
+                'Delete Item from Inventory',
+                style: TextStyle(
+                  color: AppColors.outOfStockText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.outOfStockBorder),
+                backgroundColor: AppColors.outOfStockBg,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () => _confirmDeleteItem(context, item),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDeleteItem(BuildContext context, InventoryItemModel item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline_rounded, color: AppColors.outOfStockText, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Item?'),
+          ],
+        ),
+        content: Text('Are you sure you want to delete ${item.name} from your inventory?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.outOfStockText,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && context.mounted) {
+      final success = await ref.read(inventoryControllerProvider.notifier).deleteItem(item.id);
+      if (context.mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${item.name} deleted from inventory'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF1E293B),
+            ),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete ${item.name}'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildDetailRow(String label, String value) {

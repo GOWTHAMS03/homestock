@@ -20,6 +20,7 @@ public class MonthlyBillSummaryDto {
     private String shopName;
     private String billNumber;
     private LocalDate billDate;
+    private java.time.Instant createdAt;
     private BigDecimal totalAmount;
     private BigDecimal subtotal;
     private BigDecimal taxAmount;

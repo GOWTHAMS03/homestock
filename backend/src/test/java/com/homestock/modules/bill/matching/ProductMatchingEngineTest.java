@@ -61,7 +61,7 @@ class ProductMatchingEngineTest {
                 .build();
         existingItem.setId(UUID.randomUUID());
 
-        when(inventoryItemRepository.findByHomeId(eq(homeId))).thenReturn(List.of(existingItem));
+        when(inventoryItemRepository.findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(eq(homeId))).thenReturn(List.of(existingItem));
 
         ParsedBillItem scanned = ParsedBillItem.builder()
                 .name("AASHIRVAAD ATTA 5KG")
@@ -81,7 +81,7 @@ class ProductMatchingEngineTest {
 
     @Test
     void testNewProductCandidateWhenNoInventoryOrCatalogMatch() {
-        when(inventoryItemRepository.findByHomeId(eq(homeId))).thenReturn(List.of());
+        when(inventoryItemRepository.findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(eq(homeId))).thenReturn(List.of());
 
         ParsedBillItem scanned = ParsedBillItem.builder()
                 .name("ORGANIC CHIA SEEDS 250G")
@@ -101,7 +101,7 @@ class ProductMatchingEngineTest {
 
     @Test
     void testStandardUnitPriceCalculationGramsToKg() {
-        when(inventoryItemRepository.findByHomeId(eq(homeId))).thenReturn(List.of());
+        when(inventoryItemRepository.findAllByHomeIdAndIsArchivedFalseOrderByNameAsc(eq(homeId))).thenReturn(List.of());
 
         // 500g for Rs. 275.00 -> Standard price per KG is 275 / 500 * 1000 = 550.00
         ParsedBillItem scanned = ParsedBillItem.builder()

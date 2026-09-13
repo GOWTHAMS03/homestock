@@ -247,6 +247,32 @@ class InventoryController extends StateNotifier<InventoryState> {
     }
   }
 
+  /// Delete item: local-first soft-delete with sync queue.
+  Future<bool> deleteItem(String itemId) async {
+    if (_homeId == null) return false;
+    try {
+      await _repo.deleteItem(_homeId, itemId);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  /// Delete multiple items in batch
+  Future<bool> deleteItems(Iterable<String> itemIds) async {
+    if (_homeId == null) return false;
+    try {
+      for (final id in itemIds) {
+        await _repo.deleteItem(_homeId, id);
+      }
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _itemsSub?.cancel();

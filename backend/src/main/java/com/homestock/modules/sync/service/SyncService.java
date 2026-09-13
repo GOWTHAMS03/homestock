@@ -1129,10 +1129,33 @@ public class SyncService {
     private Map<String, Object> mapPurchase(Purchase p) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", p.getId().toString());
+        map.put("storeId", p.getStore() != null ? p.getStore().getId().toString() : null);
         map.put("storeName", p.getStore() != null ? p.getStore().getName() : "Direct");
+        map.put("recordedByName", p.getRecordedBy() != null ? p.getRecordedBy().getFullName() : "Me");
         map.put("totalAmount", p.getTotalAmount().doubleValue());
         map.put("purchaseDate", p.getPurchaseDate().toString());
-        map.put("itemCount", p.getItems() != null ? p.getItems().size() : 0);
+        map.put("createdAt", p.getCreatedAt() != null ? p.getCreatedAt().toString() : null);
+        map.put("currency", p.getCurrency() != null ? p.getCurrency() : "INR");
+        map.put("notes", p.getNotes());
+
+        List<Map<String, Object>> itemMaps = new ArrayList<>();
+        if (p.getItems() != null) {
+            for (PurchaseItem item : p.getItems()) {
+                Map<String, Object> iMap = new HashMap<>();
+                iMap.put("id", item.getId().toString());
+                iMap.put("purchaseId", p.getId().toString());
+                iMap.put("inventoryItemId", item.getInventoryItem() != null ? item.getInventoryItem().getId().toString() : null);
+                iMap.put("itemName", item.getItemName());
+                iMap.put("categoryName", item.getCategory() != null ? item.getCategory().getName() : null);
+                iMap.put("quantity", item.getQuantity() != null ? item.getQuantity().doubleValue() : 1.0);
+                iMap.put("unit", item.getUnit() != null ? item.getUnit() : "pcs");
+                iMap.put("unitPrice", item.getUnitPrice() != null ? item.getUnitPrice().doubleValue() : 0.0);
+                iMap.put("totalPrice", item.getTotalPrice() != null ? item.getTotalPrice().doubleValue() : 0.0);
+                itemMaps.add(iMap);
+            }
+        }
+        map.put("items", itemMaps);
+        map.put("itemCount", itemMaps.size());
         return map;
     }
 

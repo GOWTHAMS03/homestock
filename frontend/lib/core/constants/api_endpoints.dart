@@ -130,5 +130,11 @@ class ApiEndpoints {
   static const String voiceCommand = '/voice/command';
   static const String voiceProcessAudio = '/voice/process-audio';
   static const String voiceExecute = '/voice/execute';
+
+  // Production AI Voice Engine
+  static const String voiceAiCommand = '/voice/ai/command';
+  static const String voiceAiParse = '/voice/ai/parse';
+  static const String voiceAiFollowUp = '/voice/ai/follow-up';
+  static const String voiceAudit = '/voice/audit';
 }
 

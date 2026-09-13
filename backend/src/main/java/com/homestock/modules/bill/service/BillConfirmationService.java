@@ -203,6 +203,11 @@ public class BillConfirmationService {
         purchase = purchaseRepository.save(purchase);
 
         // Clear draft bill items if any, then insert confirmed items
+        List<PurchasedBillItem> existingDraftItems = billItemRepository.findByBillId(bill.getId());
+        if (!existingDraftItems.isEmpty()) {
+            billItemRepository.deleteAll(existingDraftItems);
+            billItemRepository.flush();
+        }
         List<PurchasedBillItem> confirmedBillItems = new ArrayList<>();
 
         for (ConfirmBillItemRequest itemReq : request.getItems()) {
