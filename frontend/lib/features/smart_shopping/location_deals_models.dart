@@ -2,6 +2,8 @@
 
 class NearbyShop {
   final String id;
+  final String? osmId;
+  final String? osmType;
   final String name;
   final String shopType;
   final String address;
@@ -10,18 +12,26 @@ class NearbyShop {
   final String postalCode;
   final double latitude;
   final double longitude;
+  final int? distanceMeters;
   final double distanceKm;
   final String distanceLabel;
   final double rating;
   final int reviewCount;
   final String openingHours;
+  final String? phone;
+  final String? website;
   final bool isOpen;
   final bool isVerified;
   final int availableDealsCount;
   final double? estimatedBasketTotal;
+  final String source;
+  final String attribution;
+  final bool isOfflineCache;
 
   const NearbyShop({
     required this.id,
+    this.osmId,
+    this.osmType,
     required this.name,
     required this.shopType,
     required this.address,
@@ -30,20 +40,86 @@ class NearbyShop {
     required this.postalCode,
     required this.latitude,
     required this.longitude,
+    this.distanceMeters,
     required this.distanceKm,
     required this.distanceLabel,
     required this.rating,
     required this.reviewCount,
     required this.openingHours,
+    this.phone,
+    this.website,
     required this.isOpen,
     required this.isVerified,
     required this.availableDealsCount,
     this.estimatedBasketTotal,
+    this.source = 'OpenStreetMap',
+    this.attribution = 'Data © OpenStreetMap contributors, ODbL',
+    this.isOfflineCache = false,
   });
+
+  NearbyShop copyWith({
+    String? id,
+    String? osmId,
+    String? osmType,
+    String? name,
+    String? shopType,
+    String? address,
+    String? area,
+    String? city,
+    String? postalCode,
+    double? latitude,
+    double? longitude,
+    int? distanceMeters,
+    double? distanceKm,
+    String? distanceLabel,
+    double? rating,
+    int? reviewCount,
+    String? openingHours,
+    String? phone,
+    String? website,
+    bool? isOpen,
+    bool? isVerified,
+    int? availableDealsCount,
+    double? estimatedBasketTotal,
+    String? source,
+    String? attribution,
+    bool? isOfflineCache,
+  }) {
+    return NearbyShop(
+      id: id ?? this.id,
+      osmId: osmId ?? this.osmId,
+      osmType: osmType ?? this.osmType,
+      name: name ?? this.name,
+      shopType: shopType ?? this.shopType,
+      address: address ?? this.address,
+      area: area ?? this.area,
+      city: city ?? this.city,
+      postalCode: postalCode ?? this.postalCode,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      distanceKm: distanceKm ?? this.distanceKm,
+      distanceLabel: distanceLabel ?? this.distanceLabel,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      openingHours: openingHours ?? this.openingHours,
+      phone: phone ?? this.phone,
+      website: website ?? this.website,
+      isOpen: isOpen ?? this.isOpen,
+      isVerified: isVerified ?? this.isVerified,
+      availableDealsCount: availableDealsCount ?? this.availableDealsCount,
+      estimatedBasketTotal: estimatedBasketTotal ?? this.estimatedBasketTotal,
+      source: source ?? this.source,
+      attribution: attribution ?? this.attribution,
+      isOfflineCache: isOfflineCache ?? this.isOfflineCache,
+    );
+  }
 
   factory NearbyShop.fromJson(Map<String, dynamic> json) {
     return NearbyShop(
       id: json['id'] as String? ?? '',
+      osmId: json['osmId'] as String?,
+      osmType: json['osmType'] as String?,
       name: json['name'] as String? ?? 'Nearby Store',
       shopType: json['shopType'] as String? ?? 'SUPERMARKET',
       address: json['address'] as String? ?? '',
@@ -52,16 +128,53 @@ class NearbyShop {
       postalCode: json['postalCode'] as String? ?? '',
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      distanceMeters: (json['distanceMeters'] as num?)?.toInt(),
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       distanceLabel: json['distanceLabel'] as String? ?? 'Nearby',
       rating: (json['rating'] as num?)?.toDouble() ?? 4.2,
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       openingHours: json['openingHours'] as String? ?? '8:00 AM - 10:00 PM',
+      phone: json['phone'] as String?,
+      website: json['website'] as String?,
       isOpen: json['isOpen'] as bool? ?? true,
       isVerified: json['isVerified'] as bool? ?? true,
       availableDealsCount: (json['availableDealsCount'] as num?)?.toInt() ?? 0,
       estimatedBasketTotal: (json['estimatedBasketTotal'] as num?)?.toDouble(),
+      source: json['source'] as String? ?? 'OpenStreetMap',
+      attribution: json['attribution'] as String? ?? 'Data © OpenStreetMap contributors, ODbL',
+      isOfflineCache: json['isOfflineCache'] as bool? ?? false,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      if (osmId != null) 'osmId': osmId,
+      if (osmType != null) 'osmType': osmType,
+      'name': name,
+      'shopType': shopType,
+      'address': address,
+      'area': area,
+      'city': city,
+      'postalCode': postalCode,
+      'latitude': latitude,
+      'longitude': longitude,
+      if (distanceMeters != null) 'distanceMeters': distanceMeters,
+      'distanceKm': distanceKm,
+      'distanceLabel': distanceLabel,
+      'rating': rating,
+      'reviewCount': reviewCount,
+      'openingHours': openingHours,
+      if (phone != null) 'phone': phone,
+      if (website != null) 'website': website,
+      'isOpen': isOpen,
+      'isVerified': isVerified,
+      'availableDealsCount': availableDealsCount,
+      if (estimatedBasketTotal != null) 'estimatedBasketTotal': estimatedBasketTotal,
+      'source': source,
+      'attribution': attribution,
+      'isOfflineCache': isOfflineCache,
+    };
   }
 }
 

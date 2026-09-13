@@ -6,10 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-import '../../auth/auth_controller.dart';
+import '../../../core/sync/sync_providers.dart' show connectivityMonitorProvider;
 import '../../home_switcher/home_controller.dart';
 import '../../inventory/inventory_controller.dart';
 import '../../shopping/shopping_controller.dart';
+import '../controllers/voice_controller.dart' show offlineSpeechEngineProvider, offlineModelManagerProvider;
+import '../data/parser/command_parser.dart';
+import '../data/speech/offline_model_manager.dart';
 import '../models/voice_models.dart';
 import '../services/voice_ai_service.dart';
 
@@ -34,6 +37,9 @@ class VoiceAiState {
   final String? errorMessage;
   final String detectedLanguage;
   final bool isFollowUpExpected;
+  final bool isModelInstalled;
+  final bool isModelDownloading;
+  final double modelDownloadProgress;
 
   const VoiceAiState({
     this.status = VoiceAiStatus.idle,
@@ -46,6 +52,9 @@ class VoiceAiState {
     this.errorMessage,
     this.detectedLanguage = 'EN',
     this.isFollowUpExpected = false,
+    this.isModelInstalled = false,
+    this.isModelDownloading = false,
+    this.modelDownloadProgress = 0.0,
   });
 
   bool get isRecording => status == VoiceAiStatus.listening;
@@ -63,6 +72,9 @@ class VoiceAiState {
     String? errorMessage,
     String? detectedLanguage,
     bool? isFollowUpExpected,
+    bool? isModelInstalled,
+    bool? isModelDownloading,
+    double? modelDownloadProgress,
   }) {
     return VoiceAiState(
       status: status ?? this.status,
@@ -75,6 +87,9 @@ class VoiceAiState {
       errorMessage: errorMessage ?? this.errorMessage,
       detectedLanguage: detectedLanguage ?? this.detectedLanguage,
       isFollowUpExpected: isFollowUpExpected ?? this.isFollowUpExpected,
+      isModelInstalled: isModelInstalled ?? this.isModelInstalled,
+      isModelDownloading: isModelDownloading ?? this.isModelDownloading,
+      modelDownloadProgress: modelDownloadProgress ?? this.modelDownloadProgress,
     );
   }
 }
@@ -96,6 +111,7 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
 
   Timer? _durationTimer;
   Timer? _amplitudeTimer;
+  StreamSubscription<ModelInfo>? _modelStatusSub;
   String? _currentRecordingPath;
   DateTime? _recordingStartTime;
 
@@ -105,7 +121,43 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
     String? homeId,
   })  : _ref = ref,
         _aiService = aiService,
-        super(const VoiceAiState());
+        super(const VoiceAiState()) {
+    _initModelStatus();
+  }
+
+  void _initModelStatus() {
+    final modelManager = _ref.read(offlineModelManagerProvider);
+    state = state.copyWith(
+      isModelInstalled: modelManager.isModelReady,
+      isModelDownloading: modelManager.currentModel.status == ModelStatus.downloading,
+      modelDownloadProgress: modelManager.currentModel.downloadProgress,
+    );
+    _modelStatusSub = modelManager.statusStream.listen((info) {
+      if (mounted) {
+        state = state.copyWith(
+          isModelInstalled: info.status == ModelStatus.installed || info.status == ModelStatus.ready,
+          isModelDownloading: info.status == ModelStatus.downloading,
+          modelDownloadProgress: info.downloadProgress,
+        );
+      }
+    });
+    modelManager.isModelInstalled().then((installed) {
+      if (mounted) {
+        state = state.copyWith(isModelInstalled: installed);
+      }
+    });
+  }
+
+  void downloadModel([WhisperModelVariant? variant]) {
+    final modelManager = _ref.read(offlineModelManagerProvider);
+    state = state.copyWith(
+      isModelDownloading: true,
+      modelDownloadProgress: 0.01,
+      status: VoiceAiStatus.idle,
+      errorMessage: null,
+    );
+    modelManager.downloadModel(variant);
+  }
 
   String? get _homeId {
     final homeState = _ref.read(homeControllerProvider);
@@ -122,6 +174,7 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
   void dispose() {
     _durationTimer?.cancel();
     _amplitudeTimer?.cancel();
+    _modelStatusSub?.cancel();
     _audioRecorder.dispose();
     super.dispose();
   }
@@ -147,15 +200,15 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
 
       final tempDir = await getTemporaryDirectory();
       _currentRecordingPath =
-          '${tempDir.path}/voice_ai_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          '${tempDir.path}/voice_ai_${DateTime.now().millisecondsSinceEpoch}.wav';
       _recordingStartTime = DateTime.now();
 
       await _audioRecorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-          sampleRate: 44100,
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
           numChannels: 1,
+          bitRate: 256000,
         ),
         path: _currentRecordingPath!,
       );
@@ -244,11 +297,64 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
         return;
       }
 
-      // 1. Process via Gemini Flash-Lite multimodal pipeline
-      final result = await _aiService.processAudioCommand(
-        audioFilePath: path,
-        homeId: homeId,
-      );
+      VoiceCommandResult? result;
+
+      // 1. Process via Gemini Flash-Lite multimodal pipeline if online
+      final isOnline = _ref.read(connectivityMonitorProvider).isOnline;
+      if (isOnline) {
+        try {
+          final aiRes = await _aiService.processAudioCommand(
+            audioFilePath: path,
+            homeId: homeId,
+          );
+          final t = aiRes.transcript.trim().toLowerCase();
+          if (t.isNotEmpty &&
+              !t.contains('add 2 litre cooking oil') &&
+              aiRes.intent != VoiceIntentType.unknown) {
+            result = aiRes;
+          }
+        } catch (e) {
+          debugPrint('Gemini Voice AI endpoint error: $e, checking on-device Whisper');
+        }
+      }
+
+      // 2. If Gemini didn't produce real speech, use on-device Whisper.cpp via OfflineSpeechEngine!
+      if (result == null) {
+        final offlineEngine = _ref.read(offlineSpeechEngineProvider);
+        final isOfflineReady = await offlineEngine.isAvailable();
+
+        if (isOfflineReady) {
+          try {
+            final transcript = await offlineEngine.transcribe(path);
+            final cleanText = transcript.cleanText.isNotEmpty ? transcript.cleanText : transcript.rawText;
+
+            if (cleanText.trim().isNotEmpty) {
+              final parsedCmd = CommandParser.parse(cleanText, isOffline: true);
+              result = _convertNormalizedToResult(parsedCmd, cleanText);
+            } else {
+              state = state.copyWith(
+                status: VoiceAiStatus.error,
+                errorMessage: "Could not detect clear speech. Please tap mic and speak again.",
+              );
+              return;
+            }
+          } catch (e) {
+            debugPrint('Offline whisper speech recognition error: $e');
+            state = state.copyWith(
+              status: VoiceAiStatus.error,
+              errorMessage: 'Speech recognition error: $e',
+            );
+            return;
+          }
+        } else {
+          // Model not installed
+          state = state.copyWith(
+            status: VoiceAiStatus.error,
+            errorMessage: 'Offline voice model is not installed. Download the free model (75 MB) to recognize your voice offline.',
+          );
+          return;
+        }
+      }
 
       _handleCommandResult(result);
     } catch (e) {
@@ -258,6 +364,27 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
         errorMessage: e.toString().replaceAll('Exception: ', '').replaceAll('ApiException: ', ''),
       );
     }
+  }
+
+  VoiceCommandResult _convertNormalizedToResult(NormalizedVoiceCommand cmd, String transcript) {
+    return VoiceCommandResult(
+      transcript: transcript,
+      intent: cmd.intent,
+      confidence: cmd.confidence,
+      intentConfidence: cmd.intentConfidence,
+      productMatchConfidence: cmd.productConfidence,
+      detectedLanguage: 'auto',
+      requiresConfirmation: cmd.requiresConfirmation,
+      message: cmd.confirmationMessage ?? 'Do you want to ${cmd.intent.displayName}?',
+      disambiguationOptions: cmd.disambiguationOptions,
+      entities: VoiceEntities(
+        itemName: cmd.productName ?? (cmd.productQuery.isNotEmpty ? cmd.productQuery : transcript),
+        quantity: cmd.quantity,
+        unit: cmd.unit,
+        category: cmd.category,
+        matchedInventoryItemId: cmd.productId,
+      ),
+    );
   }
 
   /// Process text command directly
@@ -452,6 +579,43 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
       } catch (e) {
         debugPrint('Local-first clearShoppingList error: $e');
       }
+    }
+
+    if (cmd.intent == VoiceIntentType.searchInventory) {
+      final query = (cmd.entities?.itemName != null && cmd.entities!.itemName!.trim().isNotEmpty)
+          ? cmd.entities!.itemName!.trim()
+          : cmd.transcript.trim();
+      try {
+        _ref.read(inventoryControllerProvider.notifier).setSearchQuery(query);
+      } catch (_) {}
+      state = state.copyWith(
+        status: VoiceAiStatus.success,
+        executionResponse: ExecuteCommandResponse(
+          success: true,
+          intent: VoiceIntentType.searchInventory,
+          message: 'Searching inventory for "$query"',
+          navigation: {'route': '/inventory', 'query': query},
+        ),
+        errorMessage: null,
+      );
+      return;
+    }
+
+    if (cmd.intent == VoiceIntentType.searchProduct) {
+      final query = (cmd.entities?.itemName != null && cmd.entities!.itemName!.trim().isNotEmpty)
+          ? cmd.entities!.itemName!.trim()
+          : cmd.transcript.trim();
+      state = state.copyWith(
+        status: VoiceAiStatus.success,
+        executionResponse: ExecuteCommandResponse(
+          success: true,
+          intent: VoiceIntentType.searchProduct,
+          message: 'Searching deals for "$query"',
+          navigation: {'route': '/deals', 'query': query},
+        ),
+        errorMessage: null,
+      );
+      return;
     }
 
     // 2. Server execution fallback for all other intents

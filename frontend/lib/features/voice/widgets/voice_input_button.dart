@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/constants/app_colors.dart';
-import 'voice_command_sheet.dart';
+import '../models/voice_models.dart';
+import 'voice_bottom_sheet.dart';
 
 enum VoiceButtonVariant {
   iconOnly,
@@ -15,6 +16,8 @@ class VoiceInputButton extends StatelessWidget {
   final String? tooltip;
   final Color? color;
   final double size;
+  final ValueChanged<String>? onSearch;
+  final ValueChanged<VoiceCommandResult>? onResult;
 
   const VoiceInputButton({
     super.key,
@@ -22,6 +25,8 @@ class VoiceInputButton extends StatelessWidget {
     this.tooltip = 'Speak to Homie',
     this.color,
     this.size = 22.0,
+    this.onSearch,
+    this.onResult,
   });
 
   const VoiceInputButton.floating({
@@ -29,6 +34,8 @@ class VoiceInputButton extends StatelessWidget {
     this.tooltip = 'Speak to Homie',
     this.color,
     this.size = 26.0,
+    this.onSearch,
+    this.onResult,
   }) : variant = VoiceButtonVariant.floating;
 
   const VoiceInputButton.compactChip({
@@ -36,11 +43,13 @@ class VoiceInputButton extends StatelessWidget {
     this.tooltip = 'Speak to Homie',
     this.color,
     this.size = 18.0,
+    this.onSearch,
+    this.onResult,
   }) : variant = VoiceButtonVariant.compactChip;
 
   void _onTap(BuildContext context) {
     HapticFeedback.lightImpact();
-    VoiceCommandSheet.show(context);
+    VoiceBottomSheet.show(context, onSearchQuery: onSearch, onCommandResult: onResult);
   }
 
   @override

@@ -21,6 +21,7 @@ enum VoiceIntentType {
   getSpending,
   whatDoINeed,
   searchInventory,
+  searchProduct,
   addInventoryItem,
   updateInventoryItem,
   openShoppingList,
@@ -33,6 +34,12 @@ enum VoiceIntentType {
   static VoiceIntentType fromString(String? val) {
     if (val == null) return VoiceIntentType.unknown;
     switch (val.toUpperCase()) {
+      case 'SEARCH_PRODUCT':
+      case 'PRODUCT_SEARCH':
+        return VoiceIntentType.searchProduct;
+      case 'SEARCH_INVENTORY':
+      case 'INVENTORY_SEARCH':
+        return VoiceIntentType.searchInventory;
       case 'ADD_SHOPPING_ITEM':
       case 'ADD_TO_SHOPPING_LIST':
         return VoiceIntentType.addShoppingItem;
@@ -78,8 +85,6 @@ enum VoiceIntentType {
         return VoiceIntentType.getSpending;
       case 'WHAT_DO_I_NEED':
         return VoiceIntentType.whatDoINeed;
-      case 'SEARCH_INVENTORY':
-        return VoiceIntentType.searchInventory;
       case 'ADD_INVENTORY_ITEM':
         return VoiceIntentType.addInventoryItem;
       case 'UPDATE_INVENTORY_ITEM':
@@ -137,6 +142,8 @@ enum VoiceIntentType {
         return 'WHAT_DO_I_NEED';
       case VoiceIntentType.searchInventory:
         return 'SEARCH_INVENTORY';
+      case VoiceIntentType.searchProduct:
+        return 'SEARCH_PRODUCT';
       case VoiceIntentType.addInventoryItem:
         return 'ADD_INVENTORY_ITEM';
       case VoiceIntentType.updateInventoryItem:
@@ -192,6 +199,8 @@ enum VoiceIntentType {
         return 'What Do I Need?';
       case VoiceIntentType.searchInventory:
         return 'Search Inventory';
+      case VoiceIntentType.searchProduct:
+        return 'Search Product';
       case VoiceIntentType.addInventoryItem:
         return 'New Inventory Item';
       case VoiceIntentType.updateInventoryItem:

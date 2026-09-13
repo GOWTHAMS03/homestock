@@ -586,5 +586,41 @@ void main() {
       expect(dangerVal.canAutoExecute, isFalse);
       expect(dangerVal.promptMessage, contains('Clear all items'));
     });
+
+    test('Search commands parse accurately across English, Tamil, and Tanglish', () {
+      final cmd1 = CommandParser.parse('search rice');
+      expect(cmd1.intent, equals(VoiceIntentType.searchInventory));
+      expect(cmd1.productName?.toLowerCase(), contains('rice'));
+      expect(cmd1.requiresConfirmation, isFalse);
+      expect(CommandValidator.validate(cmd1).canAutoExecute, isTrue);
+
+      final cmd2 = CommandParser.parse('find cooking oil');
+      expect(cmd2.intent, equals(VoiceIntentType.searchInventory));
+      expect(cmd2.productName?.toLowerCase(), contains('oil'));
+      expect(cmd2.requiresConfirmation, isFalse);
+
+      final cmd3 = CommandParser.parse('sugar enga irukku');
+      expect(cmd3.intent, equals(VoiceIntentType.searchInventory));
+      expect(cmd3.productName?.toLowerCase(), contains('sugar'));
+
+      final cmd4 = CommandParser.parse('thedu arisi');
+      expect(cmd4.intent, equals(VoiceIntentType.searchInventory));
+      expect(cmd4.productName?.toLowerCase(), anyOf(contains('arisi'), contains('rice')));
+
+      final cmd5 = CommandParser.parse('deals for sunflower oil');
+      expect(cmd5.intent, equals(VoiceIntentType.searchProduct));
+      expect(cmd5.productName?.toLowerCase(), contains('oil'));
+      expect(cmd5.requiresConfirmation, isFalse);
+      expect(CommandValidator.validate(cmd5).canAutoExecute, isTrue);
+
+      final cmd6 = CommandParser.parse('offers on ponni rice');
+      expect(cmd6.intent, equals(VoiceIntentType.searchProduct));
+      expect(cmd6.productName?.toLowerCase(), contains('rice'));
+
+      final cmd7 = CommandParser.parse('cheap milk where to buy');
+      expect(cmd7.intent, equals(VoiceIntentType.searchProduct));
+      expect(cmd7.productName?.toLowerCase(), contains('milk'));
+    });
   });
 }
+

@@ -154,8 +154,10 @@ class CommandParser {
     } else if (effectiveQuantity != null && effectiveQuantity >= 50) {
       requiresConfirmation = true;
       confirmMsg = 'Add $effectiveQuantity $effectiveUnit $resolvedProduct? That is a large quantity.';
-    } else if (intent == VoiceIntentType.removeShoppingItem) {
-      requiresConfirmation = false; // Fast removal for simple items
+    } else if (intent == VoiceIntentType.removeShoppingItem ||
+               intent == VoiceIntentType.searchInventory ||
+               intent == VoiceIntentType.searchProduct) {
+      requiresConfirmation = false; // Fast execution and direct search for items
     }
 
     return NormalizedVoiceCommand(

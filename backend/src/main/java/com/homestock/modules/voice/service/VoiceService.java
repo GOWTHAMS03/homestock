@@ -367,6 +367,18 @@ public class VoiceService {
     private VoiceCommandResult fallbackProcessAudio(MultipartFile audioFile, UUID homeId, UUID userId,
                                                     String audioHash, String idempotencyKey) {
         TranscriptionResult transcription = transcribe(audioFile, "auto");
+        if (transcription == null || transcription.getTranscript() == null || transcription.getTranscript().isBlank()) {
+            return VoiceCommandResult.builder()
+                    .transcript("")
+                    .intent(VoiceIntent.UNKNOWN)
+                    .confidence(0.0)
+                    .intentConfidence(0.0)
+                    .productMatchConfidence(0.0)
+                    .detectedLanguage("EN")
+                    .message("Cloud voice recognition requires GEMINI_API_KEY. Please download the offline voice model in Settings or configure GEMINI_API_KEY.")
+                    .executionStatus("FAILED")
+                    .build();
+        }
         VoiceCommandResult result = voiceCommandParser.parse(homeId, transcription.getTranscript());
         result.setTranscript(transcription.getTranscript());
         result.setIdempotencyKey(idempotencyKey);

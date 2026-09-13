@@ -17,6 +17,7 @@ import '../../features/shopping/shopping_screen.dart';
 import '../../features/bill/screens/bill_scanner_screen.dart';
 import '../../features/bill/screens/bill_confirmation_screen.dart';
 import '../../features/bill/screens/expense_intelligence_screen.dart';
+import '../../features/smart_shopping/nearby_grocery_shops_screen.dart';
 import '../widgets/splash_screen.dart';
 import 'main_scaffold.dart';
 
@@ -133,6 +134,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/shops/nearby',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NearbyGroceryShopsScreen(),
       ),
 
       // Floating 3-tab Bottom Navigation Shell (Home, Inventory, Shopping List)

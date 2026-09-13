@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:homestock/core/location/location_controller.dart';
@@ -12,7 +11,7 @@ import 'package:homestock/core/location/widgets/location_bar_widget.dart';
 import 'package:homestock/core/location/widgets/location_explanation_sheet.dart';
 import 'package:homestock/core/location/widgets/location_status_banner.dart';
 import 'package:homestock/features/smart_shopping/location_service.dart'
-    show LocationResultDealsExtension, UserLocationContext;
+    show LocationResultDealsExtension;
 
 /// Controllable mock provider for testing all platform scenarios.
 class MockLocationProvider implements LocationProvider {
@@ -577,7 +576,6 @@ void main() {
     });
 
     testWidgets('LocationStatusBanner renders action buttons for disabled GPS and permission denied', (tester) async {
-      bool tryAgainTapped = false;
       bool openSettingsTapped = false;
       bool chooseManuallyTapped = false;
 
@@ -589,7 +587,7 @@ void main() {
               state: const LocationState(
                 status: LocationStateEnum.LOCATION_SERVICES_DISABLED,
               ),
-              onTryAgain: () => tryAgainTapped = true,
+              onTryAgain: () {},
               onOpenSettings: () => openSettingsTapped = true,
               onOpenLocationSettings: () => openSettingsTapped = true,
               onChooseManually: () => chooseManuallyTapped = true,

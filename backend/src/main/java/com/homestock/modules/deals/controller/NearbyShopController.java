@@ -22,14 +22,16 @@ public class NearbyShopController {
 
     private final NearbyShopService nearbyShopService;
 
-    @GetMapping("/nearby")
-    @Operation(summary = "Find nearby grocery stores within radius (1km, 3km, 5km, 10km, 15km)")
+    @GetMapping(value = {"/nearby", "/api/v1/nearby-shops"})
+    @Operation(summary = "Find nearby grocery stores within radius (2km default, 5km, 10km) using OpenStreetMap")
     public ResponseEntity<ApiResponse<List<NearbyShopDto>>> getNearbyShops(
             @RequestParam(required = false) BigDecimal lat,
             @RequestParam(required = false) BigDecimal lon,
-            @RequestParam(defaultValue = "5.0") Double radius) {
+            @RequestParam(defaultValue = "5.0") Double radius,
+            @RequestParam(defaultValue = "false") Boolean forceRefresh) {
 
-        List<NearbyShopDto> shops = nearbyShopService.findNearbyShops(lat, lon, radius);
+        List<NearbyShopDto> shops = nearbyShopService.findNearbyShops(
+                lat, lon, radius, Boolean.TRUE.equals(forceRefresh));
         return ResponseEntity.ok(ApiResponse.success("Nearby grocery shops retrieved", shops));
     }
 

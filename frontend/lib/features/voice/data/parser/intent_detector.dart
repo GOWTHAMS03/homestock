@@ -226,7 +226,30 @@ class IntentDetector {
       );
     }
 
-    // 13. Default: Add to Shopping List (Primary core action)
+    // 13. Search Inventory & Products ("search rice", "find oil", "show eggs", "rice thedu", "enga irukku oil", "arisi kaatu", "where to buy milk")
+    final hasSearchKeyword = _matchesAny(lower, [
+      'search', 'find', 'thedu', 'theduga', 'thedunga', 'show', 'lookup', 'look for',
+      'enga irukku', 'enga iruku', 'engae', 'enga kedaikkum', 'enga',
+      'தேடு', 'காட்டு', 'எங்கே', 'search for', 'kaatu',
+      'deals for', 'deals', 'offers on', 'offers for', 'offers',
+      'where to buy', 'where can i get', 'where can i find', 'where is', 'where',
+    ]);
+
+    final isPureAddOrRemove = _matchesAny(lower, [
+      'add', 'remove', 'delete', 'used', 'vaanganum', 'vangiten',
+      'consumed', 'thooku', 'eduthudu', 'podu', 'சேர்க்கவும்', 'நீக்கு',
+    ]) || (!lower.contains('where') && lower.contains('buy'));
+
+    if (hasSearchKeyword && !isPureAddOrRemove) {
+      final isCatalogSearch = lower.contains('deal') || lower.contains('offer') || lower.contains('discount') || lower.contains('price') || lower.contains('where to buy') || lower.contains('where can i') || lower.contains('catalog') || lower.contains('product') || lower.contains('market') || lower.contains('cheap');
+      return IntentDetectionResult(
+        intent: isCatalogSearch ? VoiceIntentType.searchProduct : VoiceIntentType.searchInventory,
+        confidence: 0.96,
+        matchedPattern: 'search_intent',
+      );
+    }
+
+    // 14. Default: Add to Shopping List (Primary core action)
     // Matches "2 kilo rice add pannu", "add 2 kg rice", "rice rendu kilo venum", "2 kilo rice", etc.
     return const IntentDetectionResult(
       intent: VoiceIntentType.addShoppingItem,

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../models/voice_models.dart';
 import '../providers/voice_command_provider.dart';
 import 'voice_feedback_widget.dart';
 
@@ -186,6 +185,73 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // 2b. Offline Model Download / Progress Card
+          if (state.isModelDownloading) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Downloading Voice Model (${(state.modelDownloadProgress * 100).toInt()}%)',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: state.modelDownloadProgress > 0 ? state.modelDownloadProgress : null,
+                      backgroundColor: Colors.grey.withOpacity(0.2),
+                      color: AppColors.primary,
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Downloading multilingual Whisper model for 100% offline voice recognition.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ] else if (!state.isModelInstalled && (state.errorMessage?.toLowerCase().contains('model') ?? false)) ...[
+            ElevatedButton.icon(
+              onPressed: () {
+                ref.read(voiceAiControllerProvider.notifier).downloadModel();
+              },
+              icon: const Icon(Icons.cloud_download_rounded, size: 20),
+              label: const Text('Download Free Voice Model (75 MB)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(46),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
               ),
             ),
             const SizedBox(height: 14),

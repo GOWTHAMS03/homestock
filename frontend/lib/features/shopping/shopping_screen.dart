@@ -12,6 +12,7 @@ import '../inventory/inventory_model.dart';
 import '../purchase/add_purchase_screen.dart';
 import '../purchase/purchases_screen.dart';
 import '../bill/screens/bill_scanner_screen.dart';
+import '../smart_shopping/nearby_grocery_shops_screen.dart';
 import '../smart_shopping/product_deal_search_screen.dart';
 import '../smart_shopping/smart_shopping_screen.dart';
 import '../voice/widgets/voice_input_button.dart';
@@ -422,6 +423,11 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
                     // 7. Best Prices Promotion Banner: [ 🏷 Best prices for your list > ]
                     _buildBestPricesBanner(context, pendingCount),
+
+                    const SizedBox(height: 10),
+
+                    // 7b. Free Nearby Grocery Shops: [ 🏪 Nearby Grocery Shops > ]
+                    _buildNearbyShopsShortcut(context),
 
                     const SizedBox(height: 14),
 
@@ -935,7 +941,17 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                     tooltip: 'Scan Barcode',
                     onPressed: () => BarcodeScannerWidget.open(context),
                   ),
-                  const VoiceInputButton(size: 20, color: Color(0xFF6366F1), tooltip: 'Homie voice command'),
+                  VoiceInputButton(
+                    size: 20,
+                    color: const Color(0xFF6366F1),
+                    tooltip: 'Homie voice command',
+                    onSearch: (query) {
+                      setState(() {
+                        _searchController.text = query;
+                        _searchQuery = query.trim();
+                      });
+                    },
+                  ),
                   const SizedBox(width: 4),
                 ],
               ],
@@ -1447,6 +1463,69 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 size: 20,
                 color: Color(0xFFB45309),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNearbyShopsShortcut(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const NearbyGroceryShopsScreen()),
+        ),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 1.5),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.storefront_rounded, size: 18, color: Color(0xFF10B981)),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nearby Grocery Shops',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    SizedBox(height: 1),
+                    Text(
+                      'Free discovery via OpenStreetMap • Directions & hours',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF9CA3AF)),
             ],
           ),
         ),

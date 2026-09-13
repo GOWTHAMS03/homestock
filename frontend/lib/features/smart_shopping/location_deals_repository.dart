@@ -1,31 +1,60 @@
 import '../../core/network/api_client.dart';
+import '../../core/storage/cache_service.dart';
 import 'location_deals_models.dart';
 
 /// Repository communicating with Spring Boot Location-Aware Deals & Nearby Shop endpoints.
 class LocationDealsRepository {
   final ApiClient _apiClient;
+  final CacheService _cacheService;
 
-  LocationDealsRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+  LocationDealsRepository({
+    required ApiClient apiClient,
+    CacheService? cacheService,
+  })  : _apiClient = apiClient,
+        _cacheService = cacheService ?? CacheService();
 
-  /// Fetch nearby grocery stores within radius
+  /// Fetch nearby grocery stores within radius with spatial caching and offline fallback
   Future<List<NearbyShop>> getNearbyShops({
     required double latitude,
     required double longitude,
-    double radiusKm = 5.0,
+    double radiusKm = 2.0,
+    bool forceRefresh = false,
   }) async {
+    final spatialKey = '${latitude.toStringAsFixed(3)}_${longitude.toStringAsFixed(3)}_${(radiusKm * 1000).toInt()}';
+
+    // 1. Check local offline cache if not forcing refresh
+    if (!forceRefresh) {
+      final cachedJson = _cacheService.getCachedNearbyShops(spatialKey);
+      if (cachedJson != null && cachedJson.isNotEmpty) {
+        return cachedJson.map((e) => NearbyShop.fromJson(e).copyWith(isOfflineCache: false)).toList();
+      }
+    }
+
     try {
       final response = await _apiClient.dio.get(
         '/api/v1/shops/nearby',
         queryParameters: {
           'lat': latitude,
           'lon': longitude,
-          'radius': radiusKm,
+          'radius': radiusKm <= 50 ? radiusKm : radiusKm / 1000.0,
+          'forceRefresh': forceRefresh,
         },
       );
 
       final data = response.data['data'] as List<dynamic>? ?? [];
-      return data.map((e) => NearbyShop.fromJson(e as Map<String, dynamic>)).toList();
+      final shops = data.map((e) => NearbyShop.fromJson(e as Map<String, dynamic>)).toList();
+
+      if (shops.isNotEmpty) {
+        await _cacheService.cacheNearbyShops(spatialKey, shops.map((s) => s.toJson()).toList());
+      }
+
+      return shops;
     } catch (_) {
+      // 2. Offline Fallback: If network failed, attempt loading cached results and mark isOfflineCache: true
+      final cachedJson = _cacheService.getCachedNearbyShops(spatialKey);
+      if (cachedJson != null && cachedJson.isNotEmpty) {
+        return cachedJson.map((e) => NearbyShop.fromJson(e).copyWith(isOfflineCache: true)).toList();
+      }
       return [];
     }
   }

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../models/voice_models.dart';
-import '../providers/voice_command_provider.dart';
 
 class VoiceFeedbackWidget extends ConsumerWidget {
   final VoiceCommandResult result;
@@ -66,13 +65,16 @@ class VoiceFeedbackWidget extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                result.intent.displayName,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  result.intent.displayName,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               _buildConfidenceBadge(result.confidence),
             ],
           ),

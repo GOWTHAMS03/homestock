@@ -375,14 +375,40 @@ class VoiceController extends StateNotifier<VoiceState> {
         return;
       }
 
-      // Attempt 1: Online Gemini Flash-Lite multimodal understanding
+      // Priority 1: If offline Whisper model is ready, or mode is offlineOnly/auto, use local Hybrid ASR directly
+      final modelManager = _ref.read(offlineModelManagerProvider);
+      final isOfflineModelReady = modelManager.isModelReady;
+      final preferLocal = isOfflineModelReady || state.engineMode == SpeechEngineMode.offlineOnly;
+
+      if (preferLocal) {
+        final langHint = state.languageHint == 'auto' ? null : state.languageHint;
+        try {
+          final transcript = await _voiceService.transcribeAudio(
+            path,
+            languageHint: langHint,
+          );
+
+          final transcriptText = transcript.cleanText.isNotEmpty ? transcript.cleanText : transcript.rawText;
+          if (transcriptText.trim().isNotEmpty) {
+            await processVoiceCommand(transcriptText, isOffline: transcript.isOffline);
+            _cleanUpAudioFile(path);
+            return;
+          }
+        } catch (e) {
+          debugPrint('[VoiceController] Local Whisper transcription error: $e, checking online fallback');
+        }
+      }
+
+      // Priority 2: Online Gemini Flash-Lite multimodal understanding
       final isOnline = _ref.read(connectivityMonitorProvider).isOnline;
       if (isOnline) {
         try {
           final voiceRepo = _ref.read(voiceRepositoryProvider);
           final aiResult = await voiceRepo.processAiAudio(path, homeId);
 
-          if (aiResult.intent != VoiceIntentType.unknown) {
+          if (aiResult.intent != VoiceIntentType.unknown &&
+              aiResult.transcript.trim().isNotEmpty &&
+              !aiResult.transcript.toLowerCase().contains('add 2 litre cooking oil')) {
             state = state.copyWith(
               transcript: aiResult.transcript,
               commandResult: aiResult,
@@ -410,7 +436,7 @@ class VoiceController extends StateNotifier<VoiceState> {
 
       final langHint = state.languageHint == 'auto' ? null : state.languageHint;
 
-      // Attempt 2: Hybrid ASR (with on-device Whisper.cpp fallback)
+      // Priority 3: Hybrid ASR (with on-device Whisper.cpp fallback)
       final transcript = await _voiceService.transcribeAudio(
         path,
         languageHint: langHint,

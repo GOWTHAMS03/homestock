@@ -12,10 +12,13 @@ import 'deal_search_models.dart';
 import 'location_deals_controller.dart';
 import 'location_deals_models.dart';
 import 'location_service.dart';
+import 'nearby_grocery_shops_screen.dart';
 import 'nearby_shop_detail_screen.dart';
 import 'product_deal_controller.dart';
 import 'widgets/manual_location_dialog.dart';
 import 'widgets/shop_radar_map_view.dart';
+import '../voice/widgets/voice_input_button.dart';
+import '../voice/widgets/voice_bottom_sheet.dart';
 
 /// Screen for Real-World Product Deal Search.
 /// Supports both generic intent discovery ("Oil", "Rice", "Milk", "samayal ennai")
@@ -132,6 +135,16 @@ class _ProductDealSearchScreenState
             ? 'Deals: ${_searchController.text}'
             : 'Real-World Deals',
         subtitle: 'Compare real market prices across stores',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.storefront_rounded, color: Color(0xFF10B981)),
+            tooltip: 'Nearby Grocery Shops',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NearbyGroceryShopsScreen()),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -251,9 +264,18 @@ class _ProductDealSearchScreenState
                     },
                   ),
                 ),
+                VoiceInputButton(
+                  size: 20,
+                  color: hsColors.primary,
+                  tooltip: 'Voice search deals',
+                  onSearch: (query) {
+                    _searchController.text = query;
+                    _performSearch(query);
+                  },
+                ),
                 IconButton(
-                  tooltip: 'Voice & Tanglish Deal Search',
-                  icon: Icon(Icons.mic_rounded, color: hsColors.primary, size: 20),
+                  tooltip: 'Voice & Tanglish Deal Finder',
+                  icon: Icon(Icons.chat_bubble_outline_rounded, color: hsColors.primary, size: 20),
                   onPressed: () => _openVoiceSearchDialog(context, locController, hsColors),
                 ),
                 if (_searchController.text.isNotEmpty)
@@ -2092,8 +2114,25 @@ class _ProductDealSearchScreenState
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: hsColors.outline),
                         ),
-                        suffixIcon: locState.isVoiceSearching
-                            ? const Padding(
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.mic_rounded, color: hsColors.primary),
+                              tooltip: 'Speak query',
+                              onPressed: () {
+                                VoiceBottomSheet.show(
+                                  context,
+                                  onSearchQuery: (q) async {
+                                    voiceTextController.text = q;
+                                    await locController.searchVoice(q);
+                                    setDialogState(() {});
+                                  },
+                                );
+                              },
+                            ),
+                            if (locState.isVoiceSearching)
+                              const Padding(
                                 padding: EdgeInsets.all(12),
                                 child: SizedBox(
                                   width: 18,
@@ -2101,7 +2140,8 @@ class _ProductDealSearchScreenState
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
                               )
-                            : IconButton(
+                            else
+                              IconButton(
                                 icon: Icon(Icons.send_rounded, color: hsColors.primary),
                                 onPressed: () async {
                                   final query = voiceTextController.text.trim();
@@ -2111,6 +2151,8 @@ class _ProductDealSearchScreenState
                                   }
                                 },
                               ),
+                          ],
+                        ),
                       ),
                       onSubmitted: (val) async {
                         if (val.trim().isNotEmpty) {

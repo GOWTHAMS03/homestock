@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'location_exceptions.dart';
 import 'location_models.dart';
-import 'location_provider.dart';
 import 'location_service.dart';
 import 'location_state.dart';
 import 'widgets/location_explanation_sheet.dart';

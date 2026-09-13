@@ -80,7 +80,7 @@ class EntityExtractor {
     // Remove common voice command stopwords, target indicators, and conversational padding
     productCandidate = productCandidate.replaceAll(
       RegExp(
-        r'\b(?:add|put|buy|remove|delete|used|consumed|stock|inventory|in|out|quantity|shopping|list|la|le|ula|ku|ukku|lerundhu|irundhu|podu|podunga|pannu|pannunga|panu|irukku|irukka|theendhuduchu|vaanganum|vaangu|venum|eduthachu|bought|update|set|mathu|to|from|for|me|please|show|find|search|cheapest|price|where|enga|veetla|veetil|kaatu|solla|சேர்க்கவும்|போடு|நீக்கு|காட்டு)\b',
+        r'\b(?:add|put|buy|remove|delete|used|consumed|stock|inventory|in|out|quantity|shopping|list|la|le|ula|ku|ukku|lerundhu|irundhu|podu|podunga|pannu|pannunga|panu|irukku|irukka|theendhuduchu|vaanganum|vaangu|venum|eduthachu|bought|update|set|mathu|to|from|for|me|please|show|find|search|cheapest|price|where|enga|engae|veetla|veetil|kaatu|solla|thedu|theduga|thedunga|paaru|தேடு|காட்டு|சேர்க்கவும்|போடு|நீக்கு)\b',
         caseSensitive: false,
       ),
       ' ',

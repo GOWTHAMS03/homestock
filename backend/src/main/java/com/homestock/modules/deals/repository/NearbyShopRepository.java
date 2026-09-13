@@ -8,10 +8,13 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface NearbyShopRepository extends JpaRepository<NearbyShop, UUID> {
+
+    Optional<NearbyShop> findByOsmId(String osmId);
 
     List<NearbyShop> findByCityIgnoreCase(String city);
 

@@ -835,7 +835,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   tooltip: 'Scan Barcode',
                   onPressed: () => BarcodeScannerWidget.open(context),
                 ),
-                const VoiceInputButton(size: 20, color: Color(0xFF6366F1), tooltip: 'Homie voice search'),
+                VoiceInputButton(
+                  size: 20,
+                  color: const Color(0xFF6366F1),
+                  tooltip: 'Homie voice search',
+                  onSearch: (query) {
+                    _searchController.text = query;
+                    ref.read(inventoryControllerProvider.notifier).setSearchQuery(query);
+                    setState(() {});
+                  },
+                ),
                 const SizedBox(width: 4),
               ],
             ),

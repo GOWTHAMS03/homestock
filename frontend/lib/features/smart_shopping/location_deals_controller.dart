@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage_service.dart';
+import '../../core/storage/cache_service.dart';
 import '../auth/auth_controller.dart' show apiClientProvider;
 import 'location_deals_models.dart';
 import 'location_deals_repository.dart';
@@ -10,7 +11,8 @@ import 'location_service.dart';
 final locationDealsRepositoryProvider = Provider<LocationDealsRepository>((ref) {
   try {
     final apiClient = ref.watch(apiClientProvider);
-    return LocationDealsRepository(apiClient: apiClient);
+    final cacheService = ref.watch(cacheServiceProvider);
+    return LocationDealsRepository(apiClient: apiClient, cacheService: cacheService);
   } catch (_) {
     return LocationDealsRepository(
       apiClient: ApiClient(secureStorage: SecureStorageService()),
@@ -160,7 +162,7 @@ class LocationDealsController extends StateNotifier<LocationDealsState> {
   }
 
   /// Load physical grocery shops near current location
-  Future<void> loadNearbyShops() async {
+  Future<void> loadNearbyShops({bool forceRefresh = false}) async {
     if (!state.location.isResolved) {
       state = state.copyWith(nearbyShops: const [], isLoading: false);
       return;
@@ -172,6 +174,7 @@ class LocationDealsController extends StateNotifier<LocationDealsState> {
         latitude: state.location.latitude,
         longitude: state.location.longitude,
         radiusKm: state.radiusKm,
+        forceRefresh: forceRefresh,
       );
 
       state = state.copyWith(

@@ -12,6 +12,12 @@ class TanglishNormalizer {
     if (word.isEmpty) return word;
     String clean = word.trim();
 
+    // Preserve core verbs
+    final lower = clean.toLowerCase();
+    if (lower == 'irukku' || lower == 'iruku' || lower == 'irukka') {
+      return clean;
+    }
+
     // Strip hyphenated postpositions
     clean = clean.replaceAll(
       RegExp(r'-(?:la|ula|le|ule|ah|a|ai|oda|kku|ukku|ku|lerundhu|irundhu)$', caseSensitive: false),

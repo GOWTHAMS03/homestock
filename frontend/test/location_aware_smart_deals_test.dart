@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:homestock/features/smart_shopping/location_deals_controller.dart';
 import 'package:homestock/features/smart_shopping/location_deals_models.dart';
@@ -13,6 +12,7 @@ class FakeLocationDealsRepository extends Fake implements LocationDealsRepositor
     required double latitude,
     required double longitude,
     double radiusKm = 5.0,
+    bool forceRefresh = false,
   }) async {
     return [
       const NearbyShop(

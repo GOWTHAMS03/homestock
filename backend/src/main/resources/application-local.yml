@@ -3,16 +3,16 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/homestock}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:admin1234}
-    driver-class-name: org.postgresql.Driver
+    driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: false
+      ddl-auto: ${JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${HIBERNATE_FORMAT_SQL:true}
 
 logging:
   level:
-    com.homestock: DEBUG
-    org.springframework.security: INFO
+    com.homestock: ${LOGGING_LEVEL_HOMESTOCK:DEBUG}
+    org.springframework.security: ${LOGGING_LEVEL_SECURITY:INFO}

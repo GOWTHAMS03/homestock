@@ -160,10 +160,17 @@ public class VoiceCommandParser {
                     .build();
         }
 
-        // 10. Search Inventory ("Show rice", "Find oil", "Search for ...")
-        if (matchesAny(lower, "show", "find", "search", "thedu", "engae") && !matchesAny(lower, "shopping list", "add")) {
+        // 10. Search Deals / Products ("Deals for rice", "Offers on cooking oil", "Where to buy sugar", "Deals")
+        if (matchesAny(lower, "deal", "deals", "offer", "offers", "discount", "discounts", "rate", "vilai", "where to buy") && !matchesAny(lower, "shopping list", "add")) {
             VoiceEntities entities = extractEntities(lower);
-            return buildResult(transcript, VoiceIntent.SEARCH_INVENTORY, 0.90, entities, false,
+            return buildResult(transcript, VoiceIntent.SEARCH_PRODUCT, 0.92, entities, false,
+                    "Searching deals for " + entities.getItemName() + "...");
+        }
+
+        // 11. Search Inventory ("Show rice", "Find oil", "Search for ...", "thedu", "thedunga", "kaatu", "தேடு", "காட்டு")
+        if (matchesAny(lower, "show", "find", "search", "thedu", "thedunga", "thedungoo", "enga", "engae", "kaatu", "தேடு", "காட்டு", "எங்கே") && !matchesAny(lower, "shopping list", "add", "remove", "delete")) {
+            VoiceEntities entities = extractEntities(lower);
+            return buildResult(transcript, VoiceIntent.SEARCH_INVENTORY, 0.92, entities, false,
                     "Searching inventory for " + entities.getItemName() + "...");
         }
 
@@ -254,7 +261,8 @@ public class VoiceCommandParser {
         // Extract Item Name by filtering out common stop words, units, numbers, and command phrases
         String itemCandidate = clean;
         // Strip common voice command markers
-        itemCandidate = itemCandidate.replaceAll("(?i)\\b(add|put|buy|remove|delete|used|stock|in|out|quantity|shopping|list|la|podu|pannu|irukku|irukka|theendhuduchu|vaanganum|eduthachu|bought|update|set|to|from|for|me|please|show|find|search|cheapest|price|where)\\b", " ");
+        itemCandidate = itemCandidate.replaceAll("(?i)\\b(add|put|buy|remove|delete|used|stock|in|out|quantity|shopping|list|la|podu|pannu|irukku|irukka|theendhuduchu|vaanganum|eduthachu|bought|update|set|to|from|for|me|please|show|find|search|cheapest|price|where|thedu|thedunga|thedungoo|engae|enga|kaatu|deals?|offers?)\\b", " ");
+        itemCandidate = itemCandidate.replaceAll("[தேடுகாட்டுஎங்கே]+", " ");
         // Strip units
         itemCandidate = itemCandidate.replaceAll("(?i)\\b(kg|kgs|kilo|litre|litres|liter|liters|litru|ml|g|gm|packet|packets|pack|packs|bottle|bottles|can|box|pieces?|pcs)\\b", " ");
         // Strip digits

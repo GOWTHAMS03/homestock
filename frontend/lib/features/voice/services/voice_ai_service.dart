@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -141,9 +140,11 @@ class VoiceAiService {
     if (result.disambiguationOptions.isNotEmpty) return false;
     if (result.intent == VoiceIntentType.clearShoppingList) return false;
 
-    // Adding items to shopping list is safe and should auto-execute immediately
-    if (result.intent == VoiceIntentType.addShoppingItem) {
-      return result.intentConfidence >= 0.80;
+    // Adding items to shopping list and search operations are safe and should auto-execute immediately
+    if (result.intent == VoiceIntentType.addShoppingItem ||
+        result.intent == VoiceIntentType.searchInventory ||
+        result.intent == VoiceIntentType.searchProduct) {
+      return result.intentConfidence >= 0.70;
     }
 
     // Dual confidence criteria for inventory and other modifications

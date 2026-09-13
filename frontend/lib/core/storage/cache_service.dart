@@ -156,4 +156,20 @@ class CacheService {
     } catch (_) {}
     return null;
   }
+
+  // Nearby Grocery Shops Offline Cache
+  Future<void> cacheNearbyShops(String key, List<Map<String, dynamic>> shopsJson) async {
+    await set('nearby_shops_$key', jsonEncode(shopsJson));
+  }
+
+  List<Map<String, dynamic>>? getCachedNearbyShops(String key) {
+    try {
+      final data = get('nearby_shops_$key');
+      if (data is String && data.isNotEmpty) {
+        final list = jsonDecode(data) as List;
+        return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    return null;
+  }
 }

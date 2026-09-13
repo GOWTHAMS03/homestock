@@ -14,7 +14,8 @@ import java.math.BigDecimal;
         @Index(name = "idx_ns_coords", columnList = "latitude, longitude"),
         @Index(name = "idx_ns_city", columnList = "city"),
         @Index(name = "idx_ns_postal_code", columnList = "postal_code"),
-        @Index(name = "idx_ns_shop_type", columnList = "shop_type")
+        @Index(name = "idx_ns_shop_type", columnList = "shop_type"),
+        @Index(name = "idx_ns_osmid", columnList = "osm_id")
 })
 @Getter
 @Setter
@@ -22,6 +23,9 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NearbyShop extends BaseEntity {
+
+    @Column(name = "osm_id", length = 60)
+    private String osmId;
 
     @Column(name = "name", nullable = false, length = 150)
     private String name;
@@ -55,7 +59,7 @@ public class NearbyShop extends BaseEntity {
     @Column(name = "geohash", length = 12)
     private String geohash;
 
-    @Column(name = "phone", length = 30)
+    @Column(name = "phone", length = 50)
     private String phone;
 
     @Builder.Default

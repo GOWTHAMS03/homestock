@@ -92,6 +92,8 @@ class CommandValidator {
         command.intent == VoiceIntentType.getExpiringItems ||
         command.intent == VoiceIntentType.getItemStatus ||
         command.intent == VoiceIntentType.whatDoINeed ||
+        command.intent == VoiceIntentType.searchInventory ||
+        command.intent == VoiceIntentType.searchProduct ||
         command.intent == VoiceIntentType.smartPriceCheck) {
       return CommandValidationResult.autoExecute();
     }

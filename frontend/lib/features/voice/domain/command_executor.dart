@@ -130,6 +130,12 @@ class CommandExecutor {
             isOffline: command.isOffline,
           );
 
+        case VoiceIntentType.searchInventory:
+          return await _executeSearchInventory(command, homeId);
+
+        case VoiceIntentType.searchProduct:
+          return await _executeSearchProduct(command, homeId);
+
         case VoiceIntentType.smartPriceCheck:
           return CommandExecutionResult.success(
             operationId: command.operationId,
@@ -623,6 +629,56 @@ class CommandExecutor {
       intent: command.intent,
       message: '✓ ${expiring.length} items expiring soon: $names',
       navigationRoute: '/inventory',
+      isOffline: command.isOffline,
+    );
+  }
+
+  Future<CommandExecutionResult> _executeSearchInventory(
+    NormalizedVoiceCommand command,
+    String homeId,
+  ) async {
+    final items = await _inventoryRepo.getItems(homeId);
+    final targetName = (command.productName ?? command.productQuery).toLowerCase().trim();
+
+    final matchingItems = items.cast<dynamic>().where(
+      (i) => i.name.toLowerCase().contains(targetName) ||
+             targetName.contains(i.name.toLowerCase()) ||
+             (i.categoryName != null && i.categoryName.toLowerCase().contains(targetName)),
+    ).toList();
+
+    if (matchingItems.isNotEmpty) {
+      final names = matchingItems.take(3).map((i) => '${i.name} (${_formatQty(i.quantity)} ${i.unit})').join(', ');
+      final more = matchingItems.length > 3 ? ' and ${matchingItems.length - 3} more' : '';
+      return CommandExecutionResult.success(
+        operationId: command.operationId,
+        intent: command.intent,
+        message: '✓ Found ${matchingItems.length} matching items: $names$more',
+        affectedItemName: matchingItems.first.name,
+        navigationRoute: '/inventory',
+        isOffline: command.isOffline,
+      );
+    } else {
+      return CommandExecutionResult.success(
+        operationId: command.operationId,
+        intent: command.intent,
+        message: 'No items matching "${command.productName ?? targetName}" in your inventory.',
+        navigationRoute: '/inventory',
+        isOffline: command.isOffline,
+      );
+    }
+  }
+
+  Future<CommandExecutionResult> _executeSearchProduct(
+    NormalizedVoiceCommand command,
+    String homeId,
+  ) async {
+    final query = command.productName ?? command.productQuery;
+    return CommandExecutionResult.success(
+      operationId: command.operationId,
+      intent: command.intent,
+      message: '✓ Searching deals for "$query"...',
+      affectedItemName: query,
+      navigationRoute: '/smart-shopping',
       isOffline: command.isOffline,
     );
   }

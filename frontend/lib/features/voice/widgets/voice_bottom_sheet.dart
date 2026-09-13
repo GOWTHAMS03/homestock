@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../controllers/voice_controller.dart';
@@ -9,14 +8,32 @@ import '../data/speech/offline_model_manager.dart';
 import '../models/voice_models.dart';
 import 'voice_model_settings.dart';
 import 'voice_settings_dialog.dart';
-import 'voice_command_sheet.dart';
 
 class VoiceBottomSheet extends ConsumerStatefulWidget {
-  const VoiceBottomSheet({super.key});
+  final ValueChanged<String>? onSearchQuery;
+  final ValueChanged<VoiceCommandResult>? onCommandResult;
 
-  static Future<void> show(BuildContext context) {
-    // Directly launch Gemini Voice AI sheet with zero offline model download requirements
-    return VoiceCommandSheet.show(context);
+  const VoiceBottomSheet({
+    super.key,
+    this.onSearchQuery,
+    this.onCommandResult,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    ValueChanged<String>? onSearchQuery,
+    ValueChanged<VoiceCommandResult>? onCommandResult,
+  }) {
+    HapticFeedback.lightImpact();
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => VoiceBottomSheet(
+        onSearchQuery: onSearchQuery,
+        onCommandResult: onCommandResult,
+      ),
+    );
   }
 
   @override
@@ -63,10 +80,34 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
     final voiceState = ref.watch(voiceControllerProvider);
     final theme = Theme.of(context);
 
-    // Haptic feedback on success (manual close, no auto-dismiss)
+    // Haptic feedback and callbacks on success
     ref.listen<VoiceState>(voiceControllerProvider, (previous, next) {
       if (next.status == VoiceStatus.success && previous?.status != VoiceStatus.success) {
         HapticFeedback.mediumImpact();
+        if (widget.onCommandResult != null && next.commandResult != null) {
+          widget.onCommandResult!(next.commandResult!);
+        }
+        if (widget.onSearchQuery != null) {
+          final q = next.normalizedCommand?.productName ??
+              next.commandResult?.entities?.itemName ??
+              next.transcript;
+          if (q.trim().isNotEmpty) {
+            widget.onSearchQuery!(q.trim());
+          }
+        }
+      } else if (next.status == VoiceStatus.parsed && previous?.status != VoiceStatus.parsed) {
+        final isSearch = next.normalizedCommand?.intent == VoiceIntentType.searchInventory ||
+            next.normalizedCommand?.intent == VoiceIntentType.searchProduct ||
+            next.commandResult?.intent == VoiceIntentType.searchInventory ||
+            next.commandResult?.intent == VoiceIntentType.searchProduct;
+        if (widget.onSearchQuery != null && isSearch) {
+          final q = next.normalizedCommand?.productName ??
+              next.commandResult?.entities?.itemName ??
+              next.transcript;
+          if (q.trim().isNotEmpty) {
+            widget.onSearchQuery!(q.trim());
+          }
+        }
       }
     });
 
@@ -867,6 +908,7 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
         color = Colors.deepOrange;
         break;
       case VoiceIntentType.searchInventory:
+      case VoiceIntentType.searchProduct:
       case VoiceIntentType.getItemStatus:
         icon = Icons.search;
         color = Colors.blue;
@@ -927,6 +969,33 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
             color: AppColors.textSecondary,
           ),
         ),
+        if (widget.onSearchQuery != null ||
+            state.normalizedCommand?.intent == VoiceIntentType.searchInventory ||
+            state.normalizedCommand?.intent == VoiceIntentType.searchProduct) ...[
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final q = state.normalizedCommand?.productName ??
+                    state.commandResult?.entities?.itemName ??
+                    state.transcript;
+                if (widget.onSearchQuery != null && q.trim().isNotEmpty) {
+                  widget.onSearchQuery!(q.trim());
+                }
+                Navigator.of(context).pop();
+              },
+              icon: const Icon(Icons.search_rounded, size: 18),
+              label: Text('Apply "${state.normalizedCommand?.productName ?? state.transcript}" to Search'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 28),
       ],
     );
