@@ -32,7 +32,7 @@ import java.util.*;
  * Dedicated REST Controller for Real-Time & Location-Aware Smart Deals.
  */
 @RestController
-@RequestMapping("/api/v1/deals")
+@RequestMapping({"/api/v1/deals", "/api/v1/api/v1/deals"})
 @RequiredArgsConstructor
 @Tag(name = "Deals Engine", description = "Real-time location-aware smart deals, nearby shops, and basket optimization")
 public class DealEngineController {

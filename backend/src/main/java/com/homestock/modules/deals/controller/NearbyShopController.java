@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/shops")
+@RequestMapping({"/api/v1/shops", "/api/v1/api/v1/shops"})
 @RequiredArgsConstructor
 @Tag(name = "Nearby Shops", description = "Discovery and catalog intelligence for physical grocery stores")
 public class NearbyShopController {

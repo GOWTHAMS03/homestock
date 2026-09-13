@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/location")
+@RequestMapping({"/api/v1/location", "/api/v1/api/v1/location"})
 @RequiredArgsConstructor
 @Tag(name = "Location Intelligence", description = "Privacy-first user location preferences and manual fallback search")
 public class DealLocationController {
