@@ -91,9 +91,11 @@ public class VoiceCommandParser {
                     "Mark " + name + " as bought and restock inventory?");
         }
 
-        // 7. Stock Out / Consumption ("Used 500 ml oil", "500 ml oil use panniten", "theendhuduchu", "kaali aayiduchu", "consumed")
-        if (matchesAny(lower, "used", "consumed", "use panniten", "theendhuduchu", "theendhiduchu", "theerndhuduchu", "theerndhiduchu", "theernthuduchu", "theernthiduchu", "theerndhadhu", "kaali aayiduchu", "finish aayiduchu", "mudinjuruchu", "stock out")) {
+        // 7. Stock Out / Consumption ("Used 500 ml oil", "remove 2 kg rice", "500 ml oil use panniten", "theendhuduchu", "kaali aayiduchu", "consumed")
+        if (matchesAny(lower, "used", "consumed", "use panniten", "theendhuduchu", "theendhiduchu", "theerndhuduchu", "theerndhiduchu", "theernthuduchu", "theernthiduchu", "theerndhadhu", "kaali aayiduchu", "finish aayiduchu", "mudinjuruchu", "stock out")
+                || (matchesAny(lower, "remove", "deduct", "take out") && !matchesAny(lower, "shopping list", "shopping", "list la"))) {
             VoiceEntities entities = extractEntities(lower);
+            entities.setAction("REMOVE");
             resolveItemMatching(homeId, entities);
 
             ProductMatcher.MatchResult match = productMatcher.matchProduct(homeId, entities.getItemName());
@@ -103,6 +105,7 @@ public class VoiceCommandParser {
                         .transcript(transcript)
                         .intent(VoiceIntent.STOCK_OUT)
                         .confidence(0.75)
+                        .action("REMOVE")
                         .entities(entities)
                         .requiresConfirmation(true)
                         .message("Which " + entities.getItemName() + " did you use?")
@@ -110,31 +113,30 @@ public class VoiceCommandParser {
                         .build();
             }
 
-            String qtyStr = entities.getQuantity() != null ? (entities.getQuantity() + " " + entities.getUnit()) : "some";
+            String qtyStr = entities.getQuantity() != null ? (entities.getQuantity().stripTrailingZeros().toPlainString() + " " + entities.getUnit()) : "some";
             String itemName = entities.getMatchedInventoryItemName() != null ? entities.getMatchedInventoryItemName() : entities.getItemName();
             return buildResult(transcript, VoiceIntent.STOCK_OUT, 0.93, entities, true,
                     "Deduct " + qtyStr + " " + itemName + " from inventory?");
         }
 
-        // 8. Stock In / Direct Addition ("Bought 2 litre oil", "Added 5 kg rice", "stock in")
-        if (matchesAny(lower, "bought", "purchased", "stock in", "restock", "vanthurukku", "vaanginen")
-                && !matchesAny(lower, "shopping list")) {
-            VoiceEntities entities = extractEntities(lower);
-            resolveItemMatching(homeId, entities);
-            String qtyStr = entities.getQuantity() != null ? (entities.getQuantity() + " " + entities.getUnit()) : "1 PCS";
-            String itemName = entities.getMatchedInventoryItemName() != null ? entities.getMatchedInventoryItemName() : entities.getItemName();
-            return buildResult(transcript, VoiceIntent.STOCK_IN, 0.92, entities, true,
-                    "Add " + qtyStr + " " + itemName + " to inventory stock?");
-        }
+        // 8. Update / Set Stock ("set rice to 10 kg", "set stock to 200 kg", "Rice stock 5 kg", "Cooking oil quantity 500 ml ah update pannu")
+        boolean isExplicitSet = lower.startsWith("set ") || lower.contains("set to ") || matchesAny(lower, "set stock", "stock set");
+        boolean isStockUpdate = matchesAny(lower, "stock", "quantity", "alavu") && matchesAny(lower, "update", "set", "mathu", "irukku");
 
-        // 9. Update Stock ("Rice stock 5 kg", "Cooking oil quantity 500 ml ah update pannu")
-        if (matchesAny(lower, "stock", "quantity", "alavu") && matchesAny(lower, "update", "set", "mathu", "irukku")) {
+        if (isExplicitSet || isStockUpdate) {
             VoiceEntities entities = extractEntities(lower);
+            entities.setAction("SET");
             resolveItemMatching(homeId, entities);
-            String qtyStr = entities.getQuantity() != null ? (entities.getQuantity() + " " + entities.getUnit()) : "5";
+            String qtyStr = entities.getQuantity() != null ? (entities.getQuantity().stripTrailingZeros().toPlainString() + " " + entities.getUnit()) : "5";
             String itemName = entities.getMatchedInventoryItemName() != null ? entities.getMatchedInventoryItemName() : entities.getItemName();
 
-            // Provide options for Set vs Add ambiguity
+            if (isExplicitSet) {
+                // User explicitly said SET - do not confuse with ADD
+                return buildResult(transcript, VoiceIntent.UPDATE_STOCK, 0.95, entities, true,
+                        "Set " + itemName + " stock to " + qtyStr + "?");
+            }
+
+            // Ambiguous ("Rice stock 5 kg") -> Provide options for Set vs Add ambiguity
             List<DisambiguationOption> disambiguation = new ArrayList<>();
             disambiguation.add(DisambiguationOption.builder()
                     .id("SET")
@@ -153,11 +155,28 @@ public class VoiceCommandParser {
                     .transcript(transcript)
                     .intent(VoiceIntent.UPDATE_STOCK)
                     .confidence(0.88)
+                    .action("SET")
                     .entities(entities)
                     .requiresConfirmation(true)
                     .message("Update stock for " + itemName + " to " + qtyStr + " or add it?")
                     .disambiguationOptions(disambiguation)
                     .build();
+        }
+
+        // 9. Stock In / Direct Addition to Inventory ("Bought 2 litre oil", "Added 5 kg rice", "add 200 kg rice", "add 2 kg rice")
+        boolean isExplicitInventoryAdd = matchesAny(lower, "inventory", "pantry", "stock in", "restock", "bought", "purchased", "vanthurukku", "vaanginen")
+                && !matchesAny(lower, "shopping list", "shopping", "list la");
+        boolean isGeneralAddWithoutShopping = (lower.startsWith("add ") || lower.contains(" add "))
+                && !matchesAny(lower, "shopping list", "shopping", "list la", "list-la");
+
+        if (isExplicitInventoryAdd || isGeneralAddWithoutShopping) {
+            VoiceEntities entities = extractEntities(lower);
+            entities.setAction("ADD");
+            resolveItemMatching(homeId, entities);
+            String qtyStr = entities.getQuantity() != null ? (entities.getQuantity().stripTrailingZeros().toPlainString() + " " + entities.getUnit()) : "1 PCS";
+            String itemName = entities.getMatchedInventoryItemName() != null ? entities.getMatchedInventoryItemName() : entities.getItemName();
+            return buildResult(transcript, VoiceIntent.STOCK_IN, 0.92, entities, true,
+                    "Add " + qtyStr + " " + itemName + " to inventory stock?");
         }
 
         // 10. Search Deals / Products ("Deals for rice", "Offers on cooking oil", "Where to buy sugar", "Deals")
@@ -167,16 +186,17 @@ public class VoiceCommandParser {
                     "Searching deals for " + entities.getItemName() + "...");
         }
 
-        // 11. Search Inventory ("Show rice", "Find oil", "Search for ...", "thedu", "thedunga", "kaatu", "தேடு", "காட்டு")
+        // 11. Search Inventory ("Show rice", "Find oil", "Search for ...", "thedu", "thedunga", "kaatu", "தேடு", "காட்டு", "எங்கே") && !matchesAny(lower, "shopping list", "add", "remove", "delete")) {
         if (matchesAny(lower, "show", "find", "search", "thedu", "thedunga", "thedungoo", "enga", "engae", "kaatu", "தேடு", "காட்டு", "எங்கே") && !matchesAny(lower, "shopping list", "add", "remove", "delete")) {
             VoiceEntities entities = extractEntities(lower);
             return buildResult(transcript, VoiceIntent.SEARCH_INVENTORY, 0.92, entities, false,
                     "Searching inventory for " + entities.getItemName() + "...");
         }
 
-        // 11. Add to Shopping List (Default and most frequent action)
+        // 12. Add to Shopping List (Default and most frequent action)
         // Matches "Add ... to shopping list", "... shopping list la add pannu", "shopping list la ... podu", "buy ..."
         VoiceEntities entities = extractEntities(lower);
+        entities.setAction("ADD");
         resolveItemMatching(homeId, entities);
 
         ProductMatcher.MatchResult match = productMatcher.matchProduct(homeId, entities.getItemName());
@@ -186,6 +206,7 @@ public class VoiceCommandParser {
                     .transcript(transcript)
                     .intent(VoiceIntent.ADD_SHOPPING_ITEM)
                     .confidence(0.85)
+                    .action("ADD")
                     .entities(entities)
                     .requiresConfirmation(true)
                     .message("Which " + entities.getItemName() + " would you like to add?")
@@ -263,8 +284,8 @@ public class VoiceCommandParser {
         // Strip common voice command markers
         itemCandidate = itemCandidate.replaceAll("(?i)\\b(add|put|buy|remove|delete|used|stock|in|out|quantity|shopping|list|la|podu|pannu|irukku|irukka|theendhuduchu|vaanganum|eduthachu|bought|update|set|to|from|for|me|please|show|find|search|cheapest|price|where|thedu|thedunga|thedungoo|engae|enga|kaatu|deals?|offers?)\\b", " ");
         itemCandidate = itemCandidate.replaceAll("[தேடுகாட்டுஎங்கே]+", " ");
-        // Strip units
-        itemCandidate = itemCandidate.replaceAll("(?i)\\b(kg|kgs|kilo|litre|litres|liter|liters|litru|ml|g|gm|packet|packets|pack|packs|bottle|bottles|can|box|pieces?|pcs)\\b", " ");
+        // Strip units (both abbreviations and full words)
+        itemCandidate = itemCandidate.replaceAll("(?i)\\b(kg|kgs|kilo|kilos|kilograms?|litre|litres|liter|liters|litru|ml|mls|millilitres?|milliliters?|g|gm|gms|grams?|packet|packets|pack|packs|bottle|bottles|can|cans|box|boxes|pieces?|pcs)\\b", " ");
         // Strip digits
         itemCandidate = itemCandidate.replaceAll("\\b\\d+(\\.\\d+)?\\b", " ");
         // Strip number words
@@ -296,11 +317,26 @@ public class VoiceCommandParser {
     }
 
     private VoiceCommandResult buildResult(String transcript, VoiceIntent intent, double confidence, VoiceEntities entities, boolean requiresConfirmation, String message) {
+        String action = "ADD";
+        if (entities != null && entities.getAction() != null) {
+            action = entities.getAction();
+        } else if (intent != null) {
+            action = switch (intent) {
+                case STOCK_OUT, REMOVE_INVENTORY_ITEM, REMOVE_SHOPPING_ITEM -> "REMOVE";
+                case UPDATE_STOCK, UPDATE_INVENTORY_ITEM -> "SET";
+                default -> "ADD";
+            };
+        }
+        if (entities != null && entities.getAction() == null) {
+            entities.setAction(action);
+        }
+
         return VoiceCommandResult.builder()
                 .transcript(transcript)
                 .intent(intent)
                 .confidence(confidence)
-                .entities(entities != null ? entities : VoiceEntities.builder().build())
+                .action(action)
+                .entities(entities != null ? entities : VoiceEntities.builder().action(action).build())
                 .requiresConfirmation(requiresConfirmation)
                 .message(message)
                 .disambiguationOptions(new ArrayList<>())

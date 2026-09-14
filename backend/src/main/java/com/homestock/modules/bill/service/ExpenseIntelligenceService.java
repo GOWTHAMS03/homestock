@@ -55,13 +55,25 @@ public class ExpenseIntelligenceService {
         // 1. Fetch all Confirmed PurchasedBills in Period
         List<PurchasedBill> scannedBills = billRepository.findBillsInPeriod(homeId, startDate, endDate);
         List<MonthlyBillSummaryDto> monthlyBills = new ArrayList<>();
+        Set<UUID> scannedBillIds = new HashSet<>();
         Set<String> matchedPurchaseIdentifiers = new HashSet<>();
+        Set<String> scannedBillRefPrefixes = new HashSet<>();
 
         for (PurchasedBill b : scannedBills) {
+            scannedBillIds.add(b.getId());
+            scannedBillRefPrefixes.add(b.getId().toString().toLowerCase());
+            scannedBillRefPrefixes.add("rec-" + b.getId().toString().substring(0, Math.min(8, b.getId().toString().length())).toLowerCase());
+
             List<PurchasedBillItem> items = billItemRepository.findByBillId(b.getId());
             List<BillItemSummaryDto> itemSummaries = new ArrayList<>();
             for (PurchasedBillItem item : items) {
-                String cat = "Groceries";
+                String cleanItemName = (item.getNormalizedItemName() != null && !item.getNormalizedItemName().isBlank())
+                        ? item.getNormalizedItemName()
+                        : ((item.getRawItemName() != null && !item.getRawItemName().isBlank())
+                                ? item.getRawItemName()
+                                : (item.getProduct() != null ? item.getProduct().getName() : "Item"));
+
+                String cat = null;
                 if (item.getInventoryItem() != null && item.getInventoryItem().getCategory() != null) {
                     cat = item.getInventoryItem().getCategory().getName();
                 } else if (item.getProduct() != null) {
@@ -72,9 +84,13 @@ public class ExpenseIntelligenceService {
                     }
                 }
 
+                if (cat == null || cat.isBlank() || "Groceries".equalsIgnoreCase(cat)) {
+                    cat = com.homestock.modules.bill.matching.ProductMatchingEngine.inferCategory(cleanItemName);
+                }
+
                 itemSummaries.add(BillItemSummaryDto.builder()
                         .id(item.getId())
-                        .itemName(item.getNormalizedItemName() != null ? item.getNormalizedItemName() : item.getRawItemName())
+                        .itemName(cleanItemName)
                         .quantity(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ONE)
                         .unit(item.getUnit() != null ? item.getUnit() : "pcs")
                         .unitPrice(item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO)
@@ -111,23 +127,63 @@ public class ExpenseIntelligenceService {
             boolean isDuplicateOfScannedBill = false;
             String notes = p.getNotes() != null ? p.getNotes().toLowerCase() : "";
 
-            // Check 1: Bill Number in purchase notes
-            if (!notes.isBlank()) {
+            // Check 0: Explicit [BILL:<uuid>] tag
+            if (notes.contains("[bill:")) {
+                int start = notes.indexOf("[bill:") + 6;
+                int end = notes.indexOf("]", start);
+                if (end > start) {
+                    String billIdStr = notes.substring(start, end).trim();
+                    try {
+                        UUID billId = UUID.fromString(billIdStr);
+                        if (scannedBillIds.contains(billId)) {
+                            isDuplicateOfScannedBill = true;
+                        } else {
+                            Optional<PurchasedBill> optB = billRepository.findById(billId);
+                            if (optB.isPresent() && "CONFIRMED".equalsIgnoreCase(optB.get().getStatus())) {
+                                isDuplicateOfScannedBill = true;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            // Check 1: Bill Number or UUID reference prefix in purchase notes
+            if (!isDuplicateOfScannedBill && !notes.isBlank()) {
                 for (String billNum : matchedPurchaseIdentifiers) {
                     if (notes.contains(billNum)) {
                         isDuplicateOfScannedBill = true;
                         break;
                     }
                 }
+                if (!isDuplicateOfScannedBill) {
+                    for (String prefix : scannedBillRefPrefixes) {
+                        if (notes.contains(prefix)) {
+                            isDuplicateOfScannedBill = true;
+                            break;
+                        }
+                    }
+                }
             }
 
-            // Check 2: Note indicates generation from a bill and matches scanned bill by date and total
+            // Check 2: Note indicates generation from a bill and matches scanned bills by date and tolerance
             if (!isDuplicateOfScannedBill && notes.contains("generated from bill")) {
                 for (PurchasedBill b : scannedBills) {
-                    if (b.getBillDate() != null && b.getBillDate().equals(p.getPurchaseDate())
-                            && b.getTotalAmount() != null && b.getTotalAmount().compareTo(p.getTotalAmount()) == 0) {
+                    boolean dateMatches = b.getBillDate() != null && b.getBillDate().equals(p.getPurchaseDate());
+                    boolean amountMatches = b.getTotalAmount() != null && p.getTotalAmount() != null
+                            && b.getTotalAmount().subtract(p.getTotalAmount()).abs().compareTo(BigDecimal.valueOf(0.05)) < 0;
+                    if (dateMatches && amountMatches) {
                         isDuplicateOfScannedBill = true;
                         break;
+                    }
+                }
+
+                // If note explicitly says generated from bill and any scanned bill exists for the same date
+                if (!isDuplicateOfScannedBill && !scannedBills.isEmpty()) {
+                    for (PurchasedBill b : scannedBills) {
+                        if (b.getBillDate() != null && b.getBillDate().equals(p.getPurchaseDate())) {
+                            isDuplicateOfScannedBill = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -136,16 +192,20 @@ public class ExpenseIntelligenceService {
                 List<PurchaseItem> pItems = purchaseItemRepository.findAllByPurchaseId(p.getId());
                 List<BillItemSummaryDto> itemSummaries = new ArrayList<>();
                 for (PurchaseItem pi : pItems) {
-                    String cat = "Groceries";
+                    String cat = null;
                     if (pi.getCategory() != null) {
                         cat = pi.getCategory().getName();
                     } else if (pi.getInventoryItem() != null && pi.getInventoryItem().getCategory() != null) {
                         cat = pi.getInventoryItem().getCategory().getName();
                     }
 
+                    if (cat == null || cat.isBlank() || "Groceries".equalsIgnoreCase(cat)) {
+                        cat = com.homestock.modules.bill.matching.ProductMatchingEngine.inferCategory(pi.getItemName());
+                    }
+
                     itemSummaries.add(BillItemSummaryDto.builder()
                             .id(pi.getId())
-                            .itemName(pi.getItemName())
+                            .itemName(pi.getItemName() != null ? pi.getItemName() : "Item")
                             .quantity(pi.getQuantity() != null ? pi.getQuantity() : BigDecimal.ONE)
                             .unit(pi.getUnit() != null ? pi.getUnit() : "pcs")
                             .unitPrice(pi.getUnitPrice() != null ? pi.getUnitPrice() : BigDecimal.ZERO)

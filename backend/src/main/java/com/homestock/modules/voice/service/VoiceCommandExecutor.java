@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class VoiceCommandExecutor {
 
     private final ShoppingService shoppingService;
@@ -45,6 +44,44 @@ public class VoiceCommandExecutor {
     private final HomeSecurityService homeSecurityService;
     private final ProductResolutionService productResolutionService;
     private final com.homestock.modules.product.repository.ProductRepository productRepository;
+    private final UnitNormalizationService unitNormalizer;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public VoiceCommandExecutor(ShoppingService shoppingService,
+                                ShoppingListItemRepository shoppingListItemRepository,
+                                ShoppingListRepository shoppingListRepository,
+                                InventoryService inventoryService,
+                                InventoryItemRepository inventoryItemRepository,
+                                HomeRepository homeRepository,
+                                HomeSecurityService homeSecurityService,
+                                ProductResolutionService productResolutionService,
+                                com.homestock.modules.product.repository.ProductRepository productRepository,
+                                @org.springframework.beans.factory.annotation.Autowired(required = false) UnitNormalizationService unitNormalizer) {
+        this.shoppingService = shoppingService;
+        this.shoppingListItemRepository = shoppingListItemRepository;
+        this.shoppingListRepository = shoppingListRepository;
+        this.inventoryService = inventoryService;
+        this.inventoryItemRepository = inventoryItemRepository;
+        this.homeRepository = homeRepository;
+        this.homeSecurityService = homeSecurityService;
+        this.productResolutionService = productResolutionService;
+        this.productRepository = productRepository;
+        this.unitNormalizer = unitNormalizer != null ? unitNormalizer : new UnitNormalizationService();
+    }
+
+    public VoiceCommandExecutor(ShoppingService shoppingService,
+                                ShoppingListItemRepository shoppingListItemRepository,
+                                ShoppingListRepository shoppingListRepository,
+                                InventoryService inventoryService,
+                                InventoryItemRepository inventoryItemRepository,
+                                HomeRepository homeRepository,
+                                HomeSecurityService homeSecurityService,
+                                ProductResolutionService productResolutionService,
+                                com.homestock.modules.product.repository.ProductRepository productRepository) {
+        this(shoppingService, shoppingListItemRepository, shoppingListRepository, inventoryService,
+             inventoryItemRepository, homeRepository, homeSecurityService, productResolutionService,
+             productRepository, new UnitNormalizationService());
+    }
 
     @Transactional
     public ExecuteCommandResponse execute(ExecuteCommandRequest request) {
@@ -358,7 +395,20 @@ public class VoiceCommandExecutor {
                     .build();
         }
 
-        BigDecimal qtyChange = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
+        BigDecimal rawQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
+        String rawUnit = entities.getUnit() != null ? entities.getUnit() : item.getUnit();
+
+        if (!unitNormalizer.areCompatible(rawUnit, item.getUnit())) {
+            return ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(VoiceIntent.STOCK_IN)
+                    .message(String.format("Cannot add %s %s to %s (%s). Measurement types are incompatible.",
+                            rawQty.stripTrailingZeros().toPlainString(), rawUnit, item.getName(), item.getUnit()))
+                    .build();
+        }
+
+        BigDecimal qtyChange = unitNormalizer.convert(rawQty, rawUnit, item.getUnit());
+
         StockUpdateRequest stockReq = new StockUpdateRequest();
         stockReq.setTransactionType(TransactionType.STOCK_IN);
         stockReq.setQuantityChange(qtyChange);
@@ -392,7 +442,20 @@ public class VoiceCommandExecutor {
                     .build();
         }
 
-        BigDecimal qtyChange = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
+        BigDecimal rawQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
+        String rawUnit = entities.getUnit() != null ? entities.getUnit() : item.getUnit();
+
+        if (!unitNormalizer.areCompatible(rawUnit, item.getUnit())) {
+            return ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(VoiceIntent.STOCK_OUT)
+                    .message(String.format("Cannot deduct %s %s from %s (%s). Measurement types are incompatible.",
+                            rawQty.stripTrailingZeros().toPlainString(), rawUnit, item.getName(), item.getUnit()))
+                    .build();
+        }
+
+        BigDecimal qtyChange = unitNormalizer.convert(rawQty, rawUnit, item.getUnit());
+
         StockUpdateRequest stockReq = new StockUpdateRequest();
         stockReq.setTransactionType(TransactionType.STOCK_OUT);
         stockReq.setQuantityChange(qtyChange);
@@ -439,7 +502,20 @@ public class VoiceCommandExecutor {
                     .build();
         }
 
-        BigDecimal targetQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ZERO;
+        BigDecimal rawQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ZERO;
+        String rawUnit = entities.getUnit() != null ? entities.getUnit() : item.getUnit();
+
+        if (!unitNormalizer.areCompatible(rawUnit, item.getUnit())) {
+            return ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(VoiceIntent.UPDATE_STOCK)
+                    .message(String.format("Cannot set %s stock to %s %s. Configured unit is %s.",
+                            item.getName(), rawQty.stripTrailingZeros().toPlainString(), rawUnit, item.getUnit()))
+                    .build();
+        }
+
+        BigDecimal targetQty = unitNormalizer.convert(rawQty, rawUnit, item.getUnit());
+
         StockUpdateRequest stockReq = new StockUpdateRequest();
         stockReq.setTransactionType(TransactionType.ADJUSTMENT);
         stockReq.setQuantityChange(targetQty);
@@ -481,11 +557,23 @@ public class VoiceCommandExecutor {
                     .build();
         }
 
-        BigDecimal addQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
+        BigDecimal rawQty = entities.getQuantity() != null ? entities.getQuantity() : BigDecimal.ONE;
 
         // Check new or existing product
         InventoryItem existingItem = resolveInventoryItem(homeId, entities);
         if (existingItem != null) {
+            String rawUnit = entities.getUnit() != null ? entities.getUnit() : existingItem.getUnit();
+            if (!unitNormalizer.areCompatible(rawUnit, existingItem.getUnit())) {
+                return ExecuteCommandResponse.builder()
+                        .success(false)
+                        .intent(VoiceIntent.ADD_INVENTORY_ITEM)
+                        .message(String.format("Cannot add %s %s to %s (%s). Measurement types are incompatible.",
+                                rawQty.stripTrailingZeros().toPlainString(), rawUnit, existingItem.getName(), existingItem.getUnit()))
+                        .build();
+            }
+
+            BigDecimal addQty = unitNormalizer.convert(rawQty, rawUnit, existingItem.getUnit());
+
             // Existing product found -> update stock
             StockUpdateRequest stockReq = new StockUpdateRequest();
             stockReq.setTransactionType(TransactionType.STOCK_IN);

@@ -229,6 +229,13 @@ class _BillConfirmationScreenState extends ConsumerState<BillConfirmationScreen>
       if (res != null && mounted) {
         ref.read(inventoryControllerProvider.notifier).loadData();
         ref.read(shoppingControllerProvider.notifier).loadShoppingList();
+
+        // Refresh Expense Intelligence with the confirmed bill's year and month
+        final parsedDate = DateTime.tryParse(res.billDate) ?? DateTime.now();
+        ref.read(expenseIntelligenceControllerProvider.notifier).loadData(
+              year: parsedDate.year,
+              month: parsedDate.month,
+            );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF059669),

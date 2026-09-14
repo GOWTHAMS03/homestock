@@ -188,7 +188,11 @@ public class BillConfirmationService {
         bill.setConfirmedAt(Instant.now());
         billRepository.save(bill);
 
-        // 3. Create Permanent Purchase Record
+        // 3. Create Permanent Purchase Record with explicit [BILL:<uuid>] reference
+        String billRefNumber = (billNumber != null && !billNumber.isBlank() && !billNumber.equalsIgnoreCase("null"))
+                ? billNumber : "REC-" + bill.getId().toString().substring(0, 8).toUpperCase();
+        String purchaseNote = "Generated from Bill #" + billRefNumber + (shopName != null ? " at " + shopName : "") + " [BILL:" + bill.getId() + "]";
+
         Purchase purchase = Purchase.builder()
                 .home(home)
                 .store(store)
@@ -197,7 +201,7 @@ public class BillConfirmationService {
                 .totalAmount(totalAmount)
                 .currency(bill.getCurrency())
                 .receiptImageUrl(bill.getReceiptImageUrl())
-                .notes(sanitize("Generated from Bill #" + billNumber + (shopName != null ? " at " + shopName : "")))
+                .notes(sanitize(purchaseNote))
                 .items(new ArrayList<>())
                 .build();
         purchase = purchaseRepository.save(purchase);
@@ -289,6 +293,23 @@ public class BillConfirmationService {
                 }
             }
 
+            // Resolve Category for this line item
+            String targetCategoryName = (itemReq.getCategoryName() != null && !itemReq.getCategoryName().isBlank())
+                    ? itemReq.getCategoryName().trim()
+                    : ProductMatchingEngine.inferCategory(cleanName);
+
+            Category resolvedCategory = categoryRepository.findFirstByHomeIdOrGlobalAndNameIgnoreCase(homeId, targetCategoryName)
+                    .orElseGet(() -> {
+                        Category newCat = Category.builder()
+                                .home(home)
+                                .name(targetCategoryName)
+                                .icon("category")
+                                .colorHex("#6366F1")
+                                .displayOrder(50)
+                                .build();
+                        return categoryRepository.save(newCat);
+                    });
+
             // If not found in household inventory, create or link
             boolean isNewItem = false;
             if (inventoryItem == null) {
@@ -301,15 +322,10 @@ public class BillConfirmationService {
                                     .normalizedName(norm.normalizedName())
                                     .brand(itemReq.getBrand() != null ? itemReq.getBrand() : norm.detectedBrand())
                                     .unit(unit)
-                                    .categoryName(itemReq.getCategoryName() != null ? itemReq.getCategoryName() : "Food & Grocery")
+                                    .categoryName(targetCategoryName)
                                     .barcode(itemReq.getBarcode())
                                     .source("BILL_SCAN")
                                     .build()));
-                }
-
-                Category category = null;
-                if (itemReq.getCategoryName() != null) {
-                    category = categoryRepository.findByHomeIdAndNameIgnoreCase(homeId, itemReq.getCategoryName()).orElse(null);
                 }
 
                 inventoryItem = InventoryItem.builder()
@@ -317,7 +333,7 @@ public class BillConfirmationService {
                         .product(product)
                         .name(cleanName)
                         .brand(itemReq.getBrand() != null ? itemReq.getBrand() : norm.detectedBrand())
-                        .category(category)
+                        .category(resolvedCategory)
                         .quantity(BigDecimal.ZERO)
                         .unit(unit)
                         .minimumQuantity(BigDecimal.ONE)
@@ -326,6 +342,8 @@ public class BillConfirmationService {
                         .barcode(itemReq.getBarcode())
                         .build();
                 inventoryItem = inventoryItemRepository.save(inventoryItem);
+            } else if (inventoryItem.getCategory() == null && resolvedCategory != null) {
+                inventoryItem.setCategory(resolvedCategory);
             }
 
             // B. Increment Inventory Quantity with unit conversion & Record Transaction
@@ -438,7 +456,7 @@ public class BillConfirmationService {
                     .purchase(purchase)
                     .inventoryItem(savedInv)
                     .itemName(savedInv.getName())
-                    .category(savedInv.getCategory())
+                    .category(savedInv.getCategory() != null ? savedInv.getCategory() : resolvedCategory)
                     .quantity(qty)
                     .unit(unit)
                     .unitPrice(unitPrice)

@@ -26,4 +26,7 @@ public class VoiceEntities {
     // Matched HomeStock inventory linkage
     private UUID matchedInventoryItemId;
     private String matchedInventoryItemName;
+
+    // Action: "ADD", "REMOVE", "SET"
+    private String action;
 }

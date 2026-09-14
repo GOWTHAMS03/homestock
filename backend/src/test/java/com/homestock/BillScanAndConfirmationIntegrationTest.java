@@ -327,4 +327,96 @@ class BillScanAndConfirmationIntegrationTest {
                 inventoryItemRepository.findByIdAndHomeId(existingMilk.getId(), homeId).orElseThrow();
         assertEquals(0, new BigDecimal("1.500").compareTo(updatedMilk.getQuantity()));
     }
+
+    @Test
+    void testBillConfirmationDeduplicationAndCategoryAccuracy() {
+        UUID homeId = home.getId();
+
+        // 1. Scan a bill with no invoice number (null)
+        String receiptText = """
+                RELIANCE FRESH
+                DATE: 14/09/2026
+                ----------------------------------------
+                AMUL MILK 1L               2   30.00    60.00
+                FRESH RED TOMATO 1KG       1   40.00    40.00
+                AASHIRVAAD ATTA 5KG        1  250.00   250.00
+                ----------------------------------------
+                TOTAL:                                 350.00
+                """;
+
+        BillScanPreviewResponseDto preview = billScanService.scanBill(homeId, null, receiptText, currentUser);
+        assertNotNull(preview);
+        assertNotNull(preview.getBillId());
+
+        // 2. Confirm the bill with explicit categories and without bill number
+        ConfirmBillRequest confirmReq = ConfirmBillRequest.builder()
+                .billId(preview.getBillId())
+                .shopName("Reliance Fresh")
+                .billNumber(null) // No invoice number on receipt
+                .billDate(LocalDate.of(2026, 9, 14))
+                .totalAmount(new BigDecimal("350.00"))
+                .items(List.of(
+                        ConfirmBillItemRequest.builder()
+                                .rawItemName("AMUL MILK 1L")
+                                .productName("Amul Milk")
+                                .categoryName("Dairy")
+                                .quantity(new BigDecimal("2.0"))
+                                .unit("L")
+                                .unitPrice(new BigDecimal("30.00"))
+                                .finalPrice(new BigDecimal("60.00"))
+                                .build(),
+                        ConfirmBillItemRequest.builder()
+                                .rawItemName("FRESH RED TOMATO 1KG")
+                                .productName("Fresh Red Tomato")
+                                .categoryName("Produce")
+                                .quantity(new BigDecimal("1.0"))
+                                .unit("KG")
+                                .unitPrice(new BigDecimal("40.00"))
+                                .finalPrice(new BigDecimal("40.00"))
+                                .build(),
+                        ConfirmBillItemRequest.builder()
+                                .rawItemName("AASHIRVAAD ATTA 5KG")
+                                .productName("Aashirvaad Atta")
+                                .categoryName("Staples & Grains")
+                                .quantity(new BigDecimal("1.0"))
+                                .unit("KG")
+                                .unitPrice(new BigDecimal("250.00"))
+                                .finalPrice(new BigDecimal("250.00"))
+                                .build()
+                ))
+                .build();
+
+        BillResponseDto confirmed = billConfirmationService.confirmBill(homeId, preview.getBillId(), confirmReq, currentUser);
+        assertNotNull(confirmed);
+
+        // 3. Fetch Monthly Expense Report for September 2026
+        MonthlyExpenseReportDto monthly = expenseIntelligenceService.getMonthlyReport(homeId, 2026, 9);
+        assertNotNull(monthly);
+
+        // Verify total spend is EXACTLY 350.00 - NOT doubled to 700.00
+        assertEquals(0, new BigDecimal("350.00").compareTo(monthly.getTotalSpend()),
+                "Total spend must match bill total and must NOT be doubled");
+
+        // Verify bill count is exactly 1 - NOT duplicated to 2
+        assertEquals(1, monthly.getBillsCount(), "There should be exactly 1 bill, no duplicate household purchase");
+        assertEquals(1, monthly.getBills().size());
+        assertEquals("AI_SCANNED", monthly.getBills().get(0).getSource());
+
+        // Verify category breakdown has distinct categories and totals 350.00
+        List<CategoryExpenseDto> categories = monthly.getCategoryBreakdown();
+        assertFalse(categories.isEmpty());
+
+        BigDecimal categorySum = categories.stream()
+                .map(CategoryExpenseDto::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, new BigDecimal("350.00").compareTo(categorySum), "Sum of category breakdown must equal total spend");
+
+        boolean hasDairy = categories.stream().anyMatch(c -> c.getCategoryName().equalsIgnoreCase("Dairy"));
+        boolean hasProduce = categories.stream().anyMatch(c -> c.getCategoryName().equalsIgnoreCase("Produce"));
+        boolean hasStaples = categories.stream().anyMatch(c -> c.getCategoryName().toLowerCase().contains("staples") || c.getCategoryName().toLowerCase().contains("grain"));
+
+        assertTrue(hasDairy, "Should have Dairy category");
+        assertTrue(hasProduce, "Should have Produce category");
+        assertTrue(hasStaples, "Should have Staples category");
+    }
 }

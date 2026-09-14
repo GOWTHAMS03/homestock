@@ -61,6 +61,7 @@ class BillItemCandidateDto {
   final String? matchedInventoryItemId;
   final String? matchedShoppingListItemId;
   final String? matchedExistingProductName;
+  final String? categoryName;
   final bool isNewProductCandidate;
   final List<ExistingProductMatchDto> suggestedMatches;
 
@@ -81,6 +82,7 @@ class BillItemCandidateDto {
     this.matchedInventoryItemId,
     this.matchedShoppingListItemId,
     this.matchedExistingProductName,
+    this.categoryName,
     this.isNewProductCandidate = true,
     this.suggestedMatches = const [],
   });
@@ -108,6 +110,9 @@ class BillItemCandidateDto {
       matchedShoppingListItemId: json['matchedShoppingListItemId']?.toString(),
       matchedExistingProductName: json['matchedExistingProductName']?.toString() ??
           json['matchedProductName']?.toString(),
+      categoryName: json['categoryName']?.toString() ??
+          json['category']?.toString() ??
+          json['newProductCategory']?.toString(),
       isNewProductCandidate: (json['isNewProductCandidate'] as bool?) ?? (status == 'NEW_PRODUCT'),
       suggestedMatches: (json['suggestedMatches'] as List<dynamic>?)
               ?.map((e) => ExistingProductMatchDto.fromJson(e as Map<String, dynamic>))
@@ -133,6 +138,7 @@ class BillItemCandidateDto {
     String? matchedInventoryItemId,
     String? matchedShoppingListItemId,
     String? matchedExistingProductName,
+    String? categoryName,
     bool? isNewProductCandidate,
     List<ExistingProductMatchDto>? suggestedMatches,
   }) {
@@ -153,6 +159,7 @@ class BillItemCandidateDto {
       matchedInventoryItemId: matchedInventoryItemId ?? this.matchedInventoryItemId,
       matchedShoppingListItemId: matchedShoppingListItemId ?? this.matchedShoppingListItemId,
       matchedExistingProductName: matchedExistingProductName ?? this.matchedExistingProductName,
+      categoryName: categoryName ?? this.categoryName,
       isNewProductCandidate: isNewProductCandidate ?? this.isNewProductCandidate,
       suggestedMatches: suggestedMatches ?? this.suggestedMatches,
     );
@@ -211,6 +218,7 @@ class BillConfirmItemDto {
   final bool createNewProduct;
   final String? newProductName;
   final String? newProductCategory;
+  final String? categoryName;
   final double quantity;
   final String unit;
   final double? mrp;
@@ -227,6 +235,7 @@ class BillConfirmItemDto {
     this.createNewProduct = false,
     this.newProductName,
     this.newProductCategory,
+    this.categoryName,
     required this.quantity,
     this.unit = 'pcs',
     this.mrp,
@@ -243,7 +252,8 @@ class BillConfirmItemDto {
         'shoppingListItemId': shoppingListItemId,
         'createNewProduct': createNewProduct,
         'newProductName': newProductName,
-        'newProductCategory': newProductCategory,
+        'newProductCategory': newProductCategory ?? categoryName,
+        'categoryName': categoryName ?? newProductCategory,
         'quantity': quantity,
         'unit': unit,
         'mrp': mrp,

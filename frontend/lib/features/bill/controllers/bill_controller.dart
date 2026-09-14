@@ -275,6 +275,8 @@ class BillScannerController extends StateNotifier<BillScannerState> {
           shoppingListItemId: item.matchedShoppingListItemId,
           createNewProduct: item.isNewProductCandidate && item.matchedInventoryItemId == null && item.matchedProductId == null,
           newProductName: item.normalizedItemName,
+          categoryName: item.categoryName,
+          newProductCategory: item.categoryName,
           quantity: item.quantity,
           unit: item.unit,
           mrp: item.mrp,

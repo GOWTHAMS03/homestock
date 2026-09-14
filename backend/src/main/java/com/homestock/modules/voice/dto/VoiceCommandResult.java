@@ -37,4 +37,8 @@ public class VoiceCommandResult {
     private String executionStatus;
     private boolean needsQuantity;
     private boolean needsProduct;
+
+    // Quantity Confirmation & Action separation
+    private String action; // "ADD", "REMOVE", "SET"
+    private QuantityConfirmationInfo quantityConfirmation;
 }

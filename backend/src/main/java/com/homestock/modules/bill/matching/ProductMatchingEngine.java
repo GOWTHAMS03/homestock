@@ -105,7 +105,7 @@ public class ProductMatchingEngine {
                         .inventoryItemId(item.getId())
                         .productId(item.getProduct() != null ? item.getProduct().getId() : null)
                         .productName(item.getName())
-                        .category(item.getCategory() != null ? item.getCategory().getName() : "Food & Grocery")
+                        .category(item.getCategory() != null ? item.getCategory().getName() : inferCategory(item.getName()))
                         .currentStock(item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO)
                         .unit(item.getUnit())
                         .matchScore(BigDecimal.valueOf(sim).setScale(2, RoundingMode.HALF_UP))
@@ -134,7 +134,7 @@ public class ProductMatchingEngine {
                 .matchedProduct(null)
                 .resolvedName(formatCapitalized(scannedItem.getName()))
                 .resolvedBrand(brand)
-                .resolvedCategory("Food & Grocery")
+                .resolvedCategory(inferCategory(scannedItem.getName()))
                 .resolvedUnit(unit)
                 .resolvedQuantity(qty)
                 .resolvedUnitPrice(unitPrice)
@@ -308,7 +308,16 @@ public class ProductMatchingEngine {
     ) {
         String name = inv != null ? inv.getName() : (prod != null ? prod.getName() : formatCapitalized(scanned.getName()));
         String brand = inv != null ? inv.getBrand() : (prod != null ? prod.getBrand() : null);
-        String category = inv != null && inv.getCategory() != null ? inv.getCategory().getName() : "Food & Grocery";
+        String category;
+        if (inv != null && inv.getCategory() != null) {
+            category = inv.getCategory().getName();
+        } else if (prod != null && prod.getCategory() != null) {
+            category = prod.getCategory().getName();
+        } else if (prod != null && prod.getCategoryName() != null && !prod.getCategoryName().isBlank()) {
+            category = prod.getCategoryName();
+        } else {
+            category = inferCategory(name);
+        }
         String unit = inv != null ? inv.getUnit() : (prod != null ? prod.getUnit() : scanned.getUnit());
 
         return ProductMatchResult.builder()
@@ -326,6 +335,38 @@ public class ProductMatchingEngine {
                 .standardUnitPrice(standardPrice)
                 .suggestedMatches(suggestions != null ? suggestions : Collections.emptyList())
                 .build();
+    }
+
+    public static String inferCategory(String itemName) {
+        if (itemName == null || itemName.isBlank()) return "Pantry & Groceries";
+        String s = itemName.toUpperCase();
+
+        // Dairy
+        if (s.matches(".*\\b(MILK|CURD|PANEER|BUTTER|CHEESE|GHEE|YOGURT|CREAM|PAAL|VENNAI|THAYIR)\\b.*")) {
+            return "Dairy";
+        }
+        // Fresh Produce / Fruits & Vegetables
+        if (s.matches(".*\\b(TOMATO|ONION|POTATO|CARROT|BEANS|GARLIC|GINGER|CORIANDER|SPINACH|CABBAGE|CAULIFLOWER|BRINJAL|CHILLI|CHILI|APPLE|BANANA|MANGO|ORANGE|GRAPE|LEMON|PAPAYA|VEGETABLE|FRUIT|VENGAYAM|THAKKALI|VENDAKKAI|KEERAI)\\b.*")) {
+            return "Produce";
+        }
+        // Staples & Grains
+        if (s.matches(".*\\b(ATTA|RICE|WHEAT|FLOUR|MAIDA|DAL|DHAL|TOOR|MOONG|URAD|CHANA|OIL|SUGAR|SALT|RAVA|SOOJI|POORI|BESAN|MUSTARD|JEERA|CUMIN|PEPPER|TURMERIC|MASALA|SPICE)\\b.*")) {
+            return "Staples & Grains";
+        }
+        // Snacks & Beverages
+        if (s.matches(".*\\b(TEA|COFFEE|BISCUIT|COOKIES|CHIPS|CHOCOLATE|JUICE|SODA|COLA|MAGGI|NOODLES|PASTA|SNACK|NAMKEEN|RUSK|JAM)\\b.*")) {
+            return "Snacks & Beverages";
+        }
+        // Cleaning & Household
+        if (s.matches(".*\\b(SOAP|DETERGENT|SURF|VIM|DISHWASH|CLEANER|HARPIC|LIZOL|PHENYL|BROOM|TISSUE|SCRUB|WASHING|BLEACH)\\b.*")) {
+            return "Cleaning";
+        }
+        // Personal Care
+        if (s.matches(".*\\b(SHAMPOO|TOOTHPASTE|BRUSH|LOTION|CREAM|DEODORANT|POWDER|FACEWASH|SHAVING|DETTOL|BATH)\\b.*")) {
+            return "Personal Care";
+        }
+
+        return "Pantry & Groceries";
     }
 
     private String formatCapitalized(String str) {

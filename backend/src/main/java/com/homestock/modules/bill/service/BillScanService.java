@@ -482,6 +482,7 @@ public class BillScanService {
             previewItems.add(BillScanItemPreviewDto.builder()
                     .rawItemName(item.getName())
                     .matchedProductName(match.getResolvedName())
+                    .categoryName(match.getResolvedCategory())
                     .matchedProductId(match.getMatchedProduct() != null ? match.getMatchedProduct().getId() : null)
                     .matchedInventoryItemId(match.getMatchedInventoryItem() != null ? match.getMatchedInventoryItem().getId() : null)
                     .quantity(match.getResolvedQuantity())

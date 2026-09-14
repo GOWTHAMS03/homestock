@@ -25,6 +25,18 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(expenseIntelligenceControllerProvider.notifier).loadData();
+    });
+  }
+
+  Future<void> _openBillScanner() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const BillScannerScreen()),
+    );
+    if (mounted) {
+      ref.read(expenseIntelligenceControllerProvider.notifier).loadData();
+    }
   }
 
   @override
@@ -63,11 +75,7 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
         elevation: 4,
         icon: const Icon(Icons.document_scanner),
         label: const Text('Scan Bill', style: TextStyle(fontWeight: FontWeight.w700)),
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const BillScannerScreen()),
-          );
-        },
+        onPressed: _openBillScanner,
       ),
       body: state.isLoading
           ? _buildLoadingSkeleton()
@@ -415,13 +423,34 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
     );
   }
 
+  DateTime? _parseBillDateTime(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final clean = raw.trim();
+    final direct = DateTime.tryParse(clean);
+    if (direct != null) return direct;
+
+    final slashParts = clean.split(RegExp(r'[/.-]'));
+    if (slashParts.length == 3) {
+      final p1 = int.tryParse(slashParts[0]);
+      final p2 = int.tryParse(slashParts[1]);
+      final p3 = int.tryParse(slashParts[2]);
+      if (p1 != null && p2 != null && p3 != null) {
+        if (p3 > 1000) {
+          return DateTime(p3, p2, p1);
+        } else if (p1 > 1000) {
+          return DateTime(p1, p2, p3);
+        }
+      }
+    }
+    return null;
+  }
+
   List<MonthlyBillSummaryDto> _getFilteredBills(MonthlyExpenseReportDto? report, int year, int month) {
     if (report == null) return const [];
     return report.bills.where((b) {
-      if (b.billDate == null || b.billDate!.trim().isEmpty) return true;
-      final parsed = DateTime.tryParse(b.billDate!.trim());
-      if (parsed == null) return true;
-      return parsed.year == year && parsed.month == month;
+      final dt = _parseBillDateTime(b.billDate) ?? b.createdAt;
+      if (dt == null) return true;
+      return dt.year == year && dt.month == month;
     }).toList();
   }
 
@@ -906,11 +935,7 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
               ),
               icon: const Icon(Icons.document_scanner, size: 16),
               label: const Text('Scan a Bill', style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BillScannerScreen()),
-                );
-              },
+              onPressed: _openBillScanner,
             ),
           ],
         ),
@@ -2206,11 +2231,7 @@ class _ExpenseIntelligenceScreenState extends ConsumerState<ExpenseIntelligenceS
               ),
               icon: const Icon(Icons.document_scanner),
               label: const Text('Scan First Bill', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BillScannerScreen()),
-                );
-              },
+              onPressed: _openBillScanner,
             ),
           ],
         ),

@@ -51,7 +51,15 @@ public class VoiceService {
         if (transcript == null || transcript.isBlank()) {
             throw new BusinessRuleException("Transcript cannot be blank");
         }
-        return voiceCommandParser.parse(homeId, transcript.trim());
+        VoiceCommandResult result = voiceCommandParser.parse(homeId, transcript.trim());
+        var sanity = voiceCommandValidator.validateQuantitySanity(homeId, result);
+        if (sanity.isRequiresConfirmation() && sanity.getQuantityConfirmation() != null) {
+            result.setRequiresConfirmation(true);
+            result.setExecutionStatus("NEEDS_QUANTITY_CONFIRMATION");
+            result.setQuantityConfirmation(sanity.getQuantityConfirmation());
+            result.setMessage(sanity.getConfirmationPrompt());
+        }
+        return result;
     }
 
     public VoiceCommandResult processAudio(MultipartFile audioFile, String languageHint, UUID homeId) {
@@ -192,6 +200,20 @@ public class VoiceService {
     }
 
     public ExecuteCommandResponse executeWithAudit(ExecuteCommandRequest request) {
+        // Enforce quantity confirmation check
+        if (request.getCommandResult() != null
+                && request.getCommandResult().isRequiresConfirmation()
+                && !request.isConfirmed()) {
+            return ExecuteCommandResponse.builder()
+                    .success(false)
+                    .intent(request.getCommandResult().getIntent())
+                    .message(request.getCommandResult().getMessage() != null
+                            ? request.getCommandResult().getMessage()
+                            : "Please confirm before executing this command.")
+                    .executionStatus("NEEDS_CONFIRMATION")
+                    .build();
+        }
+
         String idemKey = request.getIdempotencyKey();
         if (idemKey != null && !idemKey.isBlank()) {
             Optional<ExecuteCommandResponse> cached = idempotencyService.getCachedResponse(idemKey);
@@ -243,6 +265,15 @@ public class VoiceService {
             intent = VoiceIntent.ADD_SHOPPING_ITEM;
         }
 
+        String action = "ADD";
+        if (intent != null) {
+            action = switch (intent) {
+                case STOCK_OUT, REMOVE_INVENTORY_ITEM, REMOVE_SHOPPING_ITEM -> "REMOVE";
+                case UPDATE_STOCK, UPDATE_INVENTORY_ITEM -> "SET";
+                default -> "ADD";
+            };
+        }
+
         // 1. Resolve product
         String spokenProd = resp.getProductText() != null ? resp.getProductText() : resp.getProductName();
         ProductMatchResult productMatch = productResolutionService.resolveProduct(homeId, spokenProd, resp.getProductName());
@@ -269,6 +300,7 @@ public class VoiceService {
                 .target(resp.getTarget())
                 .matchedInventoryItemId(productMatch.getProductId())
                 .matchedInventoryItemName(productMatch.getProductName())
+                .action(action)
                 .build();
 
         // 3. Check disambiguation
@@ -294,8 +326,22 @@ public class VoiceService {
 
         boolean requiresConfirmation = false;
         String executionStatus = "READY_TO_EXECUTE";
+        QuantityConfirmationInfo quantityConfirmation = null;
 
-        if (intent == VoiceIntent.CLEAR_SHOPPING_LIST) {
+        // Perform quantity sanity validation
+        VoiceCommandResult tempCmd = VoiceCommandResult.builder()
+                .transcript(resp.getTranscript())
+                .intent(intent)
+                .action(action)
+                .entities(entities)
+                .build();
+        VoiceCommandValidator.ValidationResult sanity = voiceCommandValidator.validateQuantitySanity(homeId, tempCmd);
+
+        if (sanity.isRequiresConfirmation() && sanity.getQuantityConfirmation() != null) {
+            requiresConfirmation = true;
+            executionStatus = "NEEDS_QUANTITY_CONFIRMATION";
+            quantityConfirmation = sanity.getQuantityConfirmation();
+        } else if (intent == VoiceIntent.CLEAR_SHOPPING_LIST) {
             requiresConfirmation = true;
             executionStatus = "NEEDS_CONFIRMATION";
         } else if (isAmbiguous || productMatch.getConfidence() < confirmThreshold) {
@@ -312,7 +358,9 @@ public class VoiceService {
 
         // 5. Response text generation
         String responseMessage = resp.getResponseText();
-        if (responseMessage == null || responseMessage.isBlank()) {
+        if (quantityConfirmation != null) {
+            responseMessage = sanity.getConfirmationPrompt();
+        } else if (responseMessage == null || responseMessage.isBlank()) {
             if (needsQuantity) {
                 responseMessage = voiceResponseGenerator.generateMissingQuantityPrompt(entities.getItemName(), resp.getDetectedLanguage());
             } else if (isAmbiguous) {
@@ -327,6 +375,7 @@ public class VoiceService {
         VoiceCommandResult result = VoiceCommandResult.builder()
                 .transcript(resp.getTranscript())
                 .intent(intent)
+                .action(action)
                 .confidence(Math.min(resp.getIntentConfidence(), productMatch.getConfidence()))
                 .intentConfidence(resp.getIntentConfidence())
                 .productMatchConfidence(productMatch.getConfidence())
@@ -339,6 +388,7 @@ public class VoiceService {
                 .disambiguationOptions(disambiguationOptions)
                 .message(responseMessage)
                 .executionStatus(executionStatus)
+                .quantityConfirmation(quantityConfirmation)
                 .needsQuantity(needsQuantity)
                 .needsProduct(resp.isNeedsProduct() || entities.getItemName() == null)
                 .build();
@@ -383,6 +433,14 @@ public class VoiceService {
         result.setTranscript(transcription.getTranscript());
         result.setIdempotencyKey(idempotencyKey);
         result.setDetectedLanguage(transcription.getLanguage());
+
+        var sanity = voiceCommandValidator.validateQuantitySanity(homeId, result);
+        if (sanity.isRequiresConfirmation() && sanity.getQuantityConfirmation() != null) {
+            result.setRequiresConfirmation(true);
+            result.setExecutionStatus("NEEDS_QUANTITY_CONFIRMATION");
+            result.setQuantityConfirmation(sanity.getQuantityConfirmation());
+            result.setMessage(sanity.getConfirmationPrompt());
+        }
 
         VoiceCommandAudit audit = voiceAuditService.recordCommand(userId, homeId, result, audioHash, idempotencyKey);
         if (audit != null) {

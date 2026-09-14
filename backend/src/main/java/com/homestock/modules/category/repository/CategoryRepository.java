@@ -18,6 +18,15 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     Optional<Category> findByHomeIdAndNameIgnoreCase(UUID homeId, String name);
     boolean existsByHomeIdAndNameIgnoreCase(UUID homeId, String name);
 
+    @Query("SELECT c FROM Category c WHERE (c.home.id = :homeId OR c.home IS NULL) AND LOWER(TRIM(c.name)) = LOWER(TRIM(:name)) ORDER BY CASE WHEN c.home.id IS NOT NULL THEN 0 ELSE 1 END")
+    List<Category> findByHomeIdOrGlobalAndNameIgnoreCase(@Param("homeId") UUID homeId, @Param("name") String name);
+
+    default Optional<Category> findFirstByHomeIdOrGlobalAndNameIgnoreCase(UUID homeId, String name) {
+        if (name == null || name.trim().isEmpty()) return Optional.empty();
+        List<Category> list = findByHomeIdOrGlobalAndNameIgnoreCase(homeId, name.trim());
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
     @Query("SELECT c FROM Category c WHERE (c.home.id = :homeId OR c.home IS NULL) AND c.updatedAt > :since ORDER BY c.displayOrder ASC, c.name ASC")
     List<Category> findByHomeIdAndUpdatedAtAfter(@Param("homeId") UUID homeId, @Param("since") java.time.Instant since);
 }

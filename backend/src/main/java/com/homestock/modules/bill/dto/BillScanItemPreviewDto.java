@@ -16,6 +16,7 @@ import java.util.UUID;
 public class BillScanItemPreviewDto {
     private String rawItemName;
     private String matchedProductName;
+    private String categoryName;
     private UUID matchedProductId;
     private UUID matchedInventoryItemId;
     private BigDecimal quantity;
