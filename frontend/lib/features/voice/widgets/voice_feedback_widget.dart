@@ -9,6 +9,7 @@ class VoiceFeedbackWidget extends ConsumerWidget {
   final VoiceCommandResult result;
   final VoidCallback? onConfirm;
   final VoidCallback? onCancel;
+  final ValueChanged<num>? onQuantityChanged;
   final ValueChanged<String>? onOptionSelected;
   final bool isVoiceInteraction;
 
@@ -17,9 +18,175 @@ class VoiceFeedbackWidget extends ConsumerWidget {
     required this.result,
     this.onConfirm,
     this.onCancel,
+    this.onQuantityChanged,
     this.onOptionSelected,
     this.isVoiceInteraction = false,
   });
+
+  void _showEditQuantityDialog(BuildContext context, QuantityConfirmationInfo info) {
+    final textController = TextEditingController(
+      text: info.requestedQuantity.toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Edit Quantity'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Adjust quantity for ${info.productName}:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: textController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Quantity',
+                suffixText: info.requestedUnit,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final val = double.tryParse(textController.text.trim());
+              if (val != null && val > 0) {
+                Navigator.of(dialogCtx).pop();
+                if (onQuantityChanged != null) {
+                  onQuantityChanged!(val);
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuantityConfirmationCard(
+    BuildContext context,
+    ThemeData theme,
+    QuantityConfirmationInfo info,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  info.promptTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: const Color(0xFF92400E),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFCD34D).withValues(alpha: 0.6)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  info.promptCurrent,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF451A03),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  info.promptProjected,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF047857),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (info.warningReason != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              info.warningReason!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: const Color(0xFFB45309),
+                fontSize: 11,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (onCancel != null)
+                TextButton(
+                  onPressed: onCancel,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF78350F),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              const SizedBox(width: 6),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Edit quantity'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFB45309),
+                  side: const BorderSide(color: Color(0xFFF59E0B)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
+                onPressed: () => _showEditQuantityDialog(context, info),
+              ),
+              const SizedBox(width: 6),
+              if (onConfirm != null)
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Confirm'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onPressed: onConfirm,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -111,7 +278,10 @@ class VoiceFeedbackWidget extends ConsumerWidget {
             ],
           ),
 
-          if (entities != null && entities.itemName != null) ...[
+          // Quantity Confirmation Card (Household Sanity Safeguard)
+          if (result.quantityConfirmation != null) ...[
+            _buildQuantityConfirmationCard(context, theme, result.quantityConfirmation!),
+          ] else if (entities != null && entities.itemName != null) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(10),
@@ -165,8 +335,8 @@ class VoiceFeedbackWidget extends ConsumerWidget {
             ),
           ],
 
-          // Confirmation Buttons
-          if (result.requiresConfirmation || result.needsQuantity) ...[
+          // Standard Confirmation Buttons (only if not already handled by quantityConfirmation card)
+          if (result.quantityConfirmation == null && (result.requiresConfirmation || result.needsQuantity)) ...[
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,

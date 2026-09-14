@@ -246,6 +246,9 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
                 ref.read(aiVoiceServiceProvider.notifier).stop();
                 ref.read(voiceAiControllerProvider.notifier).cancel();
               },
+              onQuantityChanged: (newQty) {
+                ref.read(voiceAiControllerProvider.notifier).updateCommandQuantity(newQty);
+              },
               onOptionSelected: (optId) {
                 ref.read(aiVoiceServiceProvider.notifier).stop();
                 ref.read(voiceAiControllerProvider.notifier).executeCommand(selectedOptionId: optId);

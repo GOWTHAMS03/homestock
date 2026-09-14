@@ -101,4 +101,93 @@ class VoiceCommandParserTest {
         VoiceCommandResult result = parser.parse(homeId, "What's running low?");
         assertEquals(VoiceIntent.GET_LOW_STOCK_ITEMS, result.getIntent());
     }
+
+    @Test
+    void testInventoryAdd2KgRice() {
+        VoiceCommandResult result = parser.parse(homeId, "add 2 kg rice");
+        assertEquals(VoiceIntent.STOCK_IN, result.getIntent());
+        assertEquals("ADD", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals("ADD", result.getEntities().getAction());
+        assertEquals("rice", result.getEntities().getItemName().toLowerCase());
+        assertEquals(0, new BigDecimal("2").compareTo(result.getEntities().getQuantity()));
+        assertTrue("KG".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
+
+    @Test
+    void testInventoryAdd200KgRicePreservesExactQuantity() {
+        VoiceCommandResult result = parser.parse(homeId, "add 200 kg rice");
+        assertEquals(VoiceIntent.STOCK_IN, result.getIntent());
+        assertEquals("ADD", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals("rice", result.getEntities().getItemName().toLowerCase());
+        // Must preserve 200 kg and never silently modify
+        assertEquals(0, new BigDecimal("200").compareTo(result.getEntities().getQuantity()));
+        assertTrue("KG".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
+
+    @Test
+    void testInventoryRemove2KgRice() {
+        VoiceCommandResult result = parser.parse(homeId, "remove 2 kg rice");
+        assertEquals(VoiceIntent.STOCK_OUT, result.getIntent());
+        assertEquals("REMOVE", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals("rice", result.getEntities().getItemName().toLowerCase());
+        assertEquals(0, new BigDecimal("2").compareTo(result.getEntities().getQuantity()));
+        assertTrue("KG".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
+
+    @Test
+    void testInventorySetRiceTo10Kg() {
+        VoiceCommandResult result = parser.parse(homeId, "set rice to 10 kg");
+        assertEquals(VoiceIntent.UPDATE_STOCK, result.getIntent());
+        assertEquals("SET", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals("rice", result.getEntities().getItemName().toLowerCase());
+        assertEquals(0, new BigDecimal("10").compareTo(result.getEntities().getQuantity()));
+        assertTrue("KG".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
+
+    @Test
+    void testInventorySetStockTo200Kg() {
+        VoiceCommandResult result = parser.parse(homeId, "set stock to 200 kg");
+        assertEquals(VoiceIntent.UPDATE_STOCK, result.getIntent());
+        assertEquals("SET", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals(0, new BigDecimal("200").compareTo(result.getEntities().getQuantity()));
+        assertTrue("KG".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
+
+    @Test
+    void testInventoryAdd500GramsRice() {
+        VoiceCommandResult result = parser.parse(homeId, "add 500 grams rice");
+        assertEquals(VoiceIntent.STOCK_IN, result.getIntent());
+        assertEquals("ADD", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals("rice", result.getEntities().getItemName().toLowerCase());
+        assertEquals(0, new BigDecimal("500").compareTo(result.getEntities().getQuantity()));
+        assertTrue("G".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
+
+    @Test
+    void testInventoryAdd2PacketsSugar() {
+        VoiceCommandResult result = parser.parse(homeId, "add 2 packets sugar");
+        assertEquals(VoiceIntent.STOCK_IN, result.getIntent());
+        assertEquals("ADD", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals("sugar", result.getEntities().getItemName().toLowerCase());
+        assertEquals(0, new BigDecimal("2").compareTo(result.getEntities().getQuantity()));
+        assertTrue("PACK".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
+
+    @Test
+    void testInventoryAdd1KgRice() {
+        VoiceCommandResult result = parser.parse(homeId, "add 1 kg rice");
+        assertEquals(VoiceIntent.STOCK_IN, result.getIntent());
+        assertEquals("ADD", result.getAction());
+        assertNotNull(result.getEntities());
+        assertEquals("rice", result.getEntities().getItemName().toLowerCase());
+        assertEquals(0, new BigDecimal("1").compareTo(result.getEntities().getQuantity()));
+        assertTrue("KG".equalsIgnoreCase(result.getEntities().getUnit()));
+    }
 }

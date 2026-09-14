@@ -244,7 +244,68 @@ class TranscriptionResult {
   }
 }
 
+class QuantityConfirmationInfo {
+  final String action;
+  final String productName;
+  final num requestedQuantity;
+  final String requestedUnit;
+  final num currentQuantity;
+  final String currentUnit;
+  final num projectedQuantity;
+  final String promptTitle;
+  final String promptCurrent;
+  final String promptProjected;
+  final String? warningReason;
+
+  const QuantityConfirmationInfo({
+    required this.action,
+    required this.productName,
+    required this.requestedQuantity,
+    required this.requestedUnit,
+    required this.currentQuantity,
+    required this.currentUnit,
+    required this.projectedQuantity,
+    required this.promptTitle,
+    required this.promptCurrent,
+    required this.promptProjected,
+    this.warningReason,
+  });
+
+  factory QuantityConfirmationInfo.fromJson(Map<String, dynamic> json) {
+    return QuantityConfirmationInfo(
+      action: json['action'] as String? ?? 'ADD',
+      productName: json['productName'] as String? ?? '',
+      requestedQuantity: json['requestedQuantity'] as num? ?? 0,
+      requestedUnit: json['requestedUnit'] as String? ?? '',
+      currentQuantity: json['currentQuantity'] as num? ?? 0,
+      currentUnit: json['currentUnit'] as String? ?? '',
+      projectedQuantity: json['projectedQuantity'] as num? ?? 0,
+      promptTitle: json['promptTitle'] as String? ?? '',
+      promptCurrent: json['promptCurrent'] as String? ?? '',
+      promptProjected: json['promptProjected'] as String? ?? '',
+      warningReason: json['warningReason'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'action': action,
+      'productName': productName,
+      'requestedQuantity': requestedQuantity,
+      'requestedUnit': requestedUnit,
+      'currentQuantity': currentQuantity,
+      'currentUnit': currentUnit,
+      'projectedQuantity': projectedQuantity,
+      'promptTitle': promptTitle,
+      'promptCurrent': promptCurrent,
+      'promptProjected': promptProjected,
+      if (warningReason != null) 'warningReason': warningReason,
+    };
+  }
+}
+
 class VoiceEntities {
+  final String? action;
   final String? itemName;
   final num? quantity;
   final String? unit;
@@ -256,6 +317,7 @@ class VoiceEntities {
   final String? matchedInventoryItemName;
 
   const VoiceEntities({
+    this.action,
     this.itemName,
     this.quantity,
     this.unit,
@@ -269,6 +331,7 @@ class VoiceEntities {
 
   factory VoiceEntities.fromJson(Map<String, dynamic> json) {
     return VoiceEntities(
+      action: json['action'] as String?,
       itemName: json['itemName'] as String?,
       quantity: json['quantity'] as num?,
       unit: json['unit'] as String?,
@@ -283,6 +346,7 @@ class VoiceEntities {
 
   Map<String, dynamic> toJson() {
     return {
+      if (action != null) 'action': action,
       if (itemName != null) 'itemName': itemName,
       if (quantity != null) 'quantity': quantity,
       if (unit != null) 'unit': unit,
@@ -296,6 +360,7 @@ class VoiceEntities {
   }
 
   VoiceEntities copyWith({
+    String? action,
     String? itemName,
     num? quantity,
     String? unit,
@@ -307,6 +372,7 @@ class VoiceEntities {
     String? matchedInventoryItemName,
   }) {
     return VoiceEntities(
+      action: action ?? this.action,
       itemName: itemName ?? this.itemName,
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
@@ -371,6 +437,8 @@ class VoiceCommandResult {
   final String? executionStatus;
   final bool needsQuantity;
   final bool needsProduct;
+  final String? action;
+  final QuantityConfirmationInfo? quantityConfirmation;
 
   const VoiceCommandResult({
     required this.transcript,
@@ -389,6 +457,8 @@ class VoiceCommandResult {
     this.executionStatus,
     this.needsQuantity = false,
     this.needsProduct = false,
+    this.action,
+    this.quantityConfirmation,
   });
 
   factory VoiceCommandResult.fromJson(Map<String, dynamic> json) {
@@ -412,6 +482,10 @@ class VoiceCommandResult {
       executionStatus: json['executionStatus'] as String?,
       needsQuantity: json['needsQuantity'] as bool? ?? false,
       needsProduct: json['needsProduct'] as bool? ?? false,
+      action: json['action'] as String?,
+      quantityConfirmation: json['quantityConfirmation'] != null
+          ? QuantityConfirmationInfo.fromJson(json['quantityConfirmation'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -433,6 +507,8 @@ class VoiceCommandResult {
       if (executionStatus != null) 'executionStatus': executionStatus,
       'needsQuantity': needsQuantity,
       'needsProduct': needsProduct,
+      if (action != null) 'action': action,
+      if (quantityConfirmation != null) 'quantityConfirmation': quantityConfirmation!.toJson(),
     };
   }
 
@@ -453,6 +529,8 @@ class VoiceCommandResult {
     String? executionStatus,
     bool? needsQuantity,
     bool? needsProduct,
+    String? action,
+    QuantityConfirmationInfo? quantityConfirmation,
   }) {
     return VoiceCommandResult(
       transcript: transcript ?? this.transcript,
@@ -471,6 +549,8 @@ class VoiceCommandResult {
       executionStatus: executionStatus ?? this.executionStatus,
       needsQuantity: needsQuantity ?? this.needsQuantity,
       needsProduct: needsProduct ?? this.needsProduct,
+      action: action ?? this.action,
+      quantityConfirmation: quantityConfirmation ?? this.quantityConfirmation,
     );
   }
 }

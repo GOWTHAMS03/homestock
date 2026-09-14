@@ -136,6 +136,8 @@ class VoiceAiService {
   bool canAutoExecute(VoiceCommandResult result) {
     if (result.intent == VoiceIntentType.unknown) return false;
     if (result.requiresConfirmation) return false;
+    if (result.quantityConfirmation != null) return false;
+    if (result.executionStatus == 'NEEDS_QUANTITY_CONFIRMATION') return false;
     if (result.needsQuantity || result.needsProduct) return false;
     if (result.disambiguationOptions.isNotEmpty) return false;
     if (result.intent == VoiceIntentType.clearShoppingList) return false;

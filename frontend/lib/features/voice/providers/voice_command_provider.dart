@@ -607,6 +607,49 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
     } catch (_) {}
   }
 
+  void updateCommandQuantity(num newQuantity) {
+    final cmd = state.commandResult;
+    if (cmd == null) return;
+
+    final updatedEntities = cmd.entities != null
+        ? cmd.entities!.copyWith(quantity: newQuantity)
+        : VoiceEntities(quantity: newQuantity);
+
+    QuantityConfirmationInfo? updatedConfirmation;
+    if (cmd.quantityConfirmation != null) {
+      final old = cmd.quantityConfirmation!;
+      num projected = newQuantity;
+      if (old.action.toUpperCase() == 'ADD') {
+        projected = old.currentQuantity + newQuantity;
+      } else if (old.action.toUpperCase() == 'REMOVE') {
+        projected = old.currentQuantity - newQuantity;
+      }
+      final actionDisplay = old.action.isEmpty
+          ? 'Update'
+          : '${old.action[0].toUpperCase()}${old.action.substring(1).toLowerCase()}';
+      updatedConfirmation = QuantityConfirmationInfo(
+        action: old.action,
+        productName: old.productName,
+        requestedQuantity: newQuantity,
+        requestedUnit: old.requestedUnit,
+        currentQuantity: old.currentQuantity,
+        currentUnit: old.currentUnit,
+        projectedQuantity: projected,
+        promptTitle: '$actionDisplay $newQuantity ${old.requestedUnit} of ${old.productName}?',
+        promptCurrent: old.promptCurrent,
+        promptProjected: 'Your new stock will be $projected ${old.currentUnit}.',
+        warningReason: old.warningReason,
+      );
+    }
+
+    final updatedCmd = cmd.copyWith(
+      entities: updatedEntities,
+      quantityConfirmation: updatedConfirmation,
+    );
+
+    state = state.copyWith(commandResult: updatedCmd);
+  }
+
   void cancel() {
     _durationTimer?.cancel();
     _amplitudeTimer?.cancel();

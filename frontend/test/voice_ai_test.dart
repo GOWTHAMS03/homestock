@@ -94,6 +94,62 @@ void main() {
         message: 'Are you sure?',
       );
       expect(aiService.canAutoExecute(clearListCmd), isFalse);
+
+      // Quantity confirmation required -> CANNOT auto execute
+      final quantityConfirmCmd = VoiceCommandResult(
+        transcript: 'add 200 kg rice',
+        intent: VoiceIntentType.stockIn,
+        intentConfidence: 0.99,
+        productMatchConfidence: 0.99,
+        requiresConfirmation: true,
+        executionStatus: 'NEEDS_QUANTITY_CONFIRMATION',
+        quantityConfirmation: const QuantityConfirmationInfo(
+          action: 'ADD',
+          productName: 'Rice',
+          requestedQuantity: 200,
+          requestedUnit: 'KG',
+          currentQuantity: 9,
+          currentUnit: 'KG',
+          projectedQuantity: 209,
+          promptTitle: 'Add 200 kg of Rice?',
+          promptCurrent: 'You currently have 9 kg.',
+          promptProjected: 'Your new stock will be 209 kg.',
+        ),
+        message: 'Add 200 kg of Rice? You currently have 9 kg. Your new stock will be 209 kg.',
+      );
+      expect(aiService.canAutoExecute(quantityConfirmCmd), isFalse);
+    });
+
+    test('QuantityConfirmationInfo serialization and deserialization', () {
+      final json = {
+        'action': 'ADD',
+        'productName': 'Rice',
+        'requestedQuantity': 200,
+        'requestedUnit': 'KG',
+        'currentQuantity': 9,
+        'currentUnit': 'KG',
+        'projectedQuantity': 209,
+        'promptTitle': 'Add 200 kg of Rice?',
+        'promptCurrent': 'You currently have 9 kg.',
+        'promptProjected': 'Your new stock will be 209 kg.',
+        'warningReason': 'Unusually high quantity detected for household rice (> 25 kg).',
+      };
+
+      final info = QuantityConfirmationInfo.fromJson(json);
+      expect(info.action, equals('ADD'));
+      expect(info.productName, equals('Rice'));
+      expect(info.requestedQuantity, equals(200));
+      expect(info.requestedUnit, equals('KG'));
+      expect(info.currentQuantity, equals(9));
+      expect(info.projectedQuantity, equals(209));
+      expect(info.promptTitle, equals('Add 200 kg of Rice?'));
+      expect(info.promptCurrent, equals('You currently have 9 kg.'));
+      expect(info.promptProjected, equals('Your new stock will be 209 kg.'));
+      expect(info.warningReason, contains('Unusually high quantity'));
+
+      final serialized = info.toJson();
+      expect(serialized['action'], equals('ADD'));
+      expect(serialized['projectedQuantity'], equals(209));
     });
 
     testWidgets('VoiceFeedbackWidget renders action, language and entities',
@@ -126,6 +182,85 @@ void main() {
       expect(find.text('2 packet Biscuits shopping list-la add panniten.'), findsOneWidget);
       expect(find.textContaining('Biscuits'), findsWidgets);
       expect(find.text('96% confidence'), findsOneWidget);
+    });
+
+    testWidgets('VoiceFeedbackWidget renders quantity confirmation card with Confirm, Edit quantity, and Cancel buttons',
+        (WidgetTester tester) async {
+      bool confirmed = false;
+      bool cancelled = false;
+      num? editedQuantity;
+
+      final result = VoiceCommandResult(
+        transcript: 'add 200 kg rice',
+        intent: VoiceIntentType.stockIn,
+        confidence: 0.98,
+        detectedLanguage: 'EN',
+        message: 'Add 200 kg of Rice? You currently have 9 kg. Your new stock will be 209 kg.',
+        requiresConfirmation: true,
+        executionStatus: 'NEEDS_QUANTITY_CONFIRMATION',
+        entities: const VoiceEntities(
+          action: 'ADD',
+          itemName: 'Rice',
+          quantity: 200,
+          unit: 'KG',
+        ),
+        quantityConfirmation: const QuantityConfirmationInfo(
+          action: 'ADD',
+          productName: 'Rice',
+          requestedQuantity: 200,
+          requestedUnit: 'KG',
+          currentQuantity: 9,
+          currentUnit: 'KG',
+          projectedQuantity: 209,
+          promptTitle: 'Add 200 kg of Rice?',
+          promptCurrent: 'You currently have 9 kg.',
+          promptProjected: 'Your new stock will be 209 kg.',
+          warningReason: 'Unusually high quantity detected for household rice (> 25 kg).',
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: VoiceFeedbackWidget(
+                result: result,
+                onConfirm: () => confirmed = true,
+                onCancel: () => cancelled = true,
+                onQuantityChanged: (q) => editedQuantity = q,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Verify prompt title, current stock, and projected stock
+      expect(find.text('Add 200 kg of Rice?'), findsOneWidget);
+      expect(find.text('You currently have 9 kg.'), findsOneWidget);
+      expect(find.text('Your new stock will be 209 kg.'), findsOneWidget);
+
+      // Verify the 3 actions: Confirm, Edit quantity, Cancel
+      expect(find.text('Confirm'), findsOneWidget);
+      expect(find.text('Edit quantity'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      // Tap Confirm
+      await tester.tap(find.text('Confirm'));
+      expect(confirmed, isTrue);
+
+      // Tap Edit quantity -> dialog opens
+      await tester.tap(find.text('Edit quantity'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Quantity'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+
+      // Enter new quantity 20
+      await tester.enterText(find.byType(TextField), '20');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(editedQuantity, equals(20.0));
     });
   });
 }

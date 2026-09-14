@@ -73,8 +73,12 @@ public class VoiceCommandValidator {
         }
 
         public static ValidationResult quantityConfirmation(QuantityConfirmationInfo info) {
-            String prompt = String.format("%s %s %s",
-                    info.getPromptTitle(), info.getPromptCurrent(), info.getPromptProjected());
+            String prompt = String.format("%s %s %s (Quantity %s %s seems unusually large. Confirm to proceed?)",
+                    info.getPromptTitle(),
+                    info.getPromptCurrent(),
+                    info.getPromptProjected(),
+                    info.getRequestedQuantity() != null ? info.getRequestedQuantity().stripTrailingZeros().toPlainString() : "",
+                    info.getRequestedUnit() != null ? info.getRequestedUnit().toLowerCase() : "");
             return ValidationResult.builder()
                     .valid(true)
                     .requiresConfirmation(true)

@@ -596,7 +596,7 @@ public class VoiceCommandExecutor {
             // New product not in inventory -> add new product
             CreateInventoryItemRequest req = new CreateInventoryItemRequest();
             req.setName(capitalize(itemName.trim()));
-            req.setQuantity(addQty);
+            req.setQuantity(rawQty);
             req.setUnit(entities.getUnit() != null ? entities.getUnit() : "pcs");
             req.setBrand(entities.getBrand());
             req.setPurchasePrice(entities.getPrice());
