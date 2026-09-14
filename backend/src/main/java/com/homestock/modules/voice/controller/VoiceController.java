@@ -2,6 +2,7 @@ package com.homestock.modules.voice.controller;
 
 import com.homestock.core.common.ApiResponse;
 import com.homestock.modules.voice.dto.*;
+import com.homestock.modules.voice.service.TextToSpeechService;
 import com.homestock.modules.voice.service.VoiceAuditService;
 import com.homestock.modules.voice.service.VoiceService;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ public class VoiceController {
 
     private final VoiceService voiceService;
     private final VoiceAuditService voiceAuditService;
+    private final TextToSpeechService textToSpeechService;
 
     // =========================================================================
     // Legacy Endpoints (Preserved for 100% Backward Compatibility)
@@ -157,5 +159,48 @@ public class VoiceController {
             @PageableDefault(size = 20) Pageable pageable) {
         Page<VoiceAuditDto> history = voiceAuditService.getAuditHistory(homeId, pageable);
         return ResponseEntity.ok(ApiResponse.success("Voice audit history retrieved", history));
+    }
+
+    // =========================================================================
+    // AI Natural Female Voice Text-to-Speech (TTS) Endpoints
+    // =========================================================================
+
+    /**
+     * Synthesize natural female voice speech for text in Tamil, Indian English, or Tanglish.
+     * Produces audio/mpeg stream cached with HTTP headers for rapid playback.
+     */
+    @GetMapping(value = "/tts", produces = "audio/mpeg")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_tts", limit = 60, windowSeconds = 60)
+    public ResponseEntity<byte[]> synthesizeSpeech(
+            @RequestParam("text") String text,
+            @RequestParam(value = "language", required = false) String language,
+            @RequestParam(value = "speed", required = false, defaultValue = "1.0") Double speed) {
+        log.debug("Synthesizing speech: text='{}', lang={}, speed={}", text, language, speed);
+        byte[] audio = textToSpeechService.synthesizeSpeech(text, language, speed);
+
+        return ResponseEntity.ok()
+                .header("Content-Type", "audio/mpeg")
+                .header("Cache-Control", "public, max-age=86400")
+                .header("Content-Disposition", "inline; filename=\"response.mp3\"")
+                .body(audio);
+    }
+
+    /**
+     * Synthesize speech via POST for longer payloads.
+     */
+    @PostMapping(value = "/tts", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "audio/mpeg")
+    @com.homestock.core.redis.RateLimited(keyPrefix = "voice_tts_post", limit = 60, windowSeconds = 60)
+    public ResponseEntity<byte[]> synthesizeSpeechPost(@Valid @RequestBody TtsRequestDto request) {
+        log.debug("Synthesizing speech via POST: text='{}', lang={}, speed={}",
+                request.getText(), request.getLanguage(), request.getSpeed());
+        byte[] audio = textToSpeechService.synthesizeSpeech(
+                request.getText(), request.getLanguage(), request.getSpeed()
+        );
+
+        return ResponseEntity.ok()
+                .header("Content-Type", "audio/mpeg")
+                .header("Cache-Control", "public, max-age=86400")
+                .header("Content-Disposition", "inline; filename=\"response.mp3\"")
+                .body(audio);
     }
 }

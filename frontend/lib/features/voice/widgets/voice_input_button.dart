@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../models/voice_models.dart';
 import 'voice_bottom_sheet.dart';
+import 'voice_command_sheet.dart';
 
 enum VoiceButtonVariant {
   iconOnly,
@@ -49,7 +50,11 @@ class VoiceInputButton extends StatelessWidget {
 
   void _onTap(BuildContext context) {
     HapticFeedback.lightImpact();
-    VoiceBottomSheet.show(context, onSearchQuery: onSearch, onCommandResult: onResult);
+    if (onSearch != null || onResult != null) {
+      VoiceBottomSheet.show(context, onSearchQuery: onSearch, onCommandResult: onResult);
+    } else {
+      VoiceCommandSheet.show(context);
+    }
   }
 
   @override

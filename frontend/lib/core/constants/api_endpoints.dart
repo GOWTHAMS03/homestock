@@ -1,8 +1,7 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  // Android emulator uses 10.0.2.2, desktop/web uses localhost, physical phone uses PC LAN IP or 127.0.0.1 with adb reverse
-  static const String currentWifiUrl = 'http://10.211.55.217:8080/api/v1';
+  static const String currentWifiUrl = 'http://192.168.0.109:8080/api/v1';
   static const String alternateWifiUrl = 'http://192.168.0.182:8080/api/v1';
   static const String usbAdbUrl = 'http://127.0.0.1:8080/api/v1';
   static const String emulatorUrl = 'http://10.0.2.2:8080/api/v1';
@@ -136,5 +135,6 @@ class ApiEndpoints {
   static const String voiceAiParse = '/voice/ai/parse';
   static const String voiceAiFollowUp = '/voice/ai/follow-up';
   static const String voiceAudit = '/voice/audit';
+  static const String voiceTts = '/voice/tts';
 }
 

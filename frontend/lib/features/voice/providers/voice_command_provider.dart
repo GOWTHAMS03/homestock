@@ -10,8 +10,7 @@ import '../../../core/sync/sync_providers.dart' show connectivityMonitorProvider
 import '../../home_switcher/home_controller.dart';
 import '../../inventory/inventory_controller.dart';
 import '../../shopping/shopping_controller.dart';
-import '../controllers/voice_controller.dart' show offlineSpeechEngineProvider, offlineModelManagerProvider;
-import '../data/parser/command_parser.dart';
+import '../controllers/voice_controller.dart' show offlineModelManagerProvider;
 import '../data/speech/offline_model_manager.dart';
 import '../models/voice_models.dart';
 import '../services/voice_ai_service.dart';
@@ -50,7 +49,7 @@ class VoiceAiState {
     this.recordingDuration = Duration.zero,
     this.amplitude = 0.0,
     this.errorMessage,
-    this.detectedLanguage = 'EN',
+    this.detectedLanguage = 'AUTO',
     this.isFollowUpExpected = false,
     this.isModelInstalled = false,
     this.isModelDownloading = false,
@@ -180,6 +179,17 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
   }
 
   Future<void> startListening() async {
+    // 1. Immediately reset state synchronously to listening so any prior response card is cleared instantly!
+    state = state.copyWith(
+      status: VoiceAiStatus.listening,
+      transcript: '',
+      commandResult: null,
+      executionResponse: null,
+      recordingDuration: Duration.zero,
+      amplitude: 0.0,
+      errorMessage: null,
+    );
+
     if (_homeId == null) {
       state = state.copyWith(
         status: VoiceAiStatus.error,
@@ -211,16 +221,6 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
           bitRate: 256000,
         ),
         path: _currentRecordingPath!,
-      );
-
-      state = state.copyWith(
-        status: VoiceAiStatus.listening,
-        transcript: '',
-        commandResult: null,
-        executionResponse: null,
-        recordingDuration: Duration.zero,
-        amplitude: 0.0,
-        errorMessage: null,
       );
 
       _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -299,61 +299,38 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
 
       VoiceCommandResult? result;
 
-      // 1. Process via Gemini Flash-Lite multimodal pipeline if online
+      // 1. Voice recognition is strictly online-only
       final isOnline = _ref.read(connectivityMonitorProvider).isOnline;
-      if (isOnline) {
-        try {
-          final aiRes = await _aiService.processAudioCommand(
-            audioFilePath: path,
-            homeId: homeId,
-          );
-          final t = aiRes.transcript.trim().toLowerCase();
-          if (t.isNotEmpty &&
-              !t.contains('add 2 litre cooking oil') &&
-              aiRes.intent != VoiceIntentType.unknown) {
-            result = aiRes;
-          }
-        } catch (e) {
-          debugPrint('Gemini Voice AI endpoint error: $e, checking on-device Whisper');
-        }
+      if (!isOnline) {
+        state = state.copyWith(
+          status: VoiceAiStatus.error,
+          errorMessage: 'Voice recognition is available only in online mode. Please connect to the internet to speak with Homie.',
+        );
+        return;
       }
 
-      // 2. If Gemini didn't produce real speech, use on-device Whisper.cpp via OfflineSpeechEngine!
-      if (result == null) {
-        final offlineEngine = _ref.read(offlineSpeechEngineProvider);
-        final isOfflineReady = await offlineEngine.isAvailable();
-
-        if (isOfflineReady) {
-          try {
-            final transcript = await offlineEngine.transcribe(path);
-            final cleanText = transcript.cleanText.isNotEmpty ? transcript.cleanText : transcript.rawText;
-
-            if (cleanText.trim().isNotEmpty) {
-              final parsedCmd = CommandParser.parse(cleanText, isOffline: true);
-              result = _convertNormalizedToResult(parsedCmd, cleanText);
-            } else {
-              state = state.copyWith(
-                status: VoiceAiStatus.error,
-                errorMessage: "Could not detect clear speech. Please tap mic and speak again.",
-              );
-              return;
-            }
-          } catch (e) {
-            debugPrint('Offline whisper speech recognition error: $e');
-            state = state.copyWith(
-              status: VoiceAiStatus.error,
-              errorMessage: 'Speech recognition error: $e',
-            );
-            return;
-          }
-        } else {
-          // Model not installed
-          state = state.copyWith(
-            status: VoiceAiStatus.error,
-            errorMessage: 'Offline voice model is not installed. Download the free model (75 MB) to recognize your voice offline.',
-          );
-          return;
+      // 2. Process via Gemini Flash-Lite multimodal pipeline
+      try {
+        final aiRes = await _aiService.processAudioCommand(
+          audioFilePath: path,
+          homeId: homeId,
+        );
+        final t = aiRes.transcript.trim().toLowerCase();
+        if (t.isNotEmpty &&
+            !t.contains('add 2 litre cooking oil') &&
+            aiRes.intent != VoiceIntentType.unknown) {
+          result = aiRes;
         }
+      } catch (e) {
+        debugPrint('Gemini Voice AI endpoint error: $e');
+      }
+
+      if (result == null) {
+        state = state.copyWith(
+          status: VoiceAiStatus.error,
+          errorMessage: 'Could not understand your voice command. Please tap mic and speak again.',
+        );
+        return;
       }
 
       _handleCommandResult(result);
@@ -364,27 +341,6 @@ class VoiceAiController extends StateNotifier<VoiceAiState> {
         errorMessage: e.toString().replaceAll('Exception: ', '').replaceAll('ApiException: ', ''),
       );
     }
-  }
-
-  VoiceCommandResult _convertNormalizedToResult(NormalizedVoiceCommand cmd, String transcript) {
-    return VoiceCommandResult(
-      transcript: transcript,
-      intent: cmd.intent,
-      confidence: cmd.confidence,
-      intentConfidence: cmd.intentConfidence,
-      productMatchConfidence: cmd.productConfidence,
-      detectedLanguage: 'auto',
-      requiresConfirmation: cmd.requiresConfirmation,
-      message: cmd.confirmationMessage ?? 'Do you want to ${cmd.intent.displayName}?',
-      disambiguationOptions: cmd.disambiguationOptions,
-      entities: VoiceEntities(
-        itemName: cmd.productName ?? (cmd.productQuery.isNotEmpty ? cmd.productQuery : transcript),
-        quantity: cmd.quantity,
-        unit: cmd.unit,
-        category: cmd.category,
-        matchedInventoryItemId: cmd.productId,
-      ),
-    );
   }
 
   /// Process text command directly

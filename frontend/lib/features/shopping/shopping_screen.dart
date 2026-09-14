@@ -16,6 +16,9 @@ import '../smart_shopping/nearby_grocery_shops_screen.dart';
 import '../smart_shopping/product_deal_search_screen.dart';
 import '../smart_shopping/smart_shopping_screen.dart';
 import '../voice/widgets/voice_input_button.dart';
+import '../voice/widgets/voice_command_sheet.dart';
+import '../../core/capabilities/capability_provider.dart';
+import '../../core/capabilities/feature_capability.dart';
 import 'add_shopping_item_dialog.dart';
 import 'shopping_controller.dart';
 import 'shopping_model.dart';
@@ -422,14 +425,16 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                     const SizedBox(height: 10),
 
                     // 7. Best Prices Promotion Banner: [ 🏷 Best prices for your list > ]
-                    _buildBestPricesBanner(context, pendingCount),
-
-                    const SizedBox(height: 10),
+                    if (ref.watch(isCapabilityAvailableProvider(FeatureCapability.deals))) ...[
+                      _buildBestPricesBanner(context, pendingCount),
+                      const SizedBox(height: 10),
+                    ],
 
                     // 7b. Free Nearby Grocery Shops: [ 🏪 Nearby Grocery Shops > ]
-                    _buildNearbyShopsShortcut(context),
-
-                    const SizedBox(height: 14),
+                    if (ref.watch(isCapabilityAvailableProvider(FeatureCapability.nearbyShops))) ...[
+                      _buildNearbyShopsShortcut(context),
+                      const SizedBox(height: 14),
+                    ],
 
                     // 8. Filter Tabs & Sort Row: [ All (2) ] [ To Buy (2) ] [ Done (0) ]   [ 🎛 Sort ]
                     _buildFilterTabsAndSortRow(
@@ -664,6 +669,37 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
           const SizedBox(width: 8),
 
+          // Homie AI Voice circular button
+          if (ref.watch(isCapabilityAvailableProvider(FeatureCapability.voice))) ...[
+            InkWell(
+              onTap: () => VoiceCommandSheet.show(context),
+              borderRadius: BorderRadius.circular(50),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.mic_rounded,
+                  color: Color(0xFF6366F1),
+                  size: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+
           // More options circular button
           PopupMenuButton<String>(
             icon: Container(
@@ -716,16 +752,17 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                     ],
                   ),
                 ),
-              const PopupMenuItem(
-                value: 'scan_bill',
-                child: Row(
-                  children: [
-                    Icon(Icons.document_scanner_rounded, size: 16, color: Color(0xFF10B981)),
-                    SizedBox(width: 8),
-                    Text('Scan Purchased Bill (OCR)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  ],
+              if (ref.watch(isCapabilityAvailableProvider(FeatureCapability.billScan)))
+                const PopupMenuItem(
+                  value: 'scan_bill',
+                  child: Row(
+                    children: [
+                      Icon(Icons.document_scanner_rounded, size: 16, color: Color(0xFF10B981)),
+                      SizedBox(width: 8),
+                      Text('Scan Purchased Bill (OCR)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ),
-              ),
               const PopupMenuItem(
                 value: 'record_bill',
                 child: Row(
@@ -941,17 +978,18 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                     tooltip: 'Scan Barcode',
                     onPressed: () => BarcodeScannerWidget.open(context),
                   ),
-                  VoiceInputButton(
-                    size: 20,
-                    color: const Color(0xFF6366F1),
-                    tooltip: 'Homie voice command',
-                    onSearch: (query) {
-                      setState(() {
-                        _searchController.text = query;
-                        _searchQuery = query.trim();
-                      });
-                    },
-                  ),
+                  if (ref.watch(isCapabilityAvailableProvider(FeatureCapability.voice)))
+                    VoiceInputButton(
+                      size: 20,
+                      color: const Color(0xFF6366F1),
+                      tooltip: 'Homie voice command',
+                      onSearch: (query) {
+                        setState(() {
+                          _searchController.text = query;
+                          _searchQuery = query.trim();
+                        });
+                      },
+                    ),
                   const SizedBox(width: 4),
                 ],
               ],
@@ -966,24 +1004,28 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   // SECTION 4: 3 FEATURE ACTION CARDS
   // ==========================================
   Widget _buildFeatureActionsRow(BuildContext context) {
+    final isDealsAvailable = ref.watch(isCapabilityAvailableProvider(FeatureCapability.deals));
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          // 1. Price Deals
-          Expanded(
-            child: _buildActionTile(
-              icon: Icons.bolt_rounded,
-              iconColor: const Color(0xFFD97706),
-              iconBg: const Color(0xFFFEF3C7),
-              title: 'Price Deals',
-              subtitle: 'Compare stores',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
+          // 1. Price Deals (Online only)
+          if (isDealsAvailable) ...[
+            Expanded(
+              child: _buildActionTile(
+                icon: Icons.bolt_rounded,
+                iconColor: const Color(0xFFD97706),
+                iconBg: const Color(0xFFFEF3C7),
+                title: 'Price Deals',
+                subtitle: 'Compare stores',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SmartShoppingScreen()),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
+            const SizedBox(width: 10),
+          ],
 
           // 2. Shop Mode
           Expanded(
@@ -1849,7 +1891,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             ),
 
             // Row 2: Deals & Scan Actions (aligned to right)
-            if (!item.isCompleted) ...[
+            if (!item.isCompleted && ref.watch(isCapabilityAvailableProvider(FeatureCapability.deals))) ...[
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,

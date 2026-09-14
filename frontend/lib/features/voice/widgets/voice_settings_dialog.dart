@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../controllers/voice_controller.dart';
-import '../data/speech/offline_model_manager.dart';
-import '../data/speech/speech_engine.dart';
-import 'voice_model_settings.dart';
+import '../models/ai_voice_settings.dart';
 
-/// Modal dialog for configuring Voice Recognition preferences
+/// Modal dialog displaying AI Voice Assistant preferences only
 class VoiceSettingsDialog extends ConsumerWidget {
   const VoiceSettingsDialog({super.key});
 
@@ -20,24 +17,29 @@ class VoiceSettingsDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final voiceState = ref.watch(voiceControllerProvider);
-    final notifier = ref.read(voiceControllerProvider.notifier);
-    final modelInfoAsync = ref.watch(modelInfoProvider);
-    final modelManager = ref.watch(offlineModelManagerProvider);
-    final modelInfo = modelInfoAsync.value ?? modelManager.currentModel;
-    final isInstalled = modelInfo.status == ModelStatus.installed ||
-        modelInfo.status == ModelStatus.ready;
-    final isDownloading = modelInfo.status == ModelStatus.downloading;
+    final aiVoiceSettings = ref.watch(aiVoiceSettingsProvider);
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       backgroundColor: AppColors.surface,
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.tune, color: AppColors.primary),
-          SizedBox(width: 10),
-          Text(
-            'Voice Settings',
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary,
+                  AppColors.primary.withValues(alpha: 0.8),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            'AI Voice Settings',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ],
@@ -47,161 +49,128 @@ class VoiceSettingsDialog extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── OFFLINE MODEL STATUS CARD ───
-            const Text(
-              'OFFLINE VOICE ENGINE (WHISPER.CPP)',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMuted,
-                letterSpacing: 0.5,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-            ),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: () {
-                Navigator.of(context).pop();
-                VoiceModelSettingsDialog.show(context);
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isInstalled
-                      ? AppColors.inStockBg
-                      : (isDownloading ? AppColors.secondaryContainer.withAlpha(100) : AppColors.lowStockBg),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isInstalled
-                        ? AppColors.inStockBorder
-                        : (isDownloading ? AppColors.secondary.withAlpha(100) : AppColors.lowStockBorder),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isInstalled
-                          ? Icons.offline_bolt
-                          : (isDownloading ? Icons.sync : Icons.download),
-                      size: 24,
-                      color: isInstalled
-                          ? AppColors.inStockText
-                          : (isDownloading ? AppColors.secondary : AppColors.lowStockText),
+              child: Column(
+                children: [
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text(
+                      'Voice responses',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isInstalled
-                                ? 'Whisper ${modelInfo.name} (${modelInfo.sizeMb} MB)'
-                                : (isDownloading
-                                    ? 'Downloading ${(modelInfo.downloadProgress * 100).toInt()}%'
-                                    : 'No Model Installed'),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: isInstalled
-                                  ? AppColors.inStockText
-                                  : (isDownloading ? AppColors.secondaryDark : AppColors.lowStockText),
-                            ),
-                          ),
-                          Text(
-                            isInstalled
-                                ? 'Ready for 100% offline Tamil + English'
-                                : (isDownloading
-                                    ? 'Please wait while model downloads'
-                                    : 'Tap to download free offline model'),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
+                    subtitle: const Text(
+                      'Speak spoken answers using neural AI voice',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                    value: aiVoiceSettings.voiceResponsesEnabled,
+                    activeTrackColor: AppColors.primary,
+                    onChanged: (val) =>
+                        ref.read(aiVoiceSettingsProvider.notifier).setVoiceResponsesEnabled(val),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text(
+                      'Auto-play',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Automatically speak after voice commands',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                    value: aiVoiceSettings.autoPlayEnabled,
+                    activeTrackColor: AppColors.primary,
+                    onChanged: (val) =>
+                        ref.read(aiVoiceSettingsProvider.notifier).setAutoPlayEnabled(val),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text(
+                      'Voice',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Natural female assistant (English, Tamil & Tanglish)',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                      ),
+                      child: const Text(
+                        'Cute Female',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
                       ),
                     ),
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 20,
-                      color: AppColors.textMuted,
+                  ),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Speaking speed',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              'Cadence multiplier',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [0.8, 1.0, 1.2].map((speed) {
+                            final isSel = (aiVoiceSettings.speakingSpeed - speed).abs() < 0.05;
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: InkWell(
+                                onTap: () =>
+                                    ref.read(aiVoiceSettingsProvider.notifier).setSpeakingSpeed(speed),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isSel ? AppColors.primary : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isSel ? AppColors.primary : const Color(0xFFCBD5E1),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${speed}x',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSel ? Colors.white : const Color(0xFF475569),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-            const Divider(height: 24),
-
-            // ─── RECOGNITION MODE ───
-            const Text(
-              'SPEECH RECOGNITION MODE',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMuted,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildModeTile(
-              context: context,
-              title: 'Auto (Recommended)',
-              subtitle: 'Offline whisper.cpp first, cloud fallback only if needed',
-              value: SpeechEngineMode.auto,
-              selected: voiceState.engineMode,
-              onSelected: notifier.setEngineMode,
-            ),
-            _buildModeTile(
-              context: context,
-              title: 'Offline Only',
-              subtitle: '100% free whisper.cpp on device (no internet or API key)',
-              value: SpeechEngineMode.offlineOnly,
-              selected: voiceState.engineMode,
-              onSelected: notifier.setEngineMode,
-            ),
-            _buildModeTile(
-              context: context,
-              title: 'Online Preferred',
-              subtitle: 'Uses cloud Whisper when available',
-              value: SpeechEngineMode.onlinePreferred,
-              selected: voiceState.engineMode,
-              onSelected: notifier.setEngineMode,
-            ),
-            const Divider(height: 24),
-
-            // ─── PRIMARY LANGUAGE ───
-            const Text(
-              'PRIMARY LANGUAGE',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMuted,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                _buildLangChip(
-                  label: 'Auto (Tanglish/Tamil/English)',
-                  code: 'auto',
-                  current: voiceState.languageHint,
-                  onSelected: notifier.setLanguageHint,
-                ),
-                _buildLangChip(
-                  label: 'Tamil (தமிழ்)',
-                  code: 'ta',
-                  current: voiceState.languageHint,
-                  onSelected: notifier.setLanguageHint,
-                ),
-                _buildLangChip(
-                  label: 'English',
-                  code: 'en',
-                  current: voiceState.languageHint,
-                  onSelected: notifier.setLanguageHint,
-                ),
-              ],
             ),
           ],
         ),
@@ -212,80 +181,6 @@ class VoiceSettingsDialog extends ConsumerWidget {
           child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
-    );
-  }
-
-  Widget _buildModeTile({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required SpeechEngineMode value,
-    required SpeechEngineMode selected,
-    required void Function(SpeechEngineMode) onSelected,
-  }) {
-    final isSelected = value == selected;
-    return InkWell(
-      onTap: () => onSelected(value),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        margin: const EdgeInsets.only(bottom: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryContainer.withAlpha(50) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.outlineVariant.withAlpha(80),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              size: 20,
-              color: isSelected ? AppColors.primary : AppColors.textMuted,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLangChip({
-    required String label,
-    required String code,
-    required String current,
-    required void Function(String) onSelected,
-  }) {
-    final isSelected = code == current;
-    return ChoiceChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: isSelected,
-      onSelected: (_) => onSelected(code),
-      selectedColor: AppColors.primaryContainer,
-      labelStyle: TextStyle(
-        color: isSelected ? AppColors.primary : AppColors.textPrimary,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
     );
   }
 }

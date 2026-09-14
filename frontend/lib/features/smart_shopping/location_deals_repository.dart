@@ -41,7 +41,15 @@ class LocationDealsRepository {
         },
       );
 
-      final data = response.data['data'] as List<dynamic>? ?? [];
+      final rawData = response.data['data'];
+      final List<dynamic> data;
+      if (rawData is List<dynamic>) {
+        data = rawData;
+      } else if (rawData is Map<String, dynamic> && rawData['shops'] is List<dynamic>) {
+        data = rawData['shops'] as List<dynamic>;
+      } else {
+        data = const [];
+      }
       final shops = data.map((e) => NearbyShop.fromJson(e as Map<String, dynamic>)).toList();
 
       if (shops.isNotEmpty) {

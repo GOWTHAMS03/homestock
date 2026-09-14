@@ -4,9 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../controllers/voice_controller.dart';
-import '../data/speech/offline_model_manager.dart';
 import '../models/voice_models.dart';
-import 'voice_model_settings.dart';
 import 'voice_settings_dialog.dart';
 
 class VoiceBottomSheet extends ConsumerStatefulWidget {
@@ -54,17 +52,10 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    // Auto-start recording only if voice model is already installed
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final modelManager = ref.read(offlineModelManagerProvider);
-      final installed = await modelManager.isModelInstalled();
+    // Auto-start recording when sheet is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
-      if (!installed) {
-        ref.read(voiceControllerProvider.notifier).promptModelDownload();
-      } else {
-        ref.read(voiceControllerProvider.notifier).startRecording();
-      }
+      ref.read(voiceControllerProvider.notifier).startRecording();
     });
   }
 
@@ -309,7 +300,7 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
       case VoiceStatus.listening:
         return _buildListeningView(state);
       case VoiceStatus.processing:
-        return _buildProcessingView('Transcribing speech with Whisper...');
+        return _buildProcessingView('Processing voice command...');
       case VoiceStatus.executing:
         return _buildProcessingView('Executing action...');
       case VoiceStatus.parsed:
@@ -1002,21 +993,6 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
   }
 
   Widget _buildErrorView(VoiceState state) {
-    // Only show model download if the model is NOT installed and was explicitly needed,
-    // or if a download is currently in progress.
-    final isExplicitModelDownloadNeeded = !state.isModelInstalled &&
-        (state.isModelDownloading ||
-            (state.errorMessage?.toLowerCase().contains('model is not installed') ?? false) ||
-            (state.errorMessage?.toLowerCase().contains('download the offline voice model') ?? false));
-
-    if (isExplicitModelDownloadNeeded) {
-      return _buildModelDownloadCard(state);
-    }
-
-    final isModelLoadIssue = (state.errorMessage?.toLowerCase().contains('failed to initialize') ?? false) ||
-        (state.errorMessage?.toLowerCase().contains('ram is limited') ?? false) ||
-        (state.errorMessage?.toLowerCase().contains('failed to load') ?? false);
-
     return Column(
       key: const ValueKey('error'),
       children: [
@@ -1029,16 +1005,16 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
             color: AppColors.outOfStockBg,
             border: Border.all(color: AppColors.outOfStockBorder),
           ),
-          child: Icon(
-            isModelLoadIssue ? Icons.memory : Icons.error_outline,
+          child: const Icon(
+            Icons.error_outline,
             color: AppColors.outOfStockText,
             size: 32,
           ),
         ),
         const SizedBox(height: 16),
-        Text(
-          isModelLoadIssue ? 'Voice Engine Setup' : 'Could Not Complete Command',
-          style: const TextStyle(
+        const Text(
+          'Could Not Complete Command',
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
@@ -1054,209 +1030,45 @@ class _VoiceBottomSheetState extends ConsumerState<VoiceBottomSheet>
           ),
         ),
         const SizedBox(height: 24),
-        if (isModelLoadIssue) ...[
-          ElevatedButton.icon(
-            onPressed: () => VoiceModelSettingsDialog.show(context),
-            icon: const Icon(Icons.tune, size: 18),
-            label: const Text('Switch Model in Settings (Tiny / Base)'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  ref.read(voiceControllerProvider.notifier).reset();
+                  Navigator.of(context).pop();
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Close'),
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () {
-              ref.read(voiceControllerProvider.notifier).reset();
-              Navigator.of(context).pop();
-            },
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Close'),
-          ),
-        ] else ...[
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    ref.read(voiceControllerProvider.notifier).reset();
-                    Navigator.of(context).pop();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Close'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  ref.read(voiceControllerProvider.notifier).startRecording();
+                },
+                icon: const Icon(Icons.mic),
+                label: const Text('Try Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    ref.read(voiceControllerProvider.notifier).startRecording();
-                  },
-                  icon: const Icon(Icons.mic),
-                  label: const Text('Try Again'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildModelDownloadCard(VoiceState state) {
-    final isDownloading = state.isModelDownloading;
-    final progress = state.modelDownloadProgress;
-    final pct = (progress * 100).toInt();
-
-    return Column(
-      key: const ValueKey('model_download_card'),
-      children: [
-        const SizedBox(height: 12),
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDownloading
-                ? AppColors.primaryContainer.withAlpha(120)
-                : AppColors.lowStockBg,
-            border: Border.all(
-              color: isDownloading ? AppColors.primary : AppColors.lowStockBorder,
             ),
-          ),
-          child: Icon(
-            isDownloading ? Icons.cloud_download : Icons.offline_bolt_outlined,
-            color: isDownloading ? AppColors.primary : AppColors.lowStockText,
-            size: 30,
-          ),
+          ],
         ),
-        const SizedBox(height: 14),
-        Text(
-          isDownloading ? 'Downloading Voice Model ($pct%)' : 'Offline Voice Model Required',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            isDownloading
-                ? 'Downloading free multilingual Whisper model. Voice commands will run 100% offline once verified.'
-                : 'Download the free on-device voice model once to enable offline speech recognition without OpenAI or paid API keys.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (isDownloading) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress > 0 ? progress : null,
-                    backgroundColor: AppColors.outlineVariant.withAlpha(80),
-                    color: AppColors.primary,
-                    minHeight: 8,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$pct% completed • Please wait',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Download in Background'),
-          ),
-        ] else ...[
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    final tiny = OfflineModelManager.availableModels.firstWhere((m) => m.id == 'tiny');
-                    ref.read(voiceControllerProvider.notifier).downloadOfflineModel(tiny);
-                  },
-                  icon: const Icon(Icons.bolt, size: 16),
-                  label: const Text('Tiny (75 MB)', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    final base = OfflineModelManager.availableModels.firstWhere((m) => m.id == 'base');
-                    ref.read(voiceControllerProvider.notifier).downloadOfflineModel(base);
-                  },
-                  icon: const Icon(Icons.download, size: 18),
-                  label: const Text('Base (142 MB)'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () => VoiceModelSettingsDialog.show(context),
-            icon: const Icon(Icons.tune, size: 15, color: AppColors.textMuted),
-            label: const Text(
-              'More Options (Small 466 MB, Diagnostics)',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
-          ),
-        ],
       ],
     );
   }
 
   Widget _buildIdleView(VoiceState state) {
-    if (!state.isModelInstalled) {
-      return _buildModelDownloadCard(state);
-    }
     return Column(
       key: const ValueKey('idle'),
       children: [

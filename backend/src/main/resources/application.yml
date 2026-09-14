@@ -58,11 +58,24 @@ app:
       dashboard-ttl-seconds: ${REDIS_CACHE_DASHBOARD_TTL:300}
       product-ttl-seconds: ${REDIS_CACHE_PRODUCT_TTL:86400}
       deals-ttl-seconds: ${REDIS_CACHE_DEALS_TTL:900}
+      nearby-shops-ttl-seconds: ${REDIS_CACHE_NEARBY_SHOPS_TTL:1800}
     lock:
       default-lease-time-seconds: ${REDIS_LOCK_LEASE_SECONDS:10}
       default-wait-time-seconds: ${REDIS_LOCK_WAIT_SECONDS:5}
     rate-limit:
       enabled: ${REDIS_RATE_LIMIT_ENABLED:true}
+  deals:
+    overpass:
+      endpoints: ${OVERPASS_ENDPOINTS:https://overpass.kumi.systems/api/interpreter,https://overpass.private.coffee/api/interpreter,https://lz4.overpass-api.de/api/interpreter,https://overpass-api.de/api/interpreter}
+      connect-timeout-ms: 3000
+      read-timeout-ms: 5000
+      query-timeout-seconds: 5
+      circuit-breaker-cooldown-seconds: 120
+    shop-sync:
+      enabled: ${SHOP_SYNC_ENABLED:true}
+      fixed-delay-ms: ${SHOP_SYNC_FIXED_DELAY_MS:900000}
+      stale-threshold-hours: ${SHOP_SYNC_STALE_HOURS:12}
+      max-batch-size: ${SHOP_SYNC_MAX_BATCH_SIZE:3}
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     access-token-expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 hours

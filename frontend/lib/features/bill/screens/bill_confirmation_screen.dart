@@ -10,6 +10,7 @@ import '../controllers/bill_controller.dart';
 import '../models/bill_models.dart';
 import '../../inventory/inventory_controller.dart';
 import '../../shopping/shopping_controller.dart';
+import '../../voice/widgets/ai_voice_response_card.dart';
 
 class BillConfirmationScreen extends ConsumerStatefulWidget {
   const BillConfirmationScreen({super.key});
@@ -264,6 +265,17 @@ class _BillConfirmationScreenState extends ConsumerState<BillConfirmationScreen>
       ),
       body: Column(
         children: [
+          if (state.editableItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: AiVoiceResponseCard(
+                text:
+                    'I found ${state.editableItems.length} items from ${state.shopName.isNotEmpty ? state.shopName : 'your receipt'} totaling Rs. ${state.totalAmount.toStringAsFixed(0)}. Please review and tap Confirm to restock inventory.',
+                language: 'EN',
+                isVoiceInteraction: false,
+              ),
+            ),
+
           // Top Metadata & Duplicate warning
           _buildHeaderSection(state, scanResult),
 

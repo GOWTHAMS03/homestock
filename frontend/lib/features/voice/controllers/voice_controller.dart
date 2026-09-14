@@ -246,7 +246,7 @@ class VoiceController extends StateNotifier<VoiceState> {
   void promptModelDownload() {
     state = state.copyWith(
       status: VoiceStatus.error,
-      errorMessage: 'Offline voice model is not installed. Please download the free model once to use voice commands offline.',
+      errorMessage: 'Voice commands require an active internet connection. Please check your network and try again.',
     );
   }
 
@@ -280,7 +280,7 @@ class VoiceController extends StateNotifier<VoiceState> {
       if (!isInstalled && (!isOnline || state.engineMode == SpeechEngineMode.offlineOnly)) {
         state = state.copyWith(
           status: VoiceStatus.error,
-          errorMessage: 'Offline voice model is not installed. Please download the free model once to use voice commands offline.',
+          errorMessage: 'Voice recognition requires an internet connection. Please check your connection and try again.',
         );
         return false;
       }

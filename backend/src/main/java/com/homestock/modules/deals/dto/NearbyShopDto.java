@@ -40,4 +40,13 @@ public class NearbyShopDto {
 
     @Builder.Default
     private String attribution = "Data © OpenStreetMap contributors, ODbL";
+
+    @Builder.Default
+    private Integer confidenceScore = 70;
+
+    @Builder.Default
+    private String dataFreshness = "FRESH";
+
+    @Builder.Default
+    private Integer userReportCount = 0;
 }

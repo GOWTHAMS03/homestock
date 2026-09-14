@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../models/voice_models.dart';
+import '../services/ai_voice_service.dart';
 
 class VoiceFeedbackWidget extends ConsumerWidget {
   final VoiceCommandResult result;
   final VoidCallback? onConfirm;
   final VoidCallback? onCancel;
   final ValueChanged<String>? onOptionSelected;
+  final bool isVoiceInteraction;
 
   const VoiceFeedbackWidget({
     super.key,
@@ -16,6 +18,7 @@ class VoiceFeedbackWidget extends ConsumerWidget {
     this.onConfirm,
     this.onCancel,
     this.onOptionSelected,
+    this.isVoiceInteraction = false,
   });
 
   @override
@@ -32,12 +35,12 @@ class VoiceFeedbackWidget extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: result.requiresConfirmation
-              ? AppColors.lowStockText.withOpacity(0.5)
-              : AppColors.primary.withOpacity(0.3),
+              ? AppColors.lowStockText.withValues(alpha: 0.5)
+              : AppColors.primary.withValues(alpha: 0.3),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -53,7 +56,7 @@ class VoiceFeedbackWidget extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -81,11 +84,31 @@ class VoiceFeedbackWidget extends ConsumerWidget {
           const SizedBox(height: 12),
 
           // Message / Question from Voice AI
-          Text(
-            result.message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  result.message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.volume_up_rounded, size: 20, color: AppColors.primary),
+                tooltip: 'Listen to Homie',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: () {
+                  ref.read(aiVoiceServiceProvider.notifier).play(
+                        text: result.message,
+                        language: result.detectedLanguage,
+                        isVoiceInteraction: true,
+                      );
+                },
+              ),
+            ],
           ),
 
           if (entities != null && entities.itemName != null) ...[
@@ -93,7 +116,7 @@ class VoiceFeedbackWidget extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -121,7 +144,7 @@ class VoiceFeedbackWidget extends ConsumerWidget {
             Text(
               'Select the correct item:',
               style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 6),
@@ -186,7 +209,7 @@ class VoiceFeedbackWidget extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

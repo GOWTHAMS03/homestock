@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 /**
  * Nearby physical retail store entity (supermarkets, grocery stores, provision stores, etc.)
@@ -15,7 +16,10 @@ import java.math.BigDecimal;
         @Index(name = "idx_ns_city", columnList = "city"),
         @Index(name = "idx_ns_postal_code", columnList = "postal_code"),
         @Index(name = "idx_ns_shop_type", columnList = "shop_type"),
-        @Index(name = "idx_ns_osmid", columnList = "osm_id")
+        @Index(name = "idx_ns_osmid", columnList = "osm_id"),
+        @Index(name = "idx_ns_active", columnList = "active"),
+        @Index(name = "idx_ns_normalized_name", columnList = "normalized_name"),
+        @Index(name = "idx_ns_confidence", columnList = "confidence_score")
 })
 @Getter
 @Setter
@@ -29,6 +33,9 @@ public class NearbyShop extends BaseEntity {
 
     @Column(name = "name", nullable = false, length = 150)
     private String name;
+
+    @Column(name = "normalized_name", length = 150)
+    private String normalizedName;
 
     @Builder.Default
     @Column(name = "shop_type", nullable = false, length = 50)
@@ -81,6 +88,34 @@ public class NearbyShop extends BaseEntity {
     @Builder.Default
     @Column(name = "is_verified", nullable = false)
     private Boolean isVerified = true;
+
+    @Builder.Default
+    @Column(name = "source", nullable = false, length = 50)
+    private String source = "OSM"; // OSM, USER, FALLBACK
+
+    @Column(name = "source_id", length = 100)
+    private String sourceId;
+
+    @Column(name = "category", length = 50)
+    private String category;
+
+    @Builder.Default
+    @Column(name = "confidence_score", nullable = false)
+    private Integer confidenceScore = 70; // OSM=70, USER=50, etc.
+
+    @Column(name = "last_osm_sync_at")
+    private Instant lastOsmSyncAt;
+
+    @Column(name = "last_verified_at")
+    private Instant lastVerifiedAt;
+
+    @Builder.Default
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
+
+    @Builder.Default
+    @Column(name = "user_report_count", nullable = false)
+    private Integer userReportCount = 0;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

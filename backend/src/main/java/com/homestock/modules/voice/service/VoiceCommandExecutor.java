@@ -66,8 +66,12 @@ public class VoiceCommandExecutor {
             throw new AccessDeniedException("User is not a member of home " + homeId);
         }
 
+        String lang = commandResult.getDetectedLanguage() != null && !commandResult.getDetectedLanguage().isBlank()
+                ? commandResult.getDetectedLanguage()
+                : "EN";
+
         ExecuteCommandResponse response = switch (intent) {
-            case ADD_SHOPPING_ITEM -> executeAddShoppingItem(homeId, entities);
+            case ADD_SHOPPING_ITEM -> executeAddShoppingItem(homeId, entities, lang);
             case REMOVE_SHOPPING_ITEM -> executeRemoveShoppingItem(homeId, entities, commandResult, request);
             case UPDATE_SHOPPING_ITEM -> executeUpdateShoppingItem(homeId, entities);
             case COMPLETE_SHOPPING_ITEM -> executeCompleteShoppingItem(homeId, entities);
@@ -77,7 +81,7 @@ public class VoiceCommandExecutor {
             case UPDATE_STOCK -> executeUpdateStock(homeId, entities, request);
             case ADD_INVENTORY_ITEM -> executeAddInventoryItem(homeId, entities, commandResult, request);
             case REMOVE_INVENTORY_ITEM -> executeRemoveInventoryItem(homeId, entities);
-            case GET_ITEM_STATUS -> executeGetItemStatus(homeId, entities);
+            case GET_ITEM_STATUS -> executeGetItemStatus(homeId, entities, lang);
             case GET_SHOPPING_LIST -> executeGetShoppingList(homeId);
             case GET_LOW_STOCK_ITEMS -> executeGetLowStockItems(homeId);
             case GET_EXPIRING_ITEMS -> executeGetExpiringItems(homeId);
@@ -129,7 +133,7 @@ public class VoiceCommandExecutor {
         return response;
     }
 
-    private ExecuteCommandResponse executeAddShoppingItem(UUID homeId, VoiceEntities entities) {
+    private ExecuteCommandResponse executeAddShoppingItem(UUID homeId, VoiceEntities entities, String lang) {
         if (!homeSecurityService.canEditShoppingList(homeId)) {
             throw new AccessDeniedException("Permission denied to edit shopping list");
         }
@@ -175,11 +179,22 @@ public class VoiceCommandExecutor {
             String qtyStr = newQty.stripTrailingZeros().toPlainString();
             String addedStr = addQty.stripTrailingZeros().toPlainString();
 
+            String msg;
+            if ("TANGLISH".equalsIgnoreCase(lang)) {
+                msg = String.format("Shopping list-la %s-ku innoru %s %s sethuten! Motham %s %s irukku.",
+                        existing.getItemName(), addedStr, updateReq.getUnit(), qtyStr, updateReq.getUnit());
+            } else if ("TA".equalsIgnoreCase(lang)) {
+                msg = String.format("ஷாப்பிங் பட்டியலில் %sக்கு மேலும் %s %s சேர்க்கப்பட்டது! மொத்தம் %s %s உள்ளது.",
+                        existing.getItemName(), addedStr, updateReq.getUnit(), qtyStr, updateReq.getUnit());
+            } else {
+                msg = String.format("Updated %s on shopping list: added %s %s (total %s %s)",
+                        existing.getItemName(), addedStr, updateReq.getUnit(), qtyStr, updateReq.getUnit());
+            }
+
             return ExecuteCommandResponse.builder()
                     .success(true)
                     .intent(VoiceIntent.ADD_SHOPPING_ITEM)
-                    .message(String.format("Updated %s on shopping list: added %s %s (total %s %s)",
-                            existing.getItemName(), addedStr, updateReq.getUnit(), qtyStr, updateReq.getUnit()))
+                    .message(msg)
                     .data(updated)
                     .navigation(Map.of("route", "/shopping"))
                     .build();
@@ -194,7 +209,14 @@ public class VoiceCommandExecutor {
             ShoppingListItemDto created = shoppingService.addItem(homeId, defaultList.getId(), req);
 
             String quantityStr = req.getQuantity().stripTrailingZeros().toPlainString();
-            String msg = String.format("Added %s %s %s to shopping list", quantityStr, req.getUnit(), req.getItemName());
+            String msg;
+            if ("TANGLISH".equalsIgnoreCase(lang)) {
+                msg = String.format("%s %s %s-ah shopping list-la add pannitten!", quantityStr, req.getUnit(), req.getItemName());
+            } else if ("TA".equalsIgnoreCase(lang)) {
+                msg = String.format("%s %s %s ஷாப்பிங் பட்டியலில் சேர்க்கப்பட்டது!", quantityStr, req.getUnit(), req.getItemName());
+            } else {
+                msg = String.format("Added %s %s %s to your shopping list!", quantityStr, req.getUnit(), req.getItemName());
+            }
 
             return ExecuteCommandResponse.builder()
                     .success(true)
@@ -506,7 +528,7 @@ public class VoiceCommandExecutor {
         }
     }
 
-    private ExecuteCommandResponse executeGetItemStatus(UUID homeId, VoiceEntities entities) {
+    private ExecuteCommandResponse executeGetItemStatus(UUID homeId, VoiceEntities entities, String lang) {
         String itemName = entities.getItemName();
         if (itemName == null || itemName.isBlank()) {
             return ExecuteCommandResponse.builder()
@@ -525,12 +547,29 @@ public class VoiceCommandExecutor {
 
         if (item != null) {
             String qtyStr = item.getQuantity().stripTrailingZeros().toPlainString();
-            String msg = String.format("%s: %s %s available in %s.",
-                    item.getName(), qtyStr, item.getUnit(),
-                    item.getStorageLocation() != null ? item.getStorageLocation() : "inventory");
-            if (onShoppingList) {
-                msg += " It is also currently on your shopping list.";
+            String location = (item.getStorageLocation() != null && !item.getStorageLocation().isBlank())
+                    ? item.getStorageLocation()
+                    : "inventory";
+            String unit = item.getUnit() != null ? item.getUnit() : "pcs";
+
+            String msg;
+            if ("TANGLISH".equalsIgnoreCase(lang)) {
+                msg = String.format("Ungaloda %s-la %s %s %s irukku.", location, qtyStr, unit, item.getName());
+                if (onShoppingList) {
+                    msg += " Idhu ungaloda shopping list-layum irukku.";
+                }
+            } else if ("TA".equalsIgnoreCase(lang)) {
+                msg = String.format("உங்கள் %sல் %s %s %s உள்ளது.", location, qtyStr, unit, item.getName());
+                if (onShoppingList) {
+                    msg += " இது உங்கள் ஷாப்பிங் பட்டியலிலும் உள்ளது.";
+                }
+            } else {
+                msg = String.format("You have %s %s of %s available in your %s.", qtyStr, unit, item.getName(), location);
+                if (onShoppingList) {
+                    msg += " It is also currently on your shopping list.";
+                }
             }
+
             return ExecuteCommandResponse.builder()
                     .success(true)
                     .intent(VoiceIntent.GET_ITEM_STATUS)
@@ -539,17 +578,33 @@ public class VoiceCommandExecutor {
                     .navigation(Map.of("route", "/inventory", "itemId", item.getId().toString()))
                     .build();
         } else if (onShoppingList) {
+            String msg;
+            if ("TANGLISH".equalsIgnoreCase(lang)) {
+                msg = capitalize(itemName) + " ippo ungaloda shopping list-la irukku, inventory-la illa.";
+            } else if ("TA".equalsIgnoreCase(lang)) {
+                msg = capitalize(itemName) + " இப்போது உங்கள் ஷாப்பிங் பட்டியலில் உள்ளது, இருப்பில் இல்லை.";
+            } else {
+                msg = capitalize(itemName) + " is currently on your shopping list, not recorded in inventory.";
+            }
             return ExecuteCommandResponse.builder()
                     .success(true)
                     .intent(VoiceIntent.GET_ITEM_STATUS)
-                    .message(capitalize(itemName) + " is currently on your shopping list, not recorded in inventory.")
+                    .message(msg)
                     .navigation(Map.of("route", "/shopping"))
                     .build();
         } else {
+            String msg;
+            if ("TANGLISH".equalsIgnoreCase(lang)) {
+                msg = capitalize(itemName) + " ungaloda inventory-layo shopping list-layo illa.";
+            } else if ("TA".equalsIgnoreCase(lang)) {
+                msg = capitalize(itemName) + " உங்கள் இருப்பிலோ ஷாப்பிங் பட்டியலிலோ இல்லை.";
+            } else {
+                msg = capitalize(itemName) + " was not found in your inventory or shopping list.";
+            }
             return ExecuteCommandResponse.builder()
                     .success(true)
                     .intent(VoiceIntent.GET_ITEM_STATUS)
-                    .message(capitalize(itemName) + " was not found in your inventory or shopping list.")
+                    .message(msg)
                     .build();
         }
     }

@@ -19,6 +19,9 @@ import 'widgets/manual_location_dialog.dart';
 import 'widgets/shop_radar_map_view.dart';
 import '../voice/widgets/voice_input_button.dart';
 import '../voice/widgets/voice_bottom_sheet.dart';
+import '../voice/services/ai_voice_service.dart';
+import '../../core/capabilities/capability_provider.dart';
+import '../../core/capabilities/feature_capability.dart';
 
 /// Screen for Real-World Product Deal Search.
 /// Supports both generic intent discovery ("Oil", "Rice", "Milk", "samayal ennai")
@@ -136,14 +139,15 @@ class _ProductDealSearchScreenState
             : 'Real-World Deals',
         subtitle: 'Compare real market prices across stores',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.storefront_rounded, color: Color(0xFF10B981)),
-            tooltip: 'Nearby Grocery Shops',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NearbyGroceryShopsScreen()),
+          if (ref.watch(isCapabilityAvailableProvider(FeatureCapability.nearbyShops)))
+            IconButton(
+              icon: const Icon(Icons.storefront_rounded, color: Color(0xFF10B981)),
+              tooltip: 'Nearby Grocery Shops',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NearbyGroceryShopsScreen()),
+              ),
             ),
-          ),
         ],
       ),
       body: SafeArea(
@@ -507,15 +511,35 @@ class _ProductDealSearchScreenState
           ),
           const SizedBox(height: 10),
 
-          // AI Insight Text
-          Text(
-            summary.aiRecommendation,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.45,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-            ),
+          // AI Insight Text + Listen button
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  summary.aiRecommendation,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.volume_up_rounded, size: 20, color: AppColors.primary),
+                tooltip: 'Listen to deal summary',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: () {
+                  ref.read(aiVoiceServiceProvider.notifier).play(
+                        text: summary.aiRecommendation,
+                        language: 'EN',
+                        isVoiceInteraction: true,
+                      );
+                },
+              ),
+            ],
           ),
           const SizedBox(height: 10),
 

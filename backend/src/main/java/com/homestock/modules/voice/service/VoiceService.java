@@ -375,7 +375,7 @@ public class VoiceService {
                     .intentConfidence(0.0)
                     .productMatchConfidence(0.0)
                     .detectedLanguage("EN")
-                    .message("Cloud voice recognition requires GEMINI_API_KEY. Please download the offline voice model in Settings or configure GEMINI_API_KEY.")
+                    .message("Could not process voice audio. Please check your connection and speak again.")
                     .executionStatus("FAILED")
                     .build();
         }

@@ -26,7 +26,7 @@ public interface NearbyShopRepository extends JpaRepository<NearbyShop, UUID> {
     @Query("SELECT s FROM NearbyShop s WHERE " +
            "s.latitude BETWEEN :minLat AND :maxLat AND " +
            "s.longitude BETWEEN :minLon AND :maxLon AND " +
-           "s.isOpen = true")
+           "s.isOpen = true AND (s.active IS NULL OR s.active = true)")
     List<NearbyShop> findShopsInBoundingBox(
             @Param("minLat") BigDecimal minLat,
             @Param("maxLat") BigDecimal maxLat,

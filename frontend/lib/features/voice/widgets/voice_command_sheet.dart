@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../providers/voice_command_provider.dart';
+import '../services/ai_voice_service.dart';
+import 'ai_voice_response_card.dart';
 import 'voice_feedback_widget.dart';
+import 'voice_settings_dialog.dart';
 
 class VoiceCommandSheet extends ConsumerStatefulWidget {
   const VoiceCommandSheet({super.key});
@@ -27,6 +30,9 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   final TextEditingController _textController = TextEditingController();
+  bool _lastInteractionWasVoice = true;
+  String? _currentSessionResponseText;
+  DateTime? _responseTimestamp;
 
   @override
   void initState() {
@@ -37,13 +43,19 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
     )..repeat(reverse: true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(aiVoiceServiceProvider.notifier).stop();
       ref.read(voiceAiControllerProvider.notifier).reset();
-      ref.read(voiceAiControllerProvider.notifier).startListening();
     });
   }
 
   @override
   void dispose() {
+    Future.microtask(() {
+      try {
+        ref.read(aiVoiceServiceProvider.notifier).stop();
+      } catch (_) {}
+    });
     _pulseController.dispose();
     _textController.dispose();
     super.dispose();
@@ -54,50 +66,86 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
     final state = ref.watch(voiceAiControllerProvider);
     final theme = Theme.of(context);
 
-    // Haptic feedback on success (manual close, no auto-dismiss)
+    // Stop audio immediately whenever listening starts; capture fresh response on success
     ref.listen<VoiceAiState>(voiceAiControllerProvider, (prev, next) {
+      if (next.status == VoiceAiStatus.listening) {
+        Future.microtask(() {
+          if (mounted) {
+            ref.read(aiVoiceServiceProvider.notifier).stop();
+          }
+        });
+      }
       if (next.status == VoiceAiStatus.success && prev?.status != VoiceAiStatus.success) {
         HapticFeedback.mediumImpact();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _currentSessionResponseText =
+                  next.executionResponse?.message ?? next.commandResult?.message ?? 'Action completed!';
+              _responseTimestamp = DateTime.now();
+            });
+          }
+        });
       }
     });
 
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        top: 20,
+        top: 18,
         left: 20,
         right: 20,
       ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Drag handle
           Container(
-            width: 40,
-            height: 4,
+            width: 42,
+            height: 4.5,
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(2),
+              color: const Color(0xFFCBD5E1),
+              borderRadius: BorderRadius.circular(3),
             ),
           ),
           const SizedBox(height: 16),
 
-          // Title & Language Mode & Close Button
+          // Header: Assistant Title, Language Mode, Settings & Close
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primary.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                  ),
                   const SizedBox(width: 8),
                   Text(
-                    'Homie',
+                    'Homie AI',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ],
@@ -107,61 +155,55 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                     ),
                     child: Text(
-                      state.detectedLanguage,
+                      state.detectedLanguage.toUpperCase(),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.tune_rounded, size: 19, color: Color(0xFF64748B)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                    tooltip: 'AI Voice Settings',
+                    onPressed: () => VoiceSettingsDialog.show(context),
+                  ),
+                  const SizedBox(width: 4),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                     tooltip: 'Close Homie',
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      ref.read(aiVoiceServiceProvider.notifier).stop();
+                      Navigator.of(context).pop();
+                    },
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          // 1. Success Message Banner (retains response while letting user speak next command)
-          if (state.status == VoiceAiStatus.success) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFBBF7D0)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      state.executionResponse?.message ?? state.commandResult?.message ?? 'Action completed!',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF15803D),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          // 1. AI Voice Response Card (ONLY rendered when response is ready for the current session)
+          if (state.status == VoiceAiStatus.success && _currentSessionResponseText != null) ...[
+            AiVoiceResponseCard(
+              text: _currentSessionResponseText!,
+              language: state.detectedLanguage,
+              isVoiceInteraction: _lastInteractionWasVoice,
+              timestamp: _responseTimestamp,
             ),
             const SizedBox(height: 14),
           ],
 
-          // 2. Error Message Banner
+          // 3. Error Message Banner
           if (state.status == VoiceAiStatus.error) ...[
             Container(
               width: double.infinity,
@@ -173,14 +215,15 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Color(0xFFE11D48), size: 22),
+                  const Icon(Icons.info_outline_rounded, color: Color(0xFFE11D48), size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      state.errorMessage ?? 'Something went wrong',
+                      state.errorMessage ?? 'Could not process voice command.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFFBE123C),
                         fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
                     ),
                   ),
@@ -190,229 +233,167 @@ class _VoiceCommandSheetState extends ConsumerState<VoiceCommandSheet>
             const SizedBox(height: 14),
           ],
 
-          // 2b. Offline Model Download / Progress Card
-          if (state.isModelDownloading) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Downloading Voice Model (${(state.modelDownloadProgress * 100).toInt()}%)',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: state.modelDownloadProgress > 0 ? state.modelDownloadProgress : null,
-                      backgroundColor: Colors.grey.withOpacity(0.2),
-                      color: AppColors.primary,
-                      minHeight: 6,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Downloading multilingual Whisper model for 100% offline voice recognition.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-          ] else if (!state.isModelInstalled && (state.errorMessage?.toLowerCase().contains('model') ?? false)) ...[
-            ElevatedButton.icon(
-              onPressed: () {
-                ref.read(voiceAiControllerProvider.notifier).downloadModel();
-              },
-              icon: const Icon(Icons.cloud_download_rounded, size: 20),
-              label: const Text('Download Free Voice Model (75 MB)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(46),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 0,
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // 3. Transcript or Status Display - Only show current transcript when NOT listening or searching freshly
-          if (state.transcript.isNotEmpty && !state.isRecording && !state.isProcessing && state.status != VoiceAiStatus.success) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '"${state.transcript}"',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // 4. Parsed Feedback Card if confirmation is required
-          if (state.commandResult != null && state.status == VoiceAiStatus.confirming)
+          // 4. Disambiguation / Confirmation Widget
+          if (state.status == VoiceAiStatus.confirming && state.commandResult != null) ...[
             VoiceFeedbackWidget(
               result: state.commandResult!,
-              onConfirm: () => ref.read(voiceAiControllerProvider.notifier).executeCommand(),
-              onCancel: () => ref.read(voiceAiControllerProvider.notifier).cancel(),
-              onOptionSelected: (optId) => ref.read(voiceAiControllerProvider.notifier).executeCommand(selectedOptionId: optId),
-            )
-          else ...[
-            // 5. Waveform / Mic recording visualizer - ALWAYS available for continuous conversation!
-            Center(
-              child: AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  final scale = state.isRecording
-                      ? 1.0 + (state.amplitude * 0.3) + (_pulseController.value * 0.1)
-                      : 1.0;
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      if (state.isRecording)
-                        Container(
-                          width: 100 * scale,
-                          height: 100 * scale,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.primary.withOpacity(0.15),
-                          ),
-                        ),
-                      GestureDetector(
-                        onTap: () {
-                          if (state.isRecording) {
-                            ref.read(voiceAiControllerProvider.notifier).stopListeningAndProcess();
-                          } else {
-                            ref.read(voiceAiControllerProvider.notifier).startListening();
-                          }
-                        },
-                        child: CircleAvatar(
-                          radius: 36,
-                          backgroundColor: state.isRecording
-                              ? Colors.red
-                              : (state.isProcessing ? AppColors.secondary : AppColors.primary),
-                          child: Icon(
-                            state.isRecording
-                                ? Icons.mic
-                                : (state.isProcessing ? Icons.auto_awesome : Icons.mic_none),
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+              isVoiceInteraction: _lastInteractionWasVoice,
+              onConfirm: () {
+                ref.read(aiVoiceServiceProvider.notifier).stop();
+                ref.read(voiceAiControllerProvider.notifier).executeCommand();
+              },
+              onCancel: () {
+                ref.read(aiVoiceServiceProvider.notifier).stop();
+                ref.read(voiceAiControllerProvider.notifier).cancel();
+              },
+              onOptionSelected: (optId) {
+                ref.read(aiVoiceServiceProvider.notifier).stop();
+                ref.read(voiceAiControllerProvider.notifier).executeCommand(selectedOptionId: optId);
+              },
             ),
             const SizedBox(height: 14),
-            Text(
-              state.isRecording
-                  ? 'Listening... Tap to stop'
-                  : (state.isProcessing
-                      ? 'Homie understanding speech...'
-                      : (state.status == VoiceAiStatus.success
-                          ? 'Tap mic to ask next command'
-                          : 'Tap mic to speak')),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: state.isRecording ? AppColors.primary : theme.colorScheme.onSurface.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (!state.isProcessing) _buildSuggestionChips(ref, theme),
           ],
+
+          // 5. Mic Recording Button & Dynamic Visualizer
+          Center(
+            child: AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                final scale = state.isRecording
+                    ? 1.0 + (state.amplitude * 0.3) + (_pulseController.value * 0.1)
+                    : 1.0;
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (state.isRecording)
+                      Container(
+                        width: 100 * scale,
+                        height: 100 * scale,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.red.withValues(alpha: 0.15),
+                        ),
+                      ),
+                    GestureDetector(
+                      onTap: () {
+                        if (state.isRecording) {
+                          ref.read(voiceAiControllerProvider.notifier).stopListeningAndProcess();
+                        } else {
+                          // Immediately kill any active speech and clear previous response card!
+                          ref.read(aiVoiceServiceProvider.notifier).stop();
+                          setState(() {
+                            _currentSessionResponseText = null;
+                            _lastInteractionWasVoice = true;
+                          });
+                          ref.read(voiceAiControllerProvider.notifier).startListening();
+                        }
+                      },
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: state.isRecording
+                                ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                                : (state.isProcessing
+                                    ? [AppColors.secondary, AppColors.secondary.withValues(alpha: 0.8)]
+                                    : [AppColors.primary, AppColors.primary.withValues(alpha: 0.85)]),
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (state.isRecording ? Colors.red : AppColors.primary).withValues(alpha: 0.3),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          state.isRecording
+                              ? Icons.stop_rounded
+                              : (state.isProcessing ? Icons.auto_awesome : Icons.mic_rounded),
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Status caption
+          Text(
+            state.isRecording
+                ? 'Listening... Tap to stop'
+                : (state.isProcessing
+                    ? 'Homie understanding speech...'
+                    : (state.status == VoiceAiStatus.success
+                        ? 'Tap mic to ask next command'
+                        : 'Tap mic to speak')),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: state.isRecording ? const Color(0xFFDC2626) : const Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (!state.isProcessing) _buildSuggestionChips(ref, theme),
         ],
       ),
     );
   }
 
   Widget _buildSuggestionChips(WidgetRef ref, ThemeData theme) {
-    const suggestions = [
-      '2 kilo rice shopping list la add pannu',
-      '1 litre oil inventory la add pannu',
-      'inventory la rice stock evlo irukku?',
-      'shopping list la sugar add pannu',
-      'naan 5 kilo rice vangiten',
-      'shopping list la irukura oil remove pannu',
+    final suggestions = [
+      'Add 2 kg rice',
+      'Milk low stock',
+      'Show my shopping list',
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.lightbulb_outline, size: 14, color: AppColors.primary),
-            const SizedBox(width: 4),
-            Text(
-              'Try saying (or tap to test):',
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-              ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: suggestions.map((phrase) {
+        return InkWell(
+          onTap: () {
+            ref.read(aiVoiceServiceProvider.notifier).stop();
+            setState(() {
+              _currentSessionResponseText = null;
+              _lastInteractionWasVoice = false;
+            });
+            ref.read(voiceAiControllerProvider.notifier).processText(phrase);
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: suggestions.map((phrase) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ActionChip(
-                  backgroundColor: AppColors.primaryContainer.withOpacity(0.5),
-                  side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  label: Text(
-                    phrase,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.chat_bubble_outline_rounded, size: 12, color: Color(0xFF64748B)),
+                const SizedBox(width: 5),
+                Text(
+                  phrase,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: const Color(0xFF334155),
+                    fontWeight: FontWeight.w500,
                   ),
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    ref.read(voiceAiControllerProvider.notifier).processText(phrase);
-                  },
                 ),
-              );
-            }).toList(),
+              ],
+            ),
           ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 }

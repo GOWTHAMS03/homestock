@@ -16,6 +16,7 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 
 /**
@@ -30,25 +31,54 @@ public class OverpassClient {
     private static final Logger log = LoggerFactory.getLogger(OverpassClient.class);
 
     // List of resilient, publicly accessible Overpass interpreter endpoints
-    private final List<String> overpassEndpoints = List.of(
+    private List<String> overpassEndpoints = List.of(
             "https://overpass-api.de/api/interpreter",
             "https://lz4.overpass-api.de/api/interpreter",
-            "https://overpass.kumi.systems/api/interpreter"
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://overpass.private.coffee/api/interpreter"
     );
 
     private final RestTemplate restTemplate;
+    private final Map<String, Instant> endpointCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @org.springframework.beans.factory.annotation.Value("${app.deals.overpass.circuit-breaker-cooldown-seconds:120}")
+    private long cooldownSeconds = 120; // 2 minutes cooldown on failure
+
+    @org.springframework.beans.factory.annotation.Value("${app.deals.overpass.query-timeout-seconds:5}")
+    private int queryTimeoutSeconds = 5;
 
     @Autowired
-    public OverpassClient(RestTemplateBuilder restTemplateBuilder) {
+    public OverpassClient(RestTemplateBuilder restTemplateBuilder,
+                          @org.springframework.beans.factory.annotation.Value("${app.deals.overpass.endpoints:https://overpass.kumi.systems/api/interpreter,https://overpass.private.coffee/api/interpreter,https://lz4.overpass-api.de/api/interpreter,https://overpass-api.de/api/interpreter}") String configuredEndpoints) {
         this.restTemplate = restTemplateBuilder
-                .setConnectTimeout(Duration.ofSeconds(10))
-                .setReadTimeout(Duration.ofSeconds(15))
+                .setConnectTimeout(Duration.ofSeconds(3))
+                .setReadTimeout(Duration.ofSeconds(5))
                 .defaultHeader("User-Agent", "HomeStock/1.0 (FreeNearbyShopDiscovery; support@homestock.app)")
                 .build();
+
+        if (configuredEndpoints != null && !configuredEndpoints.isBlank()) {
+            this.overpassEndpoints = Arrays.stream(configuredEndpoints.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
     }
 
     public OverpassClient(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
+    }
+
+    public OverpassClient(RestTemplate restTemplate, List<String> endpoints) {
+        this.restTemplate = restTemplate;
+        if (endpoints != null && !endpoints.isEmpty()) {
+            this.overpassEndpoints = endpoints;
+        }
+    }
+
+    public void setOverpassEndpoints(List<String> endpoints) {
+        if (endpoints != null && !endpoints.isEmpty()) {
+            this.overpassEndpoints = endpoints;
+        }
     }
 
     /**
@@ -56,13 +86,14 @@ public class OverpassClient {
      */
     public String buildOverpassQuery(double latitude, double longitude, int radiusMeters) {
         return String.format(Locale.US,
-                "[out:json][timeout:15];\n" +
+                "[out:json][timeout:%d];\n" +
                 "(\n" +
                 "  node[\"shop\"~\"^(supermarket|convenience|grocery|general|department_store|greengrocer|farm)$\"](around:%d,%.6f,%.6f);\n" +
                 "  way[\"shop\"~\"^(supermarket|convenience|grocery|general|department_store|greengrocer|farm)$\"](around:%d,%.6f,%.6f);\n" +
                 "  relation[\"shop\"~\"^(supermarket|convenience|grocery|general|department_store|greengrocer|farm)$\"](around:%d,%.6f,%.6f);\n" +
                 ");\n" +
                 "out center tags;",
+                queryTimeoutSeconds,
                 radiusMeters, latitude, longitude,
                 radiusMeters, latitude, longitude,
                 radiusMeters, latitude, longitude
@@ -70,12 +101,26 @@ public class OverpassClient {
     }
 
     /**
-     * Executes Overpass query with failover across mirror endpoints.
+     * Executes Overpass query with circuit-breaker aware failover across mirror endpoints.
      */
     public List<RawOsmShop> fetchNearbyGroceryShops(double latitude, double longitude, int radiusMeters) {
         String query = buildOverpassQuery(latitude, longitude, radiusMeters);
 
-        for (String endpoint : overpassEndpoints) {
+        Instant now = Instant.now();
+        List<String> prioritizedEndpoints = new ArrayList<>(overpassEndpoints);
+        // Sort: Healthy endpoints first, cooling down endpoints last
+        prioritizedEndpoints.sort(Comparator.comparing(ep -> {
+            Instant cd = endpointCooldowns.get(ep);
+            return (cd != null && cd.isAfter(now)) ? 1 : 0;
+        }));
+
+        for (String endpoint : prioritizedEndpoints) {
+            Instant cooldownUntil = endpointCooldowns.get(endpoint);
+            if (cooldownUntil != null && cooldownUntil.isAfter(now)) {
+                log.debug("[OVERPASS] Endpoint {} is in circuit breaker cooldown until {}. Probing as fallback.",
+                        endpoint, cooldownUntil);
+            }
+
             try {
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -91,14 +136,16 @@ public class OverpassClient {
                         endpoint, request, OverpassResponse.class);
 
                 if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    endpointCooldowns.remove(endpoint); // Clear cooldown on success
                     List<RawOsmShop> parsed = parseElements(response.getBody().getElements());
                     log.info("[OVERPASS] Success from endpoint {}: found {} grocery shops around ({}, {}) radius={}m",
                             endpoint, parsed.size(), latitude, longitude, radiusMeters);
                     return parsed;
                 }
             } catch (Exception e) {
-                log.warn("[OVERPASS] Endpoint {} failed with message: {}. Attempting failover if available.",
-                        endpoint, e.getMessage());
+                endpointCooldowns.put(endpoint, Instant.now().plusSeconds(cooldownSeconds));
+                log.warn("[OVERPASS] Endpoint {} failed with message: {}. Placed in cooldown for {}s. Attempting failover if available.",
+                        endpoint, e.getMessage(), cooldownSeconds);
             }
         }
 

@@ -65,7 +65,7 @@ class VoiceAiService {
       intent: VoiceIntentType.unknown,
       confidence: 0.0,
       requiresConfirmation: false,
-      message: 'Network offline. Voice processing requires internet or on-device model.',
+      message: 'Network offline. Voice processing requires an internet connection.',
     );
   }
 

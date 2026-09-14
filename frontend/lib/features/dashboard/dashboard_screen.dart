@@ -24,6 +24,8 @@ import '../inventory/item_detail_screen.dart';
 import '../notifications/notification_controller.dart';
 import '../shopping/shopping_controller.dart';
 import '../voice/widgets/voice_command_sheet.dart';
+import '../../core/capabilities/capability_provider.dart';
+import '../../core/capabilities/feature_capability.dart';
 import 'dashboard_controller.dart';
 import 'dashboard_model.dart';
 import 'what_do_i_need_sheet.dart';
@@ -176,7 +178,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     const SizedBox(height: 18),
 
                     // 3. QUICK ACTIONS: Search / Scan / Voice Pill Bar
-                    _buildSearchSection(context),
+                    _buildSearchSection(context, ref),
+                    const SizedBox(height: 18),
+
+                    // 3b. DYNAMIC CAPABILITIES: Capability-Aware Feature Actions
+                    _buildDynamicCapabilitiesSection(context, ref),
                     const SizedBox(height: 18),
 
                     // 4. FEATURED ATTENTION CARD: Focus item (e.g. Eggs) with Progress Bar & Problem-Matched Action
@@ -1323,7 +1329,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ==================================================
   // 3. SEARCH / SCAN / VOICE BAR
   // ==================================================
-  Widget _buildSearchSection(BuildContext context) {
+  Widget _buildSearchSection(BuildContext context, WidgetRef ref) {
+    final isVoiceAvailable = ref.watch(isCapabilityAvailableProvider(FeatureCapability.voice));
+
     return Container(
       height: 48,
       decoration: BoxDecoration(
@@ -1345,16 +1353,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: InkWell(
               onTap: () => context.go('/inventory'),
               borderRadius: const BorderRadius.horizontal(left: Radius.circular(28)),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: Row(
                   children: [
-                    Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
-                    SizedBox(width: 8),
+                    const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Search "Milk, Rice, Eggs..."',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF94A3B8),
                           fontWeight: FontWeight.w500,
@@ -1377,7 +1385,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
           // [ Scan ] Button
           InkWell(
-            onTap: () => _showScanSelectorSheet(context),
+            onTap: () => _showScanSelectorSheet(context, ref),
             borderRadius: BorderRadius.circular(8),
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1399,48 +1407,52 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
 
-          // Divider
-          Container(
-            width: 1,
-            height: 22,
-            color: const Color(0xFFE2E8F0),
-          ),
+          if (isVoiceAvailable) ...[
+            // Divider
+            Container(
+              width: 1,
+              height: 22,
+              color: const Color(0xFFE2E8F0),
+            ),
 
-          // [ Voice AI ] Button
-          InkWell(
-            onTap: () => VoiceCommandSheet.show(context),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              margin: const EdgeInsets.only(right: 6, top: 4, bottom: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF2FF),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFC7D2FE), width: 1),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.mic_rounded, size: 17, color: Color(0xFF4F46E5)),
-                  SizedBox(width: 4),
-                  Text(
-                    'Homie',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF4F46E5),
+            // [ Voice AI ] Button
+            InkWell(
+              onTap: () => VoiceCommandSheet.show(context),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                margin: const EdgeInsets.only(right: 6, top: 4, bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFC7D2FE), width: 1),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.mic_rounded, size: 17, color: Color(0xFF4F46E5)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Homie',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF4F46E5),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  void _showScanSelectorSheet(BuildContext context) {
+  void _showScanSelectorSheet(BuildContext context, WidgetRef ref) {
+    final isBillScanAvailable = ref.read(isCapabilityAvailableProvider(FeatureCapability.billScan));
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1479,26 +1491,28 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(10),
+                if (isBillScanAvailable) ...[
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.document_scanner_rounded, color: Color(0xFF16A34A)),
                     ),
-                    child: const Icon(Icons.document_scanner_rounded, color: Color(0xFF16A34A)),
+                    title: const Text('Scan Grocery Bill (OCR)', style: TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: const Text('Extract receipt items, restock inventory & track spend', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const BillScannerScreen()),
+                      );
+                    },
                   ),
-                  title: const Text('Scan Grocery Bill (OCR)', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Extract receipt items, restock inventory & track spend', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BillScannerScreen()),
-                    );
-                  },
-                ),
-                const Divider(height: 1),
+                  const Divider(height: 1),
+                ],
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
@@ -1519,6 +1533,169 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ==================================================
+  // 3b. DYNAMIC CAPABILITIES SECTION (Online / Offline)
+  // Strictly capability-aware: hides all unavailable features.
+  // ==================================================
+  Widget _buildDynamicCapabilitiesSection(BuildContext context, WidgetRef ref) {
+    final capabilities = ref.watch(activeHomeCapabilitiesProvider);
+    final isOnline = ref.watch(isOnlineProvider);
+
+    if (capabilities.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isOnline ? Icons.bolt_rounded : Icons.offline_bolt_rounded,
+                  size: 18,
+                  color: isOnline ? const Color(0xFF6366F1) : const Color(0xFFD97706),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isOnline ? 'Available Features' : 'Offline Capabilities',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: isOnline ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isOnline ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: isOnline ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    isOnline ? 'Online' : 'Offline Ready',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isOnline ? const Color(0xFF065F46) : const Color(0xFF475569),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        SizedBox(
+          height: 78,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: capabilities.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final cap = capabilities[index];
+              return _buildCapabilityCard(context, ref, cap);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCapabilityCard(
+    BuildContext context,
+    WidgetRef ref,
+    CapabilityDescriptor cap,
+  ) {
+    return InkWell(
+      onTap: () => cap.onAction(context, ref),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 162,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: cap.backgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cap.borderColor, width: 0.8),
+              ),
+              child: Center(
+                child: Icon(cap.icon, size: 20, color: cap.primaryColor),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    cap.title,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    cap.subtitle,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
