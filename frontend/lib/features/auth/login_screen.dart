@@ -46,7 +46,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
 
     if (success && mounted) {
-      context.go('/');
+      final user = ref.read(authControllerProvider).user;
+      if (user?.appRole == 'SHOP_OWNER') {
+        context.go('/shop/dashboard');
+      } else {
+        context.go('/');
+      }
     }
   }
 
@@ -109,7 +114,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             avatarUrl: account.photoUrl,
           );
       if (success && mounted) {
-        context.go('/');
+        final user = ref.read(authControllerProvider).user;
+        if (user?.appRole == 'SHOP_OWNER') {
+          context.go('/shop/dashboard');
+        } else {
+          context.go('/');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -620,6 +630,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ),
+                    if (_selectedTab == 0) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.cottage_rounded, size: 12, color: AppColors.primary),
+                                SizedBox(width: 4),
+                                Text('Household', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                                SizedBox(width: 6),
+                                Text('•', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                SizedBox(width: 6),
+                                Icon(Icons.storefront_rounded, size: 12, color: Color(0xFF0D9488)),
+                                SizedBox(width: 4),
+                                Text('Shop Owner', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.xl),
 
                     // Server Connection Configuration Pill

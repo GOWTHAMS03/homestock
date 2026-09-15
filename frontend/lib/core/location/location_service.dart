@@ -87,17 +87,29 @@ class LocationService {
       throw const PermissionDeniedException();
     }
 
-    // 4. Query physical device location
-    final LocationResult rawFix = await _provider.getCurrentPosition(policy: policy);
+    // 4. Query physical device location with cache fallback
+    LocationResult rawFix;
+    try {
+      rawFix = await _provider.getCurrentPosition(policy: policy);
+    } catch (e) {
+      final cached = await _provider.getLastKnownPosition();
+      if (cached != null) {
+        rawFix = cached;
+      } else {
+        rethrow;
+      }
+    }
 
     // 5. Reverse-geocode live coordinates to human area/city
     final geocoded = await reverseGeocode(rawFix.latitude, rawFix.longitude);
 
     final finalResult = rawFix.copyWith(
-      approximateArea: geocoded?.approximateArea ?? 'Current Location',
-      city: geocoded?.city ?? 'Nearby',
-      postalCode: geocoded?.postalCode ?? '',
-      source: LocationSource.CURRENT_DEVICE_LOCATION,
+      approximateArea: geocoded?.approximateArea ??
+          (rawFix.approximateArea.isNotEmpty ? rawFix.approximateArea : 'Current Location'),
+      city: geocoded?.city ??
+          (rawFix.city.isNotEmpty ? rawFix.city : 'Nearby'),
+      postalCode: geocoded?.postalCode ?? rawFix.postalCode,
+      source: rawFix.source,
     );
 
     // 6. Update local private cache

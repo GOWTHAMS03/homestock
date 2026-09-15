@@ -22,4 +22,5 @@ public class RegisterRequest {
     private String username;
     private String confirmPassword;
     private String phoneNumber;
+    private String accountType; // USER or SHOP_OWNER
 }

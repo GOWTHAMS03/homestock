@@ -78,4 +78,45 @@ public class ShopProductOffer extends BaseEntity {
     @Builder.Default
     @Column(name = "last_verified_at", nullable = false)
     private Instant lastVerifiedAt = Instant.now();
+
+    // ═══ Shop Owner catalog fields ═══
+
+    @Column(name = "offer_price", precision = 12, scale = 2)
+    private BigDecimal offerPrice;
+
+    @Column(name = "offer_start")
+    private Instant offerStart;
+
+    @Column(name = "offer_end")
+    private Instant offerEnd;
+
+    @Column(name = "stock_quantity", precision = 10, scale = 3)
+    private BigDecimal stockQuantity;
+
+    @Builder.Default
+    @Column(name = "stock_visibility", nullable = false, length = 20)
+    private String stockVisibility = "STATUS_ONLY"; // STATUS_ONLY, QUANTITY
+
+    @Builder.Default
+    @Column(name = "availability_status", nullable = false, length = 20)
+    private String availabilityStatus = "AVAILABLE"; // AVAILABLE, LIMITED, OUT_OF_STOCK
+
+    /**
+     * Check if there is an active offer right now.
+     */
+    public boolean hasActiveOffer() {
+        if (offerPrice == null || offerStart == null || offerEnd == null) return false;
+        Instant now = Instant.now();
+        return !now.isBefore(offerStart) && !now.isAfter(offerEnd);
+    }
+
+    /**
+     * Get the effective price considering active offers.
+     */
+    public BigDecimal getCurrentEffectivePrice() {
+        if (hasActiveOffer() && offerPrice != null) {
+            return offerPrice;
+        }
+        return effectivePrice;
+    }
 }

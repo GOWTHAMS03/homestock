@@ -259,6 +259,7 @@ class AuthController extends StateNotifier<AuthState> {
     String? username,
     String? confirmPassword,
     String? phoneNumber,
+    String accountType = 'USER',
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null, verificationNotice: null);
     try {
@@ -269,6 +270,7 @@ class AuthController extends StateNotifier<AuthState> {
         username: username,
         confirmPassword: confirmPassword,
         phoneNumber: phoneNumber,
+        accountType: accountType,
       );
       state = state.copyWith(
         status: AuthStatus.authenticated,

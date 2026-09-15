@@ -76,6 +76,12 @@ public class AuthService {
             }
         }
 
+        com.homestock.core.security.AppRole appRole = com.homestock.core.security.AppRole.USER;
+        if (request.getAccountType() != null &&
+                ("SHOP_OWNER".equalsIgnoreCase(request.getAccountType()) || "SHOP".equalsIgnoreCase(request.getAccountType()))) {
+            appRole = com.homestock.core.security.AppRole.SHOP_OWNER;
+        }
+
         User user = User.builder()
                 .email(email)
                 .username(username)
@@ -83,6 +89,7 @@ public class AuthService {
                 .displayName(request.getFullName().trim())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .phoneNumber(request.getPhoneNumber())
+                .appRole(appRole)
                 .status("ACTIVE")
                 .isActive(true)
                 .lastLoginAt(Instant.now())

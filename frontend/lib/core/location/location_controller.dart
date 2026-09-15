@@ -159,8 +159,8 @@ class LocationController extends StateNotifier<LocationState>
         state = state.copyWith(
           status: LocationStateEnum.LOCATION_PERMISSION_GRANTED,
         );
-        await getCurrentLocation(forceRefresh: true);
-        return true;
+        final loc = await getCurrentLocation(forceRefresh: true);
+        return loc != null;
       } else if (permission.isDeniedForever) {
         state = state.copyWith(
           isLoading: false,
@@ -174,7 +174,7 @@ class LocationController extends StateNotifier<LocationState>
           isLoading: false,
           status: LocationStateEnum.LOCATION_PERMISSION_DENIED,
           errorMessage:
-              'Location permission is needed to find nearby shops and local deals.',
+              'Location permission is needed to detect your location and find nearby shops.',
         );
         return false;
       }

@@ -22,6 +22,7 @@ public class UserDto {
     private String status;
     private String avatarUrl;
     private String phoneNumber;
+    private String appRole;
     private Instant createdAt;
 
     public static UserDto fromEntity(User user) {
@@ -35,6 +36,7 @@ public class UserDto {
                 .status(user.getStatus())
                 .avatarUrl(user.getAvatarUrl())
                 .phoneNumber(user.getPhoneNumber())
+                .appRole(user.getAppRole() != null ? user.getAppRole().name() : "USER")
                 .createdAt(user.getCreatedAt())
                 .build();
     }

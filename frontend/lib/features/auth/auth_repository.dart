@@ -60,6 +60,7 @@ class AuthRepository {
     String? username,
     String? confirmPassword,
     String? phoneNumber,
+    String accountType = 'USER',
   }) async {
     final response = await apiClient.dio.post(
       ApiEndpoints.register,
@@ -70,6 +71,7 @@ class AuthRepository {
         if (username != null && username.trim().isNotEmpty) 'username': username.trim(),
         if (confirmPassword != null && confirmPassword.isNotEmpty) 'confirmPassword': confirmPassword,
         'phoneNumber': phoneNumber,
+        'accountType': accountType,
       },
     );
 

@@ -269,6 +269,71 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.xl),
 
+            // Local Commerce & Retail Ecosystem Section
+            const Text(
+              'Local Commerce & Retail',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.outline.withValues(alpha: 0.8)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildListRow(
+                    icon: Icons.storefront_rounded,
+                    title: 'Shop Owner Portal',
+                    subtitle: 'Manage your physical store, products & deals',
+                    trailingWidget: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('Partner', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    ),
+                    onTap: () => context.push('/shop/dashboard'),
+                  ),
+                  _buildDottedDivider(),
+                  _buildListRow(
+                    icon: Icons.travel_explore_rounded,
+                    title: 'Search Local Products',
+                    subtitle: 'Find items across verified nearby stores',
+                    onTap: () => context.push('/discovery/search'),
+                  ),
+                  _buildDottedDivider(),
+                  _buildListRow(
+                    icon: Icons.near_me_outlined,
+                    title: 'Nearby Grocery Stores',
+                    subtitle: 'Discover verified shops & active local deals',
+                    onTap: () => context.push('/shops/nearby'),
+                  ),
+                  if (user?.isAdmin == true) ...[
+                    _buildDottedDivider(),
+                    _buildListRow(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'Admin Shop Verification',
+                      subtitle: 'Approve, reject, and suspend retail shops',
+                      titleColor: Colors.deepPurple,
+                      iconColor: Colors.deepPurple,
+                      onTap: () => context.push('/admin/shops'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
             // 6. Section: Your Information (Grouped rounded card)
             const Text(
               'Your Information',

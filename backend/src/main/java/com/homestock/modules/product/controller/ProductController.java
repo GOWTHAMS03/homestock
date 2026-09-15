@@ -27,6 +27,7 @@ public class ProductController {
 
     private final ProductLookupService productLookupService;
     private final ProductCatalogService productCatalogService;
+    private final com.homestock.modules.shop.service.AsyncDemandEventService asyncDemandEventService;
 
     @GetMapping("/products/barcode/{barcode}")
     @PreAuthorize("#homeId == null or @homeSecurity.isMember(#homeId)")
@@ -35,6 +36,16 @@ public class ProductController {
             @PathVariable String barcode,
             @RequestParam(required = false) UUID homeId) {
         ProductLookupResponse response = productLookupService.lookupByBarcode(barcode, homeId);
+        if (response != null && response.getProduct() != null) {
+            asyncDemandEventService.recordEventForUser(
+                    com.homestock.modules.shop.entity.DemandEventType.BARCODE_SCAN,
+                    response.getProduct().getName(),
+                    response.getProduct().getId(),
+                    response.getProduct().getCategoryName(),
+                    getOptionalUserId(),
+                    null, null
+            );
+        }
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -42,13 +53,34 @@ public class ProductController {
     @Operation(summary = "Get canonical product by ID")
     public ResponseEntity<ApiResponse<ProductDto>> getProduct(@PathVariable UUID id) {
         ProductDto product = productCatalogService.getProductById(id);
+        if (product != null) {
+            asyncDemandEventService.recordEventForUser(
+                    com.homestock.modules.shop.entity.DemandEventType.PRODUCT_VIEW,
+                    product.getName(),
+                    product.getId(),
+                    product.getCategoryName(),
+                    getOptionalUserId(),
+                    null, null
+            );
+        }
         return ResponseEntity.ok(ApiResponse.success(product));
     }
 
     @GetMapping("/products/search")
     @Operation(summary = "Search canonical products by name, brand, or barcode")
-    public ResponseEntity<ApiResponse<java.util.List<ProductDto>>> searchProducts(@RequestParam String query) {
+    public ResponseEntity<ApiResponse<java.util.List<ProductDto>>> searchProducts(
+            @RequestParam String query,
+            @RequestParam(required = false) java.math.BigDecimal lat,
+            @RequestParam(required = false) java.math.BigDecimal lon) {
         java.util.List<ProductDto> results = productCatalogService.searchProducts(query);
+        asyncDemandEventService.recordEventForUser(
+                com.homestock.modules.shop.entity.DemandEventType.SEARCH,
+                query,
+                null,
+                null,
+                getOptionalUserId(),
+                lat, lon
+        );
         return ResponseEntity.ok(ApiResponse.success(results));
     }
 
@@ -67,6 +99,27 @@ public class ProductController {
             @PathVariable UUID homeId,
             @Valid @RequestBody BarcodeInventoryRequest request) {
         InventoryItemDto item = productCatalogService.addOrUpdateInventoryFromBarcode(homeId, request);
+        if (item != null) {
+            asyncDemandEventService.recordEventForUser(
+                    com.homestock.modules.shop.entity.DemandEventType.BARCODE_SCAN,
+                    item.getName(),
+                    null,
+                    item.getCategoryName(),
+                    getOptionalUserId(),
+                    null, null
+            );
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(item));
+    }
+
+    private UUID getOptionalUserId() {
+        try {
+            org.springframework.security.core.Authentication auth =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof com.homestock.core.security.UserPrincipal p) {
+                return p.getId();
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 }

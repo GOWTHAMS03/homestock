@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart'
     hide PermissionDeniedException;
 import 'location_exceptions.dart';
@@ -82,37 +83,106 @@ class GeolocatorLocationProvider implements LocationProvider {
       throw const PermissionDeniedException();
     }
 
+    Position? position;
+
+    // Tier 1: Instant cache check.
+    // If the device already has a recent location (< 3 minutes old), use it immediately.
     try {
-      final LocationAccuracy accuracy = policy.accuracyMode == 'HIGH'
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        final age = DateTime.now().difference(lastKnown.timestamp);
+        if (age.inMinutes < 3) {
+          position = lastKnown;
+        }
+      }
+    } catch (_) {
+      // Continue to live acquisition
+    }
+
+    // Tier 2: Live GPS/Fused location with platform-optimized settings
+    if (position == null) {
+      final requestedAccuracy = policy.accuracyMode == 'HIGH'
           ? LocationAccuracy.high
           : LocationAccuracy.medium;
 
-      final Position position = await Geolocator.getCurrentPosition(
-        locationSettings: LocationSettings(
-          accuracy: accuracy,
-          timeLimit: policy.timeout,
-        ),
-      );
+      LocationSettings settings;
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        settings = AndroidSettings(
+          accuracy: requestedAccuracy,
+          distanceFilter: 0,
+          forceLocationManager: false, // Uses Google Play Services Fused Location Provider
+          intervalDuration: const Duration(seconds: 1),
+          timeLimit: const Duration(seconds: 8),
+        );
+      } else if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS)) {
+        settings = AppleSettings(
+          accuracy: requestedAccuracy,
+          distanceFilter: 0,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } else {
+        settings = LocationSettings(
+          accuracy: requestedAccuracy,
+          timeLimit: const Duration(seconds: 8),
+        );
+      }
 
-      return LocationResult(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracyMeters: position.accuracy,
-        timestamp: position.timestamp,
-        altitude: position.altitude,
-        speed: position.speed,
-        heading: position.heading,
-        source: LocationSource.CURRENT_DEVICE_LOCATION,
-      );
-    } on TimeoutException catch (e) {
-      throw LocationTimeoutException('Location request timed out after ${policy.timeout.inSeconds}s', e);
-    } on LocationServiceDisabledException catch (e) {
-      throw LocationServicesDisabledException('Location services disabled', e);
-    } on PermissionDeniedException {
-      rethrow;
-    } catch (e) {
-      throw LocationProviderException('Failed to obtain device location: $e', e);
+      try {
+        position = await Geolocator.getCurrentPosition(locationSettings: settings);
+      } catch (_) {
+        // Tier 3: Fallback - if Fused/High accuracy timed out or user granted coarse location,
+        // retry with native LocationManager and low/balanced accuracy
+        try {
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+            position = await Geolocator.getCurrentPosition(
+              locationSettings: AndroidSettings(
+                accuracy: LocationAccuracy.low,
+                distanceFilter: 0,
+                forceLocationManager: true, // Native Android provider fallback
+                intervalDuration: const Duration(seconds: 1),
+                timeLimit: const Duration(seconds: 6),
+              ),
+            );
+          } else {
+            position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.low,
+                timeLimit: Duration(seconds: 6),
+              ),
+            );
+          }
+        } catch (_) {
+          // Live acquisition attempts exhausted
+        }
+      }
     }
+
+    // Tier 4: Fallback to last known position even if older
+    if (position == null) {
+      try {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (_) {}
+    }
+
+    // If still null after all 4 tiers
+    if (position == null) {
+      throw LocationTimeoutException(
+        'Location request timed out after ${policy.timeout.inSeconds}s. Could not acquire satellite or network location.',
+      );
+    }
+
+    return LocationResult(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracyMeters: position.accuracy,
+      timestamp: position.timestamp,
+      altitude: position.altitude,
+      speed: position.speed,
+      heading: position.heading,
+      source: LocationSource.CURRENT_DEVICE_LOCATION,
+    );
   }
 
   @override

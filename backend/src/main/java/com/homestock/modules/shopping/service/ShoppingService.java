@@ -49,6 +49,8 @@ public class ShoppingService {
     private final InventoryItemRepository inventoryItemRepository;
     private final NotificationService notificationService;
     private final HomeChangeLogService homeChangeLogService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.homestock.modules.shop.service.AsyncDemandEventService asyncDemandEventService;
 
     @Transactional
     public ShoppingList getOrCreateDefaultListEntity(Home home) {
@@ -126,6 +128,18 @@ public class ShoppingService {
                 currentUser.getFullName() + " added " + item.getItemName() + " (" + item.getQuantity() + " " + item.getUnit() + ")",
                 "{\"shoppingItemId\":\"" + saved.getId() + "\"}"
         );
+
+        // Asynchronously record demand intelligence signal (zero customer PII stored)
+        if (asyncDemandEventService != null) {
+            asyncDemandEventService.recordEventForUser(
+                    com.homestock.modules.shop.entity.DemandEventType.SHOPPING_LIST_ADD,
+                    item.getItemName(),
+                    (linkedItem != null && linkedItem.getProduct() != null) ? linkedItem.getProduct().getId() : null,
+                    category != null ? category.getName() : null,
+                    currentUserId,
+                    null, null
+            );
+        }
 
         return ShoppingListItemDto.fromEntity(saved);
     }

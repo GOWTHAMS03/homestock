@@ -18,6 +18,16 @@ import '../../features/bill/screens/bill_scanner_screen.dart';
 import '../../features/bill/screens/bill_confirmation_screen.dart';
 import '../../features/bill/screens/expense_intelligence_screen.dart';
 import '../../features/smart_shopping/nearby_grocery_shops_screen.dart';
+import '../../features/shop_owner/screens/shop_onboarding_screen.dart';
+import '../../features/shop_owner/screens/shop_dashboard_screen.dart';
+import '../../features/shop_owner/screens/shop_products_screen.dart';
+import '../../features/shop_owner/screens/shop_add_product_screen.dart';
+import '../../features/shop_owner/screens/shop_deals_screen.dart';
+import '../../features/shop_owner/screens/shop_settings_screen.dart';
+import '../../features/shop_owner/screens/customer_demand_screen.dart';
+import '../../features/discovery/screens/shop_profile_screen.dart';
+import '../../features/discovery/screens/product_search_results_screen.dart';
+import '../../features/admin/screens/admin_shops_screen.dart';
 import '../widgets/splash_screen.dart';
 import 'main_scaffold.dart';
 
@@ -51,6 +61,12 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     if (isAuth && (isAuthRoute || state.matchedLocation == '/splash')) {
+      if (authState.user?.appRole == 'SHOP_OWNER') {
+        if (state.matchedLocation == '/register') {
+          return '/shop/onboarding';
+        }
+        return '/shop/dashboard';
+      }
       return '/';
     }
 
@@ -139,6 +155,86 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/shops/nearby',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const NearbyGroceryShopsScreen(),
+      ),
+
+      // Shop Owner Routes
+      GoRoute(
+        path: '/shop/onboarding',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final lat = state.uri.queryParameters['lat'];
+          final lon = state.uri.queryParameters['lon'];
+          final area = state.uri.queryParameters['area'];
+          final city = state.uri.queryParameters['city'];
+          final postalCode = state.uri.queryParameters['postalCode'];
+          final address = state.uri.queryParameters['address'];
+          return ShopOnboardingScreen(
+            initialLat: lat,
+            initialLon: lon,
+            initialArea: area,
+            initialCity: city,
+            initialPostalCode: postalCode,
+            initialAddress: address,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/dashboard',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ShopDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/shop/products',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ShopProductsScreen(),
+      ),
+      GoRoute(
+        path: '/shop/products/add',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final initialName = state.uri.queryParameters['name'];
+          return ShopAddProductScreen(initialName: initialName);
+        },
+      ),
+      GoRoute(
+        path: '/shop/deals',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ShopDealsScreen(),
+      ),
+      GoRoute(
+        path: '/shop/settings',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ShopSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/shop/demand',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const CustomerDemandScreen(),
+      ),
+
+      // Customer Discovery Routes
+      GoRoute(
+        path: '/discovery/shop/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final shopId = state.pathParameters['id'] ?? '';
+          return ShopProfileScreen(shopId: shopId);
+        },
+      ),
+      GoRoute(
+        path: '/discovery/search',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final q = state.uri.queryParameters['q'];
+          return ProductSearchResultsScreen(initialQuery: q);
+        },
+      ),
+
+      // Admin Routes
+      GoRoute(
+        path: '/admin/shops',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AdminShopsScreen(),
       ),
 
       // Floating 3-tab Bottom Navigation Shell (Home, Inventory, Shopping List)

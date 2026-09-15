@@ -39,4 +39,22 @@ public interface NearbyShopRepository extends JpaRepository<NearbyShop, UUID> {
            "LOWER(s.area) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "s.postalCode LIKE CONCAT('%', :query, '%')")
     List<NearbyShop> searchByLocationQuery(@Param("query") String query);
+
+    // ═══ Shop Owner queries ═══
+
+    Optional<NearbyShop> findByOwnerId(java.util.UUID ownerId);
+
+    List<NearbyShop> findByVerificationStatus(String verificationStatus);
+
+    @Query("SELECT s FROM NearbyShop s WHERE " +
+           "s.latitude BETWEEN :minLat AND :maxLat AND " +
+           "s.longitude BETWEEN :minLon AND :maxLon AND " +
+           "s.verificationStatus = 'VERIFIED' AND " +
+           "(s.active IS NULL OR s.active = true)")
+    List<NearbyShop> findVerifiedShopsInBoundingBox(
+            @Param("minLat") BigDecimal minLat,
+            @Param("maxLat") BigDecimal maxLat,
+            @Param("minLon") BigDecimal minLon,
+            @Param("maxLon") BigDecimal maxLon
+    );
 }

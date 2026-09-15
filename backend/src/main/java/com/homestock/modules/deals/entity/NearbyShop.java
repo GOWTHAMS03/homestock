@@ -119,4 +119,63 @@ public class NearbyShop extends BaseEntity {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    // ═══ Shop Owner fields (NULL for OSM/user-reported shops) ═══
+
+    @Column(name = "owner_id")
+    private java.util.UUID ownerId;
+
+    @Builder.Default
+    @Column(name = "verification_status", nullable = false, length = 20)
+    private String verificationStatus = "VERIFIED"; // PENDING, VERIFIED, REJECTED, SUSPENDED
+
+    @Column(name = "owner_name", length = 120)
+    private String ownerName;
+
+    @Column(name = "whatsapp_number", length = 30)
+    private String whatsappNumber;
+
+    @Column(name = "gst_number", length = 30)
+    private String gstNumber;
+
+    @Column(name = "shop_image_url", length = 512)
+    private String shopImageUrl;
+
+    @Column(name = "opening_time")
+    private java.time.LocalTime openingTime;
+
+    @Column(name = "closing_time")
+    private java.time.LocalTime closingTime;
+
+    @Column(name = "last_inventory_update")
+    private Instant lastInventoryUpdate;
+
+    @Column(name = "email", length = 180)
+    private String email;
+
+    @Builder.Default
+    @Column(name = "product_count", nullable = false)
+    private Integer productCount = 0;
+
+    /**
+     * Check if the shop is currently open based on opening/closing hours.
+     */
+    public boolean isCurrentlyOpen() {
+        if (openingTime == null || closingTime == null) {
+            return Boolean.TRUE.equals(isOpen);
+        }
+        java.time.LocalTime now = java.time.LocalTime.now();
+        if (closingTime.isAfter(openingTime)) {
+            return !now.isBefore(openingTime) && !now.isAfter(closingTime);
+        }
+        // Handles overnight shops (e.g., 10 PM - 6 AM)
+        return !now.isBefore(openingTime) || !now.isAfter(closingTime);
+    }
+
+    /**
+     * Check if this shop is owned by a registered Shop Owner.
+     */
+    public boolean isOwnerManaged() {
+        return ownerId != null;
+    }
 }

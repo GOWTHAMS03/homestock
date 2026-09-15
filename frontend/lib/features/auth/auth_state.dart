@@ -17,6 +17,7 @@ class UserProfile {
   final String status;
   final String? avatarUrl;
   final String? phoneNumber;
+  final String appRole;
 
   UserProfile({
     required this.id,
@@ -27,9 +28,14 @@ class UserProfile {
     String? status,
     this.avatarUrl,
     this.phoneNumber,
+    String? appRole,
   })  : displayName = displayName ?? fullName,
         username = username ?? '',
-        status = status ?? 'ACTIVE';
+        status = status ?? 'ACTIVE',
+        appRole = appRole ?? 'USER';
+
+  bool get isShopOwner => appRole == 'SHOP_OWNER';
+  bool get isAdmin => appRole == 'ADMIN';
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final fn = json['fullName'] as String? ?? json['display_name'] as String? ?? '';
@@ -42,6 +48,7 @@ class UserProfile {
       status: json['status'] as String? ?? 'ACTIVE',
       avatarUrl: json['avatarUrl'] as String? ?? json['avatar_url'] as String?,
       phoneNumber: json['phoneNumber'] as String? ?? json['phone_number'] as String?,
+      appRole: json['appRole'] as String? ?? json['app_role'] as String? ?? 'USER',
     );
   }
 
@@ -55,6 +62,7 @@ class UserProfile {
       'status': status,
       'avatarUrl': avatarUrl,
       'phoneNumber': phoneNumber,
+      'appRole': appRole,
     };
   }
 }

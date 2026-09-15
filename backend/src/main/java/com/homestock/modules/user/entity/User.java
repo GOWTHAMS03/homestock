@@ -2,9 +2,8 @@ package com.homestock.modules.user.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.homestock.core.common.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import com.homestock.core.security.AppRole;
+import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
@@ -45,6 +44,11 @@ public class User extends BaseEntity {
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "app_role", nullable = false, length = 20)
+    private AppRole appRole = AppRole.USER;
 
     @Column(name = "last_login_at")
     private java.time.Instant lastLoginAt;

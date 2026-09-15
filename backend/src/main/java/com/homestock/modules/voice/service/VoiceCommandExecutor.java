@@ -45,6 +45,8 @@ public class VoiceCommandExecutor {
     private final ProductResolutionService productResolutionService;
     private final com.homestock.modules.product.repository.ProductRepository productRepository;
     private final UnitNormalizationService unitNormalizer;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.homestock.modules.shop.service.AsyncDemandEventService asyncDemandEventService;
 
     @org.springframework.beans.factory.annotation.Autowired
     public VoiceCommandExecutor(ShoppingService shoppingService,
@@ -253,6 +255,20 @@ public class VoiceCommandExecutor {
                 msg = String.format("%s %s %s ஷாப்பிங் பட்டியலில் சேர்க்கப்பட்டது!", quantityStr, req.getUnit(), req.getItemName());
             } else {
                 msg = String.format("Added %s %s %s to your shopping list!", quantityStr, req.getUnit(), req.getItemName());
+            }
+
+            if (asyncDemandEventService != null) {
+                try {
+                    UUID currentUserId = com.homestock.core.util.SecurityUtils.getCurrentUserId();
+                    asyncDemandEventService.recordEventForUser(
+                            com.homestock.modules.shop.entity.DemandEventType.VOICE_ADD,
+                            trimmedName,
+                            null,
+                            null,
+                            currentUserId,
+                            null, null
+                    );
+                } catch (Exception ignored) {}
             }
 
             return ExecuteCommandResponse.builder()

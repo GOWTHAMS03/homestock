@@ -7,8 +7,9 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -19,15 +20,29 @@ public class UserPrincipal implements UserDetails {
     private final String email;
     private final String fullName;
     private final String password;
+    private final AppRole appRole;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal create(User user) {
+        AppRole role = user.getAppRole() != null ? user.getAppRole() : AppRole.USER;
+
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+
+        if (role == AppRole.SHOP_OWNER || role == AppRole.ADMIN) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_SHOP_OWNER"));
+        }
+        if (role == AppRole.ADMIN) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        }
+
         return new UserPrincipal(
                 user.getId(),
                 user.getEmail(),
                 user.getFullName(),
                 user.getPasswordHash(),
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+                role,
+                authorities
         );
     }
 

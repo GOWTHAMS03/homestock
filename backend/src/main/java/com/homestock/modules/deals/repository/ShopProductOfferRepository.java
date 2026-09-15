@@ -33,4 +33,15 @@ public interface ShopProductOfferRepository extends JpaRepository<ShopProductOff
             @Param("shopId") UUID shopId,
             @Param("normalizedName") String normalizedName
     );
+
+    List<ShopProductOffer> findByShopIdOrderByRawProductNameAsc(UUID shopId);
+
+    long countByShopId(UUID shopId);
+
+    @Query("SELECT o FROM ShopProductOffer o WHERE o.shop.id = :shopId AND " +
+           "o.availabilityStatus = :status")
+    List<ShopProductOffer> findByShopIdAndAvailabilityStatus(
+            @Param("shopId") UUID shopId,
+            @Param("status") String status
+    );
 }
